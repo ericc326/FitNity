@@ -1,3 +1,3 @@
 # FitNity
-# FYP Project
-## Testing
+## FYP Project Title
+## AI-Powered Personalized Health and Fitness Apps
