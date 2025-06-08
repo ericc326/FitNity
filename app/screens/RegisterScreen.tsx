@@ -6,7 +6,6 @@ import {
   TouchableOpacity,
   StyleSheet,
   Alert,
-  SafeAreaView,
   Image,
 } from "react-native";
 import { useNavigation } from "@react-navigation/native";
@@ -23,11 +22,16 @@ import {
   getDocs,
 } from "firebase/firestore";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
+import {
+  SafeAreaView,
+  useSafeAreaInsets,
+} from "react-native-safe-area-context";
 
 type NavigationProp = NativeStackNavigationProp<RootStackParamList, "Register">;
 
 const RegisterScreen = () => {
   const navigation = useNavigation<NavigationProp>();
+  const insets = useSafeAreaInsets();
 
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
@@ -98,7 +102,7 @@ const RegisterScreen = () => {
 
   return (
     <SafeAreaView style={styles.safeArea}>
-      <View style={styles.header}>
+      <View style={[styles.header, { top: insets.top || 10 }]}>
         <TouchableOpacity
           onPress={() => navigation.navigate("Welcome")}
           style={styles.backButton}
@@ -178,8 +182,9 @@ const styles = StyleSheet.create({
     backgroundColor: "#262135",
   },
   header: {
-    paddingHorizontal: 20,
-    paddingTop: 10,
+    position: "absolute",
+    left: 20,
+    zIndex: 10, // make sure it's above content
   },
   backButton: {
     alignSelf: "flex-start",
