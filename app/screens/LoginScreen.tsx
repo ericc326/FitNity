@@ -14,7 +14,10 @@ import { auth, db } from "../../firebaseConfig";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { RootStackParamList } from "../navigation/AppNavigator";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
-import { SafeAreaView } from "react-native";
+import {
+  SafeAreaView,
+  useSafeAreaInsets,
+} from "react-native-safe-area-context";
 
 type LoginScreenProps = {
   navigation: NativeStackNavigationProp<RootStackParamList, "Login">;
@@ -23,7 +26,8 @@ type LoginScreenProps = {
 const LoginScreen: React.FC<LoginScreenProps> = ({ navigation }) => {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [passwordVisible, setPasswordVisible] = useState(false); // toggle state
+  const [passwordVisible, setPasswordVisible] = useState(false);
+  const insets = useSafeAreaInsets();
 
   const handleLogin = async () => {
     if (!email || !password) {
@@ -32,23 +36,18 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ navigation }) => {
     }
     let loginEmail = email;
 
-    // Check if input is an email (simple regex)
     const isEmail = /\S+@\S+\.\S+/.test(email);
 
     if (!isEmail) {
-      // Assume it's a username, try to get email by username
       try {
         const usersRef = collection(db, "users");
-        const q = query(usersRef, where("name", "==", email)); // search by name
+        const q = query(usersRef, where("name", "==", email));
         const querySnapshot = await getDocs(q);
-        querySnapshot.forEach((doc) => {});
         if (querySnapshot.empty) {
           Alert.alert("Login Failed", "No user found with that name");
           return;
         }
-
         const userData = querySnapshot.docs[0].data();
-        // Assuming name is unique, get the first matched email
         loginEmail = userData.email;
       } catch (error) {
         Alert.alert("Login Failed", "Error retrieving user information");
@@ -70,13 +69,13 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ navigation }) => {
 
   return (
     <SafeAreaView style={styles.safeContainer}>
+      <TouchableOpacity
+        onPress={() => navigation.navigate("Welcome")}
+        style={[styles.backButton, { top: insets.top }]} // <-- add insets.top here
+      >
+        <MaterialCommunityIcons name="arrow-left" size={28} color="#fff" />
+      </TouchableOpacity>
       <View style={styles.container}>
-        <TouchableOpacity
-          onPress={() => navigation.navigate("Welcome")}
-          style={styles.backButton}
-        >
-          <MaterialCommunityIcons name="arrow-left" size={28} color="#fff" />
-        </TouchableOpacity>
         <Image
           source={require("../../assets/iconFitNity.png")}
           style={styles.logo}
@@ -94,10 +93,9 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ navigation }) => {
           onChangeText={setEmail}
         />
 
-        {/* Password input with icon toggle */}
         <View style={styles.passwordContainer}>
           <TextInput
-            style={styles.passwordInput} // changed here
+            style={styles.passwordInput}
             placeholder="Enter your password"
             placeholderTextColor="#888"
             secureTextEntry={!passwordVisible}
@@ -147,7 +145,6 @@ const styles = StyleSheet.create({
   },
   backButton: {
     position: "absolute",
-    top: 10,
     left: 10,
     zIndex: 10,
     padding: 8,
