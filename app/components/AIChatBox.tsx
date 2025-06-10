@@ -11,46 +11,41 @@ import {
   Alert,
 } from "react-native";
 import { db, auth } from "../../firebaseConfig";
-import { collection, addDoc, serverTimestamp } from "firebase/firestore";
+import {
+  collection,
+  addDoc,
+  serverTimestamp,
+  query,
+  orderBy,
+  getDocs,
+} from "firebase/firestore";
 import { GoogleGenAI } from "@google/genai";
 import { GEMINI_API_KEY } from "@env";
+import { MaterialCommunityIcons } from "@expo/vector-icons";
 
 const gemini = new GoogleGenAI({ apiKey: GEMINI_API_KEY });
 
-// Add this function inside your component file (outside the component)
 async function askGemini(prompt: string): Promise<string> {
-  console.log("Asking Gemini with prompt:", prompt);
-  console.log("GEMINI_API_KEY available:", !!GEMINI_API_KEY);
   const systemInstruction = `
-You are a helpful assistant that only answers questions related to fitness, exercise, health, nutrition, or diet. 
+You are a helpful assistant that only answers questions related to fitness, sport, exercise, health, nutrition, or diet. 
 If the question is not related to these topics, politely reply: "Sorry, I can only answer fitness and diet related questions."
 `;
 
   const fullPrompt = `${systemInstruction}\nUser: ${prompt}`;
 
   try {
-    console.log("Making API call to Gemini...");
     const response = await gemini.models.generateContent({
       model: "gemini-2.0-flash",
       contents: fullPrompt,
     });
-    console.log("Raw API response:", response);
 
     if (!response || !response.text) {
-      console.log("No response or text from API");
       return "No valid response from Gemini.";
     }
 
     const text = response.text.trim();
-    console.log("Processed response:", text);
     return text;
   } catch (err: any) {
-    console.error("Gemini API error:", err);
-    console.error("Error details:", {
-      name: err.name,
-      message: err.message,
-      stack: err.stack,
-    });
     return "Failed to fetch response from Gemini.";
   }
 }
@@ -67,6 +62,44 @@ const AIChatBox: React.FC<ChatBoxProps> = ({ visible, onClose }) => {
   >([]);
   const [loading, setLoading] = useState(false);
   const scrollViewRef = useRef<ScrollView>(null);
+
+  // Add this useEffect to load messages when component mounts
+  useEffect(() => {
+    const loadMessages = async () => {
+      const currentUser = auth.currentUser;
+      if (!currentUser) return;
+
+      try {
+        const messagesRef = collection(
+          db,
+          `users/${currentUser.uid}/aimessages`
+        );
+        const q = query(messagesRef, orderBy("createdAt", "asc"));
+        const querySnapshot = await getDocs(q);
+
+        const loadedMessages: { sender: "user" | "ai"; text: string }[] = [];
+        querySnapshot.forEach((doc) => {
+          const data = doc.data();
+          // Add user message
+          loadedMessages.push({
+            sender: "user",
+            text: data.user,
+          });
+          // Add AI response
+          loadedMessages.push({
+            sender: "ai",
+            text: data.ai,
+          });
+        });
+
+        setMessages(loadedMessages);
+      } catch (error) {
+        console.error("Error loading messages:", error);
+      }
+    };
+
+    loadMessages();
+  }, [visible]); // Reload when chat becomes visible
 
   useEffect(() => {
     scrollViewRef.current?.scrollToEnd({ animated: true });
@@ -89,7 +122,6 @@ const AIChatBox: React.FC<ChatBoxProps> = ({ visible, onClose }) => {
     try {
       // Get AI response from Gemini
       const aiResponse = await askGemini(prompt);
-      console.log("AI Response:", aiResponse);
 
       // Add both user and AI message to state as a pair
       setMessages((prev) => [...prev, { sender: "ai", text: aiResponse }]);
@@ -102,7 +134,6 @@ const AIChatBox: React.FC<ChatBoxProps> = ({ visible, onClose }) => {
         userId: currentUser.uid,
       });
     } catch (error) {
-      console.error("Error in handleSend:", error);
       setMessages((prev) => [
         ...prev,
         { sender: "ai", text: "Error getting response from Gemini." },
@@ -132,40 +163,66 @@ const AIChatBox: React.FC<ChatBoxProps> = ({ visible, onClose }) => {
               keyboardShouldPersistTaps="handled"
             >
               {messages.length === 0 && (
-                <Text style={styles.message}>Hi! Ask me anything.</Text>
+                <Text style={styles.message}>Hi! Ask me anything about fitness and health.</Text>
               )}
               {messages.map((msg, idx) => (
-                <Text
+                <View
                   key={idx}
                   style={[
-                    styles.message,
-                    {
-                      alignSelf:
-                        msg.sender === "user" ? "flex-end" : "flex-start",
-                      color: msg.sender === "user" ? "#4a90e2" : "#fff",
-                      marginVertical: 4,
-                    },
+                    styles.messageContainer,
+                    msg.sender === "user"
+                      ? styles.userMessageContainer
+                      : styles.aiMessageContainer,
                   ]}
                 >
-                  {msg.sender === "user" ? "You: " : "AI: "}
-                  {msg.text}
-                </Text>
+                  <View
+                    style={[
+                      styles.messageBubble,
+                      msg.sender === "user"
+                        ? styles.userBubble
+                        : styles.aiBubble,
+                    ]}
+                  >
+                    <Text style={styles.senderLabel}>
+                      {msg.sender === "user" ? "You" : "AI"}
+                    </Text>
+                    <Text
+                      style={[
+                        styles.messageText,
+                        msg.sender === "user"
+                          ? styles.userMessageText
+                          : styles.aiMessageText,
+                      ]}
+                    >
+                      {msg.text}
+                    </Text>
+                  </View>
+                </View>
               ))}
               {loading && <Text style={styles.message}>AI is typing...</Text>}
             </ScrollView>
           </View>
           {/* Input and Send Button */}
           <View style={styles.inputContainer}>
-            <TextInput
-              value={inputText}
-              onChangeText={setInputText}
-              placeholder="Type your message..."
-              placeholderTextColor="#888"
-              style={styles.textInput}
-            />
-            <TouchableOpacity onPress={handleSend} style={styles.sendButton}>
-              <Text style={styles.sendButtonText}>Send</Text>
-            </TouchableOpacity>
+            <View style={styles.inputWrapper}>
+              <TextInput
+                value={inputText}
+                onChangeText={setInputText}
+                placeholder="Type your message..."
+                placeholderTextColor="#888"
+                style={styles.textInput}
+              />
+              <TouchableOpacity
+                onPress={handleSend}
+                style={[
+                  styles.sendButton,
+                  !inputText.trim() && { opacity: 0.5 }, // visually indicate disabled
+                ]}
+                disabled={!inputText.trim()}
+              >
+                <MaterialCommunityIcons name="send" size={20} color="#000" />
+              </TouchableOpacity>
+            </View>
           </View>
         </Pressable>
       </Pressable>
@@ -174,6 +231,7 @@ const AIChatBox: React.FC<ChatBoxProps> = ({ visible, onClose }) => {
 };
 
 const styles = StyleSheet.create({
+  // Modal styles
   modalOverlay: {
     flex: 1,
     backgroundColor: "rgba(30, 30, 46, 0.7)",
@@ -194,6 +252,8 @@ const styles = StyleSheet.create({
     elevation: 10,
     justifyContent: "space-between",
   },
+
+  // Header styles
   header: {
     flexDirection: "row",
     justifyContent: "space-between",
@@ -209,38 +269,89 @@ const styles = StyleSheet.create({
     fontSize: 20,
     color: "#999",
   },
+
+  // Chat content styles
   chatContent: {
     flex: 1,
   },
   message: {
     fontSize: 16,
     color: "#fff",
+    padding: 8,
+    textAlign: "center",
   },
+  messageContainer: {
+    width: "100%",
+    paddingHorizontal: 12,
+    marginVertical: 4,
+  },
+  userMessageContainer: {
+    alignItems: "flex-end",
+  },
+  aiMessageContainer: {
+    alignItems: "flex-start",
+  },
+  messageBubble: {
+    maxWidth: "80%",
+    padding: 12,
+    borderRadius: 16,
+    elevation: 1,
+  },
+  userBubble: {
+    backgroundColor: "#4a90e2",
+    borderTopRightRadius: 4,
+  },
+  aiBubble: {
+    backgroundColor: "#373e4e",
+    borderTopLeftRadius: 4,
+  },
+  senderLabel: {
+    fontSize: 12,
+    marginBottom: 4,
+    color: "rgba(255,255,255,0.7)",
+    fontWeight: "600",
+  },
+  messageText: {
+    fontSize: 15,
+    lineHeight: 20,
+  },
+  userMessageText: {
+    color: "#ffffff",
+  },
+  aiMessageText: {
+    color: "#ffffff",
+  },
+
+  // Input area styles
   inputContainer: {
     flexDirection: "row",
     alignItems: "center",
     paddingTop: 12,
-    borderTopWidth: 1,
     borderColor: "#eee",
+  },
+  inputWrapper: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#424242",
+    borderRadius: 20,
+    paddingHorizontal: 8,
   },
   textInput: {
     flex: 1,
-    backgroundColor: "rgba(38,33,53,0.25)",
-    borderRadius: 20,
-    paddingHorizontal: 16,
-    paddingVertical: 10,
     fontSize: 16,
     color: "rgba(255,255,255,0.6)",
-    marginRight: 10,
+    paddingVertical: 10,
+    paddingHorizontal: 8,
+    backgroundColor: "transparent",
   },
   sendButton: {
-    backgroundColor: "#373e4e",
-    paddingVertical: 10,
-    paddingHorizontal: 16,
+    backgroundColor: "white",
+    paddingVertical: 8,
+    paddingHorizontal: 10,
     borderRadius: 20,
   },
   sendButtonText: {
-    color: "#fff",
+    color: "#000",
     fontWeight: "600",
   },
 });

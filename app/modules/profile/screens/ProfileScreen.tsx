@@ -1,25 +1,59 @@
-import React from "react";
+import React, { useEffect, useState } from "react";
 import {
   View,
   Text,
   StyleSheet,
-  ScrollView,
   TouchableOpacity,
   Image,
+  Alert,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useNavigation, CommonActions } from "@react-navigation/native";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { ProfileStackParamList } from "../navigation/ProfileNavigator";
-import { Alert } from "react-native";
-import { auth } from "../../../../firebaseConfig";
+import { auth, db } from "../../../../firebaseConfig";
+import { doc, getDoc } from "firebase/firestore";
 
 type ProfileScreenNavigationProp =
   NativeStackNavigationProp<ProfileStackParamList>;
 
 const ProfileScreen = () => {
   const navigation = useNavigation<ProfileScreenNavigationProp>();
+  const [userData, setUserData] = useState<{
+    name: string;
+    email: string;
+    // Add other user fields as needed
+  } | null>(null);
+
+  useEffect(() => {
+    const loadUserData = async () => {
+      try {
+        const currentUser = auth.currentUser;
+        if (!currentUser) {
+          navigation.dispatch(
+            CommonActions.reset({
+              index: 0,
+              routes: [{ name: "Auth" }],
+            })
+          );
+          return;
+        }
+
+        const userDoc = await getDoc(doc(db, "users", currentUser.uid));
+        if (userDoc.exists()) {
+          setUserData({
+            name: userDoc.data().name,
+            email: userDoc.data().email,
+          });
+        }
+      } catch (error) {
+        Alert.alert("Error", "Failed to load user data");
+      }
+    };
+
+    loadUserData();
+  }, [navigation]);
 
   const navigateToEditProfile = () => {
     navigation.navigate("EditProfile");
@@ -52,8 +86,10 @@ const ProfileScreen = () => {
             source={require("../../../assets/profile.png")}
             style={styles.profileImage}
           />
-          <Text style={styles.userName}>John Doe</Text>
-          <Text style={styles.userEmail}>john.doe@example.com</Text>
+          <Text style={styles.userName}>{userData?.name || "Loading..."}</Text>
+          <Text style={styles.userEmail}>
+            {userData?.email || "Loading..."}
+          </Text>
           <TouchableOpacity
             style={styles.editButton}
             onPress={navigateToEditProfile}
