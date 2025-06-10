@@ -11,12 +11,24 @@ import {
 } from "react-native";
 import { sendPasswordResetEmail } from "firebase/auth";
 import { collection, query, where, getDocs } from "firebase/firestore";
-import { auth, db } from "../../firebaseConfig";
+import { auth, db } from "../../../../firebaseConfig";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
-import { RootStackParamList } from "../navigation/AppNavigator";
+import { RootStackParamList } from "../../../navigation/AppNavigator";
+import { AuthStackParamList } from "../navigation/AuthNavigator";
+import { CompositeNavigationProp } from "@react-navigation/native";
+import { MaterialCommunityIcons } from "@expo/vector-icons";
+import {
+  SafeAreaView,
+  useSafeAreaInsets,
+} from "react-native-safe-area-context";
+
+type ForgotPasswordScreenNavigationProp = CompositeNavigationProp<
+  NativeStackNavigationProp<AuthStackParamList, "ForgotPassword">,
+  NativeStackNavigationProp<RootStackParamList>
+>;
 
 type ForgotPasswordScreenProps = {
-  navigation: NativeStackNavigationProp<RootStackParamList, "ForgotPassword">;
+  navigation: ForgotPasswordScreenNavigationProp;
 };
 
 const ForgotPasswordScreen: React.FC<ForgotPasswordScreenProps> = ({
@@ -24,6 +36,7 @@ const ForgotPasswordScreen: React.FC<ForgotPasswordScreenProps> = ({
 }) => {
   const [email, setEmail] = useState("");
   const [loading, setLoading] = useState(false);
+  const insets = useSafeAreaInsets();
 
   const handleResetPassword = async () => {
     if (!email) {
@@ -59,7 +72,7 @@ const ForgotPasswordScreen: React.FC<ForgotPasswordScreenProps> = ({
         "Success",
         "Password reset email sent! Please check your inbox."
       );
-      navigation.goBack();
+      navigation.navigate("Auth", { screen: "Login" });
     } catch (error: any) {
       Alert.alert("Error", error.message || "Something went wrong.");
     } finally {
@@ -68,53 +81,64 @@ const ForgotPasswordScreen: React.FC<ForgotPasswordScreenProps> = ({
   };
 
   return (
-    <KeyboardAvoidingView
-      behavior={Platform.OS === "ios" ? "padding" : undefined}
-      style={styles.container}
-    >
-      <Text style={styles.title}>Reset your password</Text>
-      <Text style={styles.instruction}>
-        Enter your email address below and we'll send you a link to reset your
-        password.
-      </Text>
-
-      <TextInput
-        style={styles.input}
-        placeholder="Enter your email"
-        placeholderTextColor="#888"
-        keyboardType="email-address"
-        autoCapitalize="none"
-        value={email}
-        onChangeText={setEmail}
-        editable={!loading}
-      />
-
+    <SafeAreaView style={styles.safeContainer}>
       <TouchableOpacity
-        style={[styles.resetButton, loading && styles.buttonDisabled]}
-        onPress={handleResetPassword}
-        disabled={loading}
+        onPress={() => navigation.navigate("Auth", { screen: "Login" })}
+        style={[styles.backButton, { top: insets.top + 10 }]}
       >
-        <Text style={styles.resetButtonText}>
-          {loading ? "Sending..." : "Send Reset Email"}
+        <MaterialCommunityIcons name="arrow-left" size={28} color="#fff" />
+      </TouchableOpacity>
+
+      <KeyboardAvoidingView
+        behavior={Platform.OS === "ios" ? "padding" : undefined}
+        style={styles.container}
+      >
+        <Text style={styles.title}>Reset your password</Text>
+        <Text style={styles.instruction}>
+          Enter your email address below and we'll send you a link to reset your
+          password.
         </Text>
-      </TouchableOpacity>
 
-      <TouchableOpacity
-        onPress={() => navigation.goBack()}
-        style={styles.backButton}
-      >
-        <Text style={styles.backButtonText}>Back to Login</Text>
-      </TouchableOpacity>
-    </KeyboardAvoidingView>
+        <TextInput
+          style={styles.input}
+          placeholder="Enter your email"
+          placeholderTextColor="#888"
+          keyboardType="email-address"
+          autoCapitalize="none"
+          value={email}
+          onChangeText={setEmail}
+          editable={!loading}
+        />
+
+        <TouchableOpacity
+          style={[styles.resetButton, loading && styles.buttonDisabled]}
+          onPress={handleResetPassword}
+          disabled={loading}
+        >
+          <Text style={styles.resetButtonText}>
+            {loading ? "Sending..." : "Send Reset Email"}
+          </Text>
+        </TouchableOpacity>
+      </KeyboardAvoidingView>
+    </SafeAreaView>
   );
 };
 
 const styles = StyleSheet.create({
-  container: {
+  safeContainer: {
     flex: 1,
     backgroundColor: "#262135",
+  },
+  container: {
+    flex: 1,
     padding: 20,
     justifyContent: "center",
+  },
+  backButton: {
+    position: "absolute",
+    left: 10,
+    zIndex: 10,
+    padding: 8,
   },
   title: {
     fontSize: 26,
@@ -154,14 +178,6 @@ const styles = StyleSheet.create({
   },
   buttonDisabled: {
     backgroundColor: "#999",
-  },
-  backButton: {
-    alignItems: "center",
-  },
-  backButtonText: {
-    color: "#8a84a5",
-    fontSize: 14,
-    textDecorationLine: "underline",
   },
 });
 
