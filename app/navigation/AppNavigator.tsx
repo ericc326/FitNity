@@ -4,18 +4,18 @@ import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 
-import SplashScreen from "../screens/SplashScreen";
-import WelcomeScreen from "../screens/WelcomeScreen";
-import LoginScreen from "../screens/LoginScreen";
-import RegisterScreen from "../screens/RegisterScreen";
-import ForgotPasswordScreen from "../screens/ForgotPasswordScreen";
+import AuthNavigator, {
+  AuthStackParamList,
+} from "../modules/auth/navigation/AuthNavigator";
+import HomeScreen from "../modules/home/screens/HomeScreen";
+import ScheduleScreen from "../modules/schedule/screens/ScheduleScreen";
+import WorkoutScreen from "../modules/workout/screens/WorkoutScreen";
+import DietScreen from "../modules/diet/screens/DietScreen";
+import CommunityScreen from "../modules/community/screens/CommunityScreen";
+import StatisticScreen from "../modules/statistics/screens/StatisticScreen";
+import ProfileNavigator from "../modules/profile/navigation/ProfileNavigator";
 
-import HomeScreen from "../screens/HomeScreen";
-import ScheduleScreen from "../screens/ScheduleScreen";
-import WorkoutScreen from "../screens/WorkoutScreen";
-import DietScreen from "../screens/DietScreen";
-import CommunityScreen from "../screens/CommunityScreen";
-
+// Tab Navigation Types
 export type HomeTabParamList = {
   Home: undefined;
   Schedule: undefined;
@@ -24,24 +24,34 @@ export type HomeTabParamList = {
   Community: undefined;
 };
 
+// Root Navigation Types
 export type RootStackParamList = {
-  Splash: undefined;
-  Welcome: undefined;
-  Login: undefined;
-  Register: undefined;
-  ForgotPassword: undefined;
-  Main: NavigatorScreenParams<HomeTabParamList>;
+  Auth: NavigatorScreenParams<AuthStackParamList>;
+  HomeTab: NavigatorScreenParams<HomeTabParamList>;
+  Statistic: undefined;
+  Profile: undefined;
 };
 
+const RootStack = createNativeStackNavigator<RootStackParamList>();
 const Tab = createBottomTabNavigator<HomeTabParamList>();
-function MainTabs() {
+
+// Bottom Tab Navigator
+function TabNavigator() {
   return (
     <Tab.Navigator
       screenOptions={{
         headerShown: false,
-        tabBarStyle: { backgroundColor: "#5A556B" }, // tab bar background
-        tabBarActiveTintColor: "#fff", // active icon/text color
+        tabBarStyle: {
+          backgroundColor: "#5A556B",
+          borderTopWidth: 0,
+          height: 80,
+        },
+        tabBarActiveTintColor: "#fff",
         tabBarInactiveTintColor: "rgba(44,38,58,0.38)",
+        tabBarLabelStyle: {
+          fontSize: 12,
+          fontWeight: "500",
+        },
       }}
     >
       <Tab.Screen
@@ -101,20 +111,25 @@ function MainTabs() {
   );
 }
 
-const RootStack = createNativeStackNavigator<RootStackParamList>();
-
+// Root Navigator
 export default function AppNavigator() {
   return (
-    <RootStack.Navigator screenOptions={{ headerShown: false }}>
-      <RootStack.Screen name="Splash" component={SplashScreen} />
-      <RootStack.Screen name="Welcome" component={WelcomeScreen} />
-      <RootStack.Screen name="Login" component={LoginScreen} />
-      <RootStack.Screen name="Register" component={RegisterScreen} />
+    <RootStack.Navigator
+      screenOptions={{ headerShown: false }}
+      initialRouteName="Auth"
+    >
+      <RootStack.Screen name="Auth" component={AuthNavigator} />
+      <RootStack.Screen name="HomeTab" component={TabNavigator} />
       <RootStack.Screen
-        name="ForgotPassword"
-        component={ForgotPasswordScreen}
+        name="Statistic"
+        component={StatisticScreen}
+        options={{ headerShown: false }}
       />
-      <RootStack.Screen name="Main" component={MainTabs} />
+      <RootStack.Screen
+        name="Profile"
+        component={ProfileNavigator}
+        options={{ headerShown: false }}
+      />
     </RootStack.Navigator>
   );
 }

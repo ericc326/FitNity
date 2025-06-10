@@ -10,17 +10,27 @@ import {
 } from "react-native";
 import { signInWithEmailAndPassword } from "firebase/auth";
 import { collection, query, where, getDocs } from "firebase/firestore";
-import { auth, db } from "../../firebaseConfig";
+import { auth, db } from "../../../../firebaseConfig";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
-import { RootStackParamList } from "../navigation/AppNavigator";
+import { RootStackParamList } from "../../../navigation/AppNavigator";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import {
   SafeAreaView,
   useSafeAreaInsets,
 } from "react-native-safe-area-context";
+import { AuthStackParamList } from "../navigation/AuthNavigator";
+import {
+  CompositeNavigationProp,
+  CommonActions,
+} from "@react-navigation/native";
+
+type LoginScreenNavigationProp = CompositeNavigationProp<
+  NativeStackNavigationProp<AuthStackParamList, "Login">,
+  NativeStackNavigationProp<RootStackParamList>
+>;
 
 type LoginScreenProps = {
-  navigation: NativeStackNavigationProp<RootStackParamList, "Login">;
+  navigation: LoginScreenNavigationProp;
 };
 
 const LoginScreen: React.FC<LoginScreenProps> = ({ navigation }) => {
@@ -57,7 +67,16 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ navigation }) => {
 
     try {
       await signInWithEmailAndPassword(auth, loginEmail, password);
-      navigation.replace("Main", { screen: "Home" });
+      navigation.dispatch(
+        CommonActions.reset({
+          index: 0,
+          routes: [
+            {
+              name: "HomeTab" as keyof RootStackParamList,
+            },
+          ],
+        })
+      );
     } catch (error: any) {
       Alert.alert("Login Failed", error.message);
     }
@@ -71,13 +90,13 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ navigation }) => {
     <SafeAreaView style={styles.safeContainer}>
       <TouchableOpacity
         onPress={() => navigation.navigate("Welcome")}
-        style={[styles.backButton, { top: insets.top }]} // <-- add insets.top here
+        style={[styles.backButton, { top: insets.top }]}
       >
         <MaterialCommunityIcons name="arrow-left" size={28} color="#fff" />
       </TouchableOpacity>
       <View style={styles.container}>
         <Image
-          source={require("../../assets/iconFitNity.png")}
+          source={require("../../../../assets/iconFitNity.png")}
           style={styles.logo}
           resizeMode="contain"
         />

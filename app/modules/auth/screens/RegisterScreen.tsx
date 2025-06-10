@@ -8,10 +8,11 @@ import {
   Alert,
   Image,
 } from "react-native";
-import { useNavigation } from "@react-navigation/native";
-import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
-import { RootStackParamList } from "../navigation/AppNavigator";
-import { auth, db } from "../../firebaseConfig";
+import { NativeStackNavigationProp } from "@react-navigation/native-stack";
+import { RootStackParamList } from "../../../navigation/AppNavigator";
+import { AuthStackParamList } from "../navigation/AuthNavigator";
+import { CompositeNavigationProp } from "@react-navigation/native";
+import { auth, db } from "../../../../firebaseConfig";
 import { createUserWithEmailAndPassword, updateProfile } from "firebase/auth";
 import {
   doc,
@@ -27,20 +28,26 @@ import {
   useSafeAreaInsets,
 } from "react-native-safe-area-context";
 
-type NavigationProp = NativeStackNavigationProp<RootStackParamList, "Register">;
+type RegisterScreenNavigationProp = CompositeNavigationProp<
+  NativeStackNavigationProp<AuthStackParamList, "Register">,
+  NativeStackNavigationProp<RootStackParamList>
+>;
 
-const RegisterScreen = () => {
-  const navigation = useNavigation<NavigationProp>();
+type RegisterScreenProps = {
+  navigation: RegisterScreenNavigationProp;
+};
+
+const RegisterScreen: React.FC<RegisterScreenProps> = ({ navigation }) => {
   const insets = useSafeAreaInsets();
 
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [passwordVisible, setPasswordVisible] = useState(false); // added state
+  const [passwordVisible, setPasswordVisible] = useState(false);
 
   const handleRegister = async () => {
     if (!name || !email || !password) {
-      Alert.alert("Please fill in all fields");
+      Alert.alert("Error", "Please fill in all fields");
       return;
     }
 
@@ -89,10 +96,13 @@ const RegisterScreen = () => {
         createdAt: new Date().toISOString(),
       });
 
-      Alert.alert("Success", `Registered as ${name}`);
-      navigation.navigate("Welcome");
+      Alert.alert("Success", `Registered as ${name}`, [
+        {
+          text: "OK",
+          onPress: () => navigation.navigate("Auth", { screen: "Login" }),
+        },
+      ]);
     } catch (error: any) {
-      console.error("Registration error:", error);
       Alert.alert(
         "Registration Error",
         error.message || "Something went wrong"
@@ -101,19 +111,17 @@ const RegisterScreen = () => {
   };
 
   return (
-    <SafeAreaView style={styles.safeArea}>
-      <View style={[styles.header, { top: insets.top || 10 }]}>
-        <TouchableOpacity
-          onPress={() => navigation.navigate("Welcome")}
-          style={styles.backButton}
-        >
-          <MaterialCommunityIcons name="arrow-left" size={28} color="#fff" />
-        </TouchableOpacity>
-      </View>
+    <SafeAreaView style={styles.safeContainer}>
+      <TouchableOpacity
+        onPress={() => navigation.navigate("Auth", { screen: "Welcome" })}
+        style={[styles.backButton, { top: insets.top + 10 }]}
+      >
+        <MaterialCommunityIcons name="arrow-left" size={28} color="#fff" />
+      </TouchableOpacity>
 
       <View style={styles.container}>
         <Image
-          source={require("../../assets/iconFitNity.png")}
+          source={require("../../../../assets/iconFitNity.png")}
           style={styles.logo}
           resizeMode="contain"
         />
@@ -135,7 +143,6 @@ const RegisterScreen = () => {
           placeholderTextColor="#888"
         />
 
-        {/* Password input with show/hide toggle */}
         <View style={styles.passwordContainer}>
           <TextInput
             style={styles.passwordInput}
@@ -165,7 +172,9 @@ const RegisterScreen = () => {
 
         <View style={styles.loginPromptContainer}>
           <Text style={styles.promptText}>Already have an account?</Text>
-          <TouchableOpacity onPress={() => navigation.navigate("Login")}>
+          <TouchableOpacity
+            onPress={() => navigation.navigate("Auth", { screen: "Login" })}
+          >
             <Text style={styles.loginText}> Login now</Text>
           </TouchableOpacity>
         </View>
@@ -174,25 +183,21 @@ const RegisterScreen = () => {
   );
 };
 
-export default RegisterScreen;
-
 const styles = StyleSheet.create({
-  safeArea: {
+  safeContainer: {
     flex: 1,
     backgroundColor: "#262135",
-  },
-  header: {
-    position: "absolute",
-    left: 20,
-    zIndex: 10, // make sure it's above content
-  },
-  backButton: {
-    alignSelf: "flex-start",
   },
   container: {
     flex: 1,
     paddingTop: 50,
     paddingHorizontal: 20,
+  },
+  backButton: {
+    position: "absolute",
+    left: 10,
+    zIndex: 10,
+    padding: 8,
   },
   logo: {
     width: 100,
@@ -217,7 +222,6 @@ const styles = StyleSheet.create({
     marginBottom: 16,
     color: "#fff",
   },
-  // Password container holds input + icon horizontally
   passwordContainer: {
     flexDirection: "row",
     alignItems: "center",
@@ -254,12 +258,14 @@ const styles = StyleSheet.create({
     marginTop: 20,
   },
   promptText: {
-    color: "#fff",
+    color: "#8a84a5",
     fontSize: 14,
   },
   loginText: {
-    color: "#FFD700",
+    color: "#fff",
     fontSize: 14,
     fontWeight: "bold",
   },
 });
+
+export default RegisterScreen;
