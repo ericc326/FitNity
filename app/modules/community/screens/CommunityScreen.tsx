@@ -1,65 +1,98 @@
-import React, { useState } from "react";
-import { View, Text, StyleSheet, TouchableOpacity } from "react-native";
-import FeedTab from "./FeedTab";
-import ChallengesTab from "./ChallengesTab";
+// import React, { useState } from "react";
+// import { View, Text, StyleSheet, TouchableOpacity } from "react-native";
+// import FeedTab from "./feed/FeedTab";
+// import ChallengesTab from "./challenges/ChallengesTab";
+
+// const CommunityScreen = () => {
+//   const [activeTab, setActiveTab] = useState<"Feed" | "Challenges">("Feed");
+
+//   return (
+//     <View style={styles.container}>
+//       <Text style={styles.header}>Community</Text>
+
+//       <View style={styles.tabContainer}>
+//         <TouchableOpacity onPress={() => setActiveTab("Feed")}>
+//           <Text style={[styles.tab, activeTab === "Feed" && styles.activeTab]}>
+//             Feed
+//           </Text>
+//         </TouchableOpacity>
+//         <TouchableOpacity onPress={() => setActiveTab("Challenges")}>
+//           <Text
+//             style={[styles.tab, activeTab === "Challenges" && styles.activeTab]}
+//           >
+//             Challenges
+//           </Text>
+//         </TouchableOpacity>
+//       </View>
+
+//       <View style={styles.contentContainer}>
+//         {activeTab === "Feed" ? <FeedTab /> : <ChallengesTab />}
+//       </View>
+//     </View>
+//   );
+// };
+
+// export default CommunityScreen;
+
+// const styles = StyleSheet.create({
+//   container: { flex: 1, backgroundColor: "#1c1c2e" },
+//   header: {
+//     color: "white",
+//     fontSize: 22,
+//     fontWeight: "bold",
+//     marginTop: 60,
+//     marginLeft: 20,
+//   },
+//   tabContainer: {
+//     flexDirection: "row",
+//     marginTop: 20,
+//     marginHorizontal: 20,
+//     borderBottomWidth: 1,
+//     borderBottomColor: "#444",
+//   },
+//   tab: {
+//     marginRight: 20,
+//     fontSize: 18,
+//     color: "#aaa",
+//     paddingBottom: 8,
+//   },
+//   activeTab: {
+//     color: "white",
+//     borderBottomWidth: 3,
+//     borderBottomColor: "#fff",
+//   },
+//   contentContainer: { flex: 1 },
+// });
+import React from "react";
+import { View, StyleSheet, Text } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
+import CommunityNavigator from "../navigation/CommunityNavigator";
 
 const CommunityScreen = () => {
-  const [activeTab, setActiveTab] = useState<"Feed" | "Challenges">("Feed");
-
   return (
-    <View style={styles.container}>
-      <Text style={styles.header}>Community</Text>
-
-      <View style={styles.tabContainer}>
-        <TouchableOpacity onPress={() => setActiveTab("Feed")}>
-          <Text style={[styles.tab, activeTab === "Feed" && styles.activeTab]}>
-            Feed
-          </Text>
-        </TouchableOpacity>
-        <TouchableOpacity onPress={() => setActiveTab("Challenges")}>
-          <Text
-            style={[styles.tab, activeTab === "Challenges" && styles.activeTab]}
-          >
-            Challenges
-          </Text>
-        </TouchableOpacity>
+    <SafeAreaView style={styles.container} edges={["top", "bottom"]}>
+      <View style={styles.headerWrapper}>
+        <Text style={styles.header}>Community</Text>
       </View>
-
-      <View style={styles.contentContainer}>
-        {activeTab === "Feed" ? <FeedTab /> : <ChallengesTab />}
-      </View>
-    </View>
+      <CommunityNavigator />
+    </SafeAreaView>
   );
 };
 
-export default CommunityScreen;
-
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#1c1c2e" },
+  container: {
+    flex: 1,
+    backgroundColor: "#262135",
+  },
+  headerWrapper: {
+    alignItems: "center",
+    marginBottom: 12,
+  },
   header: {
     color: "white",
     fontSize: 22,
     fontWeight: "bold",
-    marginTop: 60,
-    marginLeft: 20,
   },
-  tabContainer: {
-    flexDirection: "row",
-    marginTop: 20,
-    marginHorizontal: 20,
-    borderBottomWidth: 1,
-    borderBottomColor: "#444",
-  },
-  tab: {
-    marginRight: 20,
-    fontSize: 18,
-    color: "#aaa",
-    paddingBottom: 8,
-  },
-  activeTab: {
-    color: "white",
-    borderBottomWidth: 3,
-    borderBottomColor: "#fff",
-  },
-  contentContainer: { flex: 1 },
 });
+
+export default CommunityScreen;
