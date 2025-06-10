@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   View,
   Text,
@@ -20,6 +20,8 @@ import {
   RootStackParamList,
 } from "../../../navigation/AppNavigator";
 import { BottomTabNavigationProp } from "@react-navigation/bottom-tabs";
+import { auth, db } from "../../../../firebaseConfig";
+import { doc, getDoc } from "firebase/firestore";
 
 type HomeScreenNavigationProp = CompositeNavigationProp<
   BottomTabNavigationProp<HomeTabParamList, "Home">,
@@ -67,8 +69,30 @@ const todayTasks = [
 ];
 
 const HomeScreen: React.FC = () => {
-  const [showChat, setShowChat] = useState(false);
   const navigation = useNavigation<HomeScreenNavigationProp>();
+  const [showChat, setShowChat] = useState(false);
+  const [userName, setUserName] = useState<string>("");
+
+  useEffect(() => {
+    const loadUserName = async () => {
+      try {
+        const currentUser = auth.currentUser;
+        if (!currentUser) {
+          navigation.navigate("Auth", { screen: "Login" });
+          return;
+        }
+
+        const userDoc = await getDoc(doc(db, "users", currentUser.uid));
+        if (userDoc.exists()) {
+          setUserName(userDoc.data().name);
+        }
+      } catch (error) {
+        console.error("Error loading user name:", error);
+      }
+    };
+
+    loadUserName();
+  }, [navigation]);
 
   // Tab navigation
   const goToSchedule = () => navigation.navigate("Schedule");
@@ -100,8 +124,8 @@ const HomeScreen: React.FC = () => {
         {/* Header */}
         <View style={styles.header}>
           <View>
-            <Text style={styles.hiText}>Hi!,</Text>
-            <Text style={styles.nameText}>Youssef</Text>
+            <Text style={styles.hiText}>Hi!</Text>
+            <Text style={styles.nameText}>{userName}</Text>
             <View style={styles.badgeRow}>
               <Text style={styles.badge}>Beginner</Text>
               <Text style={[styles.badge, styles.trainingBadge]}>Training</Text>
@@ -299,8 +323,64 @@ const styles = StyleSheet.create({
   statLabel: { color: "#fff", fontSize: 12 },
   statValue: { color: "#fff", fontSize: 22, fontWeight: "bold" },
   statDesc: { color: "#fff", fontSize: 12, marginTop: 4 },
-  calendar: { marginTop: 30 },
-  monthText: { color: "#fff", fontSize: 16, marginBottom: 10 },
+  scheduleSection: {
+    marginTop: 20,
+    marginBottom: 20,
+  },
+  scheduleSectionHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 15,
+    paddingHorizontal: 4,
+  },
+  scheduleSectionTitle: {
+    color: "#fff",
+    fontSize: 16,
+    fontWeight: "bold",
+  },
+  tasksScrollContainer: {
+    paddingHorizontal: 4,
+  },
+  taskCard: {
+    flexDirection: "row",
+    backgroundColor: "#3C3952",
+    borderRadius: 12,
+    padding: 12,
+    marginRight: 12,
+    width: 280, // Fixed width for each card
+  },
+  taskTimeColumn: {
+    marginRight: 12,
+  },
+  taskTime: {
+    color: "#8a84a5",
+    fontSize: 14,
+  },
+  taskContent: {
+    flex: 1,
+  },
+  taskHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 4,
+  },
+  taskTitleContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  taskTitle: {
+    color: "#fff",
+    fontSize: 16,
+    fontWeight: "500",
+    marginLeft: 8,
+  },
+  taskDuration: {
+    color: "#8a84a5",
+    fontSize: 14,
+    marginTop: 4,
+  },
   createWorkoutBtn: {
     backgroundColor: "#fff",
     paddingVertical: 12,
@@ -352,86 +432,6 @@ const styles = StyleSheet.create({
     elevation: 5,
   },
   chatIcon: { width: 30, height: 30 },
-  chatModal: {
-    backgroundColor: "#1e1e2e",
-    flex: 1,
-    padding: 20,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  chatTitle: { fontSize: 20, color: "#fff", marginBottom: 20 },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: "rgba(30,30,46,0.7)", // semi-transparent background
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  chatModalBox: {
-    backgroundColor: "#1e1e2e",
-    borderRadius: 16,
-    padding: 24,
-    minWidth: 280,
-    alignItems: "center",
-  },
-  scheduleSection: {
-    marginTop: 20,
-    marginBottom: 20,
-  },
-  scheduleSectionHeader: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    marginBottom: 15,
-    paddingHorizontal: 4,
-  },
-  scheduleSectionTitle: {
-    color: "#fff",
-    fontSize: 16,
-    fontWeight: "bold",
-  },
-  tasksScrollContainer: {
-    paddingHorizontal: 4,
-    paddingBottom: 8,
-  },
-  taskCard: {
-    flexDirection: "row",
-    backgroundColor: "#3C3952",
-    borderRadius: 12,
-    padding: 12,
-    marginRight: 12,
-    width: 280, // Fixed width for each card
-  },
-  taskTimeColumn: {
-    marginRight: 12,
-  },
-  taskTime: {
-    color: "#8a84a5",
-    fontSize: 14,
-  },
-  taskContent: {
-    flex: 1,
-  },
-  taskHeader: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    marginBottom: 4,
-  },
-  taskTitleContainer: {
-    flexDirection: "row",
-    alignItems: "center",
-  },
-  taskTitle: {
-    color: "#fff",
-    fontSize: 16,
-    fontWeight: "500",
-    marginLeft: 8,
-  },
-  taskDuration: {
-    color: "#8a84a5",
-    fontSize: 14,
-    marginTop: 4,
-  },
 });
 
 export default HomeScreen;
