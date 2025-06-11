@@ -3,6 +3,7 @@ import { createMaterialTopTabNavigator } from "@react-navigation/material-top-ta
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import ChallengesTab from "../screens/challenges/ChallengesTab";
 import FeedTab from "../screens/feed/FeedTab";
+import PostDetailsScreen from "../screens/feed/PostDetailsScreen";
 // import ChallengeDetailsScreen from '../screens/challenges/ChallengeDetailsScreen';
 
 // Type definitions for navigation
@@ -13,6 +14,7 @@ export type CommunityTabParamList = {
 
 export type FeedStackParamList = {
   FeedList: undefined;
+  PostDetails: { post: any };
   CreatePost: undefined;
 };
 
@@ -30,6 +32,7 @@ const FeedNavigator = () => {
   return (
     <FeedStack.Navigator screenOptions={{ headerShown: false }}>
       <FeedStack.Screen name="FeedList" component={FeedTab} />
+      <FeedStack.Screen name="PostDetails" component={PostDetailsScreen} />
     </FeedStack.Navigator>
   );
 };

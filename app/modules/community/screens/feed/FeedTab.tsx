@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState } from "react";
 import {
   View,
   Text,
@@ -6,133 +6,343 @@ import {
   Image,
   TouchableOpacity,
   ScrollView,
+  RefreshControl,
+  Alert,
 } from "react-native";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
-import { useNavigation } from "@react-navigation/native";
+import { useNavigation, useFocusEffect } from "@react-navigation/native";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
-import { RootStackParamList } from '../../../../navigation/AppNavigator';
+import { FeedStackParamList } from "../../navigation/CommunityNavigator";
+import {
+  collection,
+  query,
+  orderBy,
+  getDocs,
+  deleteDoc,
+  doc,
+  getDoc,
+  updateDoc,
+  increment,
+} from "firebase/firestore";
+import { ref as storageRef, deleteObject } from "firebase/storage";
+import { db, auth, storage } from "../../../../../firebaseConfig";
+import LoadingIndicator from "../../../../components/LoadingIndicator";
 
-type FeedTabNavigationProp = NativeStackNavigationProp<RootStackParamList>;
+type FeedTabNavigationProp = NativeStackNavigationProp<
+  FeedStackParamList,
+  "FeedList"
+>;
 
 type PostType = {
   id: string;
-  user: {
-    name: string;
-    avatar: string;
-    timeAgo: string;
-  };
-  content: string;
-  image?: string | number;
-  likes: {
+  userId: string;
+  userName: string;
+  text: string;
+  imageUrl?: string;
+  createdAt: string;
+  likes: number;
+  comments: number;
+};
+
+const PostImage = ({ imageUrl }: { imageUrl: string }) => {
+  const [imageLoading, setImageLoading] = useState(true);
+
+  return (
+    <View style={styles.imageContainer}>
+      <Image
+        source={{ uri: imageUrl }}
+        style={styles.postImage}
+        onLoadStart={() => setImageLoading(true)}
+        onLoad={() => setImageLoading(false)}
+        onError={() => setImageLoading(false)}
+      />
+      {imageLoading && (
+        <View style={styles.imageLoadingContainer}>
+          <LoadingIndicator size="large" color="rgba(255, 255, 255, 0.5)" />
+        </View>
+      )}
+    </View>
+  );
+};
+
+type LikeState = {
+  [postId: string]: {
+    isLiked: boolean;
     count: number;
-    userNames: string[];
   };
-  responses: number;
 };
 
 const FeedTab = () => {
   const navigation = useNavigation<FeedTabNavigationProp>();
-  const posts: PostType[] = [
-    {
-      id: "1",
-      user: {
-        name: "Zepenllin",
-        avatar: require("../../../../assets/profile.png"), // Replace with db image
-        timeAgo: "9 h",
-      },
-      content: "Here is my diet for today, stay healthy and fit",
-      image: require("../../../../assets/imageNotFound.png"), // Replace with db image
-      likes: {
-        count: 1900,
-        userNames: ["Hugo", "others"],
-      },
-      responses: 150,
-    },
-    {
-      id: "2",
-      user: {
-        name: "Daniel",
-        avatar: require("../../../../assets/profile.png"), // Replace with your db image
-        timeAgo: "2 d",
-      },
-      content: "Today done the challenge of Burpee",
-      image: require("../../../../assets/imageNotFound.png"), // Replace with your db image
-      likes: {
-        count: 1200,
-        userNames: ["Hugo", "others"],
-      },
-      responses: 120,
-    },
-  ];
+  const [posts, setPosts] = useState<PostType[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [likesState, setLikesState] = useState<LikeState>({});
+
+  const fetchPosts = async () => {
+    try {
+      const postsQuery = query(
+        collection(db, "posts"),
+        orderBy("createdAt", "desc")
+      );
+      const querySnapshot = await getDocs(postsQuery);
+
+      const fetchedPosts = querySnapshot.docs.map((doc) => ({
+        id: doc.id,
+        ...doc.data(),
+      })) as PostType[];
+      // Initialize likes state for all posts
+      const newLikesState: LikeState = {};
+      fetchedPosts.forEach((post) => {
+        newLikesState[post.id] = {
+          isLiked: false, // You could fetch the user's like status here if needed
+          count: post.likes,
+        };
+      });
+      setLikesState(newLikesState);
+      setPosts(fetchedPosts);
+    } catch (error) {
+      console.error("Error fetching posts:", error);
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  };
+
+  useFocusEffect(
+    React.useCallback(() => {
+      fetchPosts();
+    }, [])
+  );
+
+  const onRefresh = () => {
+    setRefreshing(true);
+    fetchPosts();
+  };
+
+  const getTimeAgo = (dateString: string) => {
+    const date = new Date(dateString);
+    const now = new Date();
+    const diffInSeconds = Math.floor((now.getTime() - date.getTime()) / 1000);
+
+    if (diffInSeconds < 60) return `${diffInSeconds}s`;
+    if (diffInSeconds < 3600) return `${Math.floor(diffInSeconds / 60)}m`;
+    if (diffInSeconds < 86400) return `${Math.floor(diffInSeconds / 3600)}h`;
+    return `${Math.floor(diffInSeconds / 86400)}d`;
+  };
+
+  const handleMorePress = (post: PostType) => {
+    Alert.alert(
+      "Post Options",
+      "Choose an action",
+      [
+        {
+          text: "Edit",
+          onPress: () => handleEditPost(post),
+        },
+        {
+          text: "Delete",
+          style: "destructive",
+          onPress: () => handleDeletePost(post),
+        },
+        {
+          text: "Cancel",
+          style: "cancel",
+        },
+      ],
+      { cancelable: true }
+    );
+  };
+
+  // const handleDeletePost = async () => {
+  const handleDeletePost = (post: PostType) => {
+    if (!post) return;
+
+    Alert.alert(
+      "Delete Post",
+      "Are you sure you want to delete this post?",
+      [
+        {
+          text: "Cancel",
+          style: "cancel",
+        },
+        {
+          text: "Delete",
+          style: "destructive",
+          onPress: async () => {
+            try {
+              // First, delete the image if it exists
+              if (post.imageUrl) {
+                try {
+                  // Extract the file path from the URL
+                  const imageUrl = new URL(post.imageUrl);
+                  const imagePath = decodeURIComponent(
+                    imageUrl.pathname.split("/o/")[1]
+                  );
+                  const imageRef = storageRef(storage, imagePath);
+
+                  await deleteObject(imageRef);
+                } catch (imageError) {
+                  console.error("Error deleting image:", imageError);
+                }
+              }
+
+              // Then delete the post document
+              await deleteDoc(doc(db, "posts", post.id));
+
+              // Refresh posts after deletion
+              fetchPosts();
+
+              // Show success message
+              Alert.alert("Success", "Post deleted successfully");
+            } catch (error) {
+              Alert.alert("Error", "Failed to delete post. Please try again.");
+            }
+          },
+        },
+      ],
+      { cancelable: true }
+    );
+  };
+
+  const handleEditPost = (post: PostType) => {
+    if (!post) return;
+    // navigation.navigate("EditPost", { post: selectedPost });
+  };
+
+  const toggleLike = async (post: PostType) => {
+    if (!auth.currentUser) {
+      Alert.alert("Error", "You must be logged in to like posts");
+      return;
+    }
+
+    try {
+      const postRef = doc(db, "posts", post.id);
+      const postDoc = await getDoc(postRef);
+
+      if (!postDoc.exists()) {
+        console.error("Post not found");
+        return;
+      }
+
+      const currentLikeState = likesState[post.id]?.isLiked || false;
+      const increment_value = currentLikeState ? -1 : 1;
+
+      // Update the likes count in Firestore
+      await updateDoc(postRef, {
+        likes: increment(increment_value),
+      });
+
+      // Update local state
+      setLikesState((prev) => ({
+        ...prev,
+        [post.id]: {
+          isLiked: !currentLikeState,
+          count: (prev[post.id]?.count || post.likes) + increment_value,
+        },
+      }));
+    } catch (error) {
+      console.error("Error toggling like:", error);
+      Alert.alert("Error", "Failed to update like. Please try again.");
+    }
+  };
 
   const renderPost = (post: PostType) => (
     <View key={post.id} style={styles.postContainer}>
+      {/* Header Section - Clickable to view profile (if you want) */}
       <View style={styles.postHeader}>
         <View style={styles.userInfo}>
-          <Image
-            source={
-              typeof post.user.avatar === "string"
-                ? { uri: post.user.avatar }
-                : post.user.avatar
-            }
-            style={styles.avatar}
-          />
+          <View style={styles.avatar}>
+            <MaterialCommunityIcons name="account" size={24} color="#fff" />
+          </View>
           <View>
-            <Text style={styles.userName}>{post.user.name}</Text>
-            <Text style={styles.timeAgo}>{post.user.timeAgo}</Text>
+            <Text style={styles.userName}>{post.userName}</Text>
+            <Text style={styles.timeAgo}>{getTimeAgo(post.createdAt)}</Text>
           </View>
         </View>
         <View style={styles.headerButtons}>
-          <TouchableOpacity style={styles.followButton}>
-            <Text style={styles.followButtonText}>Follow</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.moreButton}>
-            <MaterialCommunityIcons
-              name="dots-vertical"
-              size={20}
-              color="#fff"
-            />
-          </TouchableOpacity>
+          {auth.currentUser && post.userId === auth.currentUser.uid ? (
+            <TouchableOpacity
+              style={styles.moreButton}
+              onPress={() => handleMorePress(post)}
+            >
+              <MaterialCommunityIcons
+                name="dots-vertical"
+                size={20}
+                color="#fff"
+              />
+            </TouchableOpacity>
+          ) : null}
         </View>
       </View>
 
-      <Text style={styles.postContent}>{post.content}</Text>
+      {/* Content Section - Clickable to view details */}
+      <TouchableOpacity
+        activeOpacity={0.7}
+        onPress={() => navigation.navigate("PostDetails", { post })}
+      >
+        <Text style={styles.postContent}>{post.text}</Text>
+        {post.imageUrl && <PostImage imageUrl={post.imageUrl} />}
+      </TouchableOpacity>
 
-      {post.image && (
-        <Image
-          source={
-            typeof post.image === "string" ? { uri: post.image } : post.image
-          }
-          style={styles.postImage}
-        />
-      )}
-
+      {/* Stats Section - Separate buttons for like and comment */}
       <View style={styles.postStats}>
-        <View style={styles.likeSection}>
-          <TouchableOpacity style={styles.likeButton}>
+        <View style={styles.leftStats}>
+          <TouchableOpacity
+            style={styles.likeSection}
+            onPress={() => toggleLike(post)}
+            activeOpacity={0.6}
+          >
             <MaterialCommunityIcons
-              name="heart-outline"
+              name={likesState[post.id]?.isLiked ? "heart" : "heart-outline"}
+              size={24}
+              color={likesState[post.id]?.isLiked ? "#e74c3c" : "#fff"}
+            />
+            <Text style={styles.likeText}>
+              {likesState[post.id]?.count || post.likes} likes
+            </Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.commentSection}
+            onPress={() => navigation.navigate("PostDetails", { post })}
+            activeOpacity={0.6}
+          >
+            <MaterialCommunityIcons
+              name="comment-outline"
               size={24}
               color="#fff"
+              style={styles.commentButton}
             />
+            <Text style={styles.responseText}>{post.comments} comments</Text>
           </TouchableOpacity>
-          <Text style={styles.likeText}>
-            Liked by {post.likes.userNames[0]} and others {post.likes.count}
-          </Text>
-        </View>
-        <View style={styles.responseSection}>
-          <View style={styles.avatarGroup}>
-            {/* Add small avatar circles here */}
-          </View>
-          <Text style={styles.responseText}>{post.responses} responses</Text>
         </View>
       </View>
     </View>
   );
 
+  if (loading) {
+    return (
+      <View style={[styles.mainContainer, styles.loadingContainer]}>
+        <LoadingIndicator size="large" color="#6c5ce7" />
+      </View>
+    );
+  }
+
   return (
     <View style={styles.mainContainer}>
-      <ScrollView style={styles.container}>{posts.map(renderPost)}</ScrollView>
+      <ScrollView
+        style={styles.container}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            tintColor="rgba(255, 255, 255, 0.5)"
+          />
+        }
+      >
+        {posts.map(renderPost)}
+      </ScrollView>
 
       <TouchableOpacity
         style={styles.addButton}
@@ -172,6 +382,9 @@ const styles = StyleSheet.create({
     height: 40,
     borderRadius: 20,
     marginRight: 12,
+    backgroundColor: "#3d3654",
+    justifyContent: "center",
+    alignItems: "center",
   },
   userName: {
     color: "#fff",
@@ -181,22 +394,11 @@ const styles = StyleSheet.create({
   timeAgo: {
     color: "#8a84a5",
     fontSize: 14,
+    paddingTop: 4,
   },
   headerButtons: {
     flexDirection: "row",
     alignItems: "center",
-  },
-  followButton: {
-    backgroundColor: "#4a90e2",
-    paddingHorizontal: 16,
-    paddingVertical: 6,
-    borderRadius: 16,
-    marginRight: 8,
-  },
-  followButtonText: {
-    color: "#fff",
-    fontSize: 14,
-    fontWeight: "500",
   },
   moreButton: {
     padding: 4,
@@ -214,12 +416,24 @@ const styles = StyleSheet.create({
   },
   postStats: {
     flexDirection: "row",
-    justifyContent: "space-between",
+    justifyContent: "flex-start",
+    alignItems: "center",
+  },
+  leftStats: {
+    flexDirection: "row",
     alignItems: "center",
   },
   likeSection: {
     flexDirection: "row",
     alignItems: "center",
+    marginRight: 16,
+  },
+  commentSection: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  commentButton: {
+    marginRight: 8,
   },
   likeButton: {
     marginRight: 8,
@@ -227,6 +441,7 @@ const styles = StyleSheet.create({
   likeText: {
     color: "#fff",
     fontSize: 14,
+    marginLeft: 8,
   },
   responseSection: {
     flexDirection: "row",
@@ -255,6 +470,22 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.25,
     shadowRadius: 4,
+  },
+  loadingContainer: {
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  imageContainer: {
+    width: "100%",
+    height: 200,
+    borderRadius: 12,
+    marginBottom: 12,
+    overflow: "hidden",
+  },
+  imageLoadingContainer: {
+    ...StyleSheet.absoluteFillObject,
+    justifyContent: "center",
+    alignItems: "center",
   },
 });
 
