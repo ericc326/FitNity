@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   View,
   Text,
@@ -11,39 +11,118 @@ import {
   TouchableWithoutFeedback,
   Keyboard,
   Image,
+  Alert,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { useNavigation } from "@react-navigation/native";
 import * as ImagePicker from "expo-image-picker";
+import { auth, db, storage } from "../../../../../firebaseConfig";
+import { doc, collection, addDoc, getDoc } from "firebase/firestore";
+import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
+import LoadingIndicator from "../../../../components/LoadingIndicator"; // adjust path as needed
+
+const PhotoButton = ({
+  icon,
+  text,
+  onPress,
+}: {
+  icon: keyof typeof MaterialCommunityIcons.glyphMap;
+  text: string;
+  onPress: () => void;
+}) => (
+  <TouchableOpacity style={styles.addPhotoButton} onPress={onPress}>
+    <MaterialCommunityIcons name={icon} size={32} color="#6c5ce7" />
+    <Text style={styles.addPhotoText}>{text}</Text>
+  </TouchableOpacity>
+);
 
 const CreatePostScreen = () => {
   const [postText, setPostText] = useState("");
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
+  const [userName, setUserName] = useState<string>("User");
+  const [isPosting, setIsPosting] = useState<boolean>(false);
   const navigation = useNavigation();
 
-  const pickImage = async () => {
-    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+  useEffect(() => {
+    (async () => {
+      const currentUser = auth.currentUser;
+      if (currentUser) {
+        try {
+          const userDoc = await getDoc(doc(db, "users", currentUser.uid));
+          setUserName(
+            userDoc.exists() ? userDoc.data().name || "User" : "User"
+          );
+        } catch {
+          setUserName("User");
+        }
+      }
+    })();
+  }, []);
 
+  const handleImage = async (fromCamera: boolean) => {
+    let status;
+    if (fromCamera) {
+      status = (await ImagePicker.requestCameraPermissionsAsync()).status;
+    } else {
+      status = (await ImagePicker.requestMediaLibraryPermissionsAsync()).status;
+    }
     if (status !== "granted") {
-      alert("Sorry, we need camera roll permissions to upload photos!");
+      alert(
+        `Sorry, we need ${fromCamera ? "camera" : "media library"} permissions!`
+      );
       return;
     }
-
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      allowsEditing: true,
-      aspect: [4, 3],
-      quality: 1,
-    });
-
-    if (!result.canceled) {
-      setSelectedImage(result.assets[0].uri);
-    }
+    const result = fromCamera
+      ? await ImagePicker.launchCameraAsync({
+          mediaTypes: "images",
+          allowsEditing: true,
+          aspect: [1, 1],
+          quality: 1,
+        })
+      : await ImagePicker.launchImageLibraryAsync({
+          mediaTypes: "images",
+          allowsEditing: true,
+          aspect: [4, 3],
+          quality: 1,
+        });
+    if (!result.canceled) setSelectedImage(result.assets[0].uri);
   };
 
-  const removeImage = () => {
-    setSelectedImage(null);
+  const removeImage = () => setSelectedImage(null);
+
+  const uploadImage = async (uri: string) => {
+    const response = await fetch(uri);
+    const blob = await response.blob();
+    const filename = uri.substring(uri.lastIndexOf("/") + 1);
+    const storageRef = ref(storage, `posts/${Date.now()}_${filename}`);
+    await uploadBytes(storageRef, blob);
+    return await getDownloadURL(storageRef);
+  };
+
+  const createPost = async () => {
+    setIsPosting(true);
+    try {
+      let imageUrl = null;
+      if (selectedImage) imageUrl = await uploadImage(selectedImage);
+      const postData = {
+        userId: auth.currentUser?.uid,
+        userName,
+        text: postText,
+        imageUrl,
+        createdAt: new Date().toISOString(),
+        likes: 0,
+        comments: 0,
+      };
+      await addDoc(collection(db, "posts"), postData);
+      Alert.alert("Success", "Your post has been created successfully!", [
+        { text: "OK", onPress: () => navigation.goBack() },
+      ]);
+    } catch (error) {
+      alert("Failed to create post. Please try again.");
+    } finally {
+      setIsPosting(false);
+    }
   };
 
   return (
@@ -61,24 +140,27 @@ const CreatePostScreen = () => {
           <TouchableOpacity
             style={[
               styles.postButton,
-              !postText && !selectedImage ? styles.postButtonDisabled : null,
+              (!postText && !selectedImage) || isPosting
+                ? styles.postButtonDisabled
+                : null,
             ]}
-            disabled={!postText && !selectedImage}
-            onPress={() => {
-              // Handle post creation
-              navigation.goBack();
-            }}
+            disabled={(!postText && !selectedImage) || isPosting}
+            onPress={createPost}
           >
-            <Text
-              style={[
-                styles.postButtonText,
-                !postText && !selectedImage
-                  ? styles.postButtonTextDisabled
-                  : null,
-              ]}
-            >
-              Post
-            </Text>
+            {isPosting ? (
+              <LoadingIndicator size="small" color="#fff" />
+            ) : (
+              <Text
+                style={[
+                  styles.postButtonText,
+                  !postText && !selectedImage
+                    ? styles.postButtonTextDisabled
+                    : null,
+                ]}
+              >
+                Post
+              </Text>
+            )}
           </TouchableOpacity>
         </View>
 
@@ -88,7 +170,7 @@ const CreatePostScreen = () => {
             <View style={styles.avatar}>
               <MaterialCommunityIcons name="account" size={24} color="#fff" />
             </View>
-            <Text style={styles.userName}>Your Name</Text>
+            <Text style={styles.userName}>{userName}</Text>
           </View>
         </View>
 
@@ -128,19 +210,19 @@ const CreatePostScreen = () => {
               </View>
             )}
 
-            {/* Add Photo Button */}
-            <TouchableOpacity style={styles.addPhotoButton} onPress={pickImage}>
-              <MaterialCommunityIcons
-                name="image-plus"
-                size={24}
-                color="#6c5ce7"
-              />
-              <Text style={styles.addPhotoText}>Add Photo</Text>
-            </TouchableOpacity>
+            {/* Add Photo Buttons */}
+            <PhotoButton
+              icon="image-plus"
+              text="Add Photo"
+              onPress={() => handleImage(false)}
+            />
+            <PhotoButton
+              icon="camera"
+              text="Take Photo"
+              onPress={() => handleImage(true)}
+            />
 
-            <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
-              <View style={styles.dismissKeyboardArea} />
-            </TouchableWithoutFeedback>
+            <View style={styles.dismissKeyboardArea} />
           </ScrollView>
         </TouchableWithoutFeedback>
       </KeyboardAvoidingView>
@@ -214,7 +296,7 @@ const styles = StyleSheet.create({
   },
   contentContainer: {
     padding: 16,
-    flexGrow: 1, // This ensures the content container can grow
+    flexGrow: 1,
   },
   input: {
     color: "#fff",
@@ -247,16 +329,18 @@ const styles = StyleSheet.create({
   addPhotoButton: {
     flexDirection: "row",
     alignItems: "center",
-    padding: 12,
-    borderRadius: 8,
-    backgroundColor: "rgba(108, 92, 231, 0.1)",
-    marginTop: 16,
+    justifyContent: "center",
+    padding: 20,
+    borderRadius: 16,
+    backgroundColor: "rgba(108, 92, 231, 0.15)",
+    marginTop: 24,
+    width: "100%",
   },
   addPhotoText: {
     color: "#6c5ce7",
-    marginLeft: 8,
-    fontSize: 16,
-    fontWeight: "500",
+    marginLeft: 12,
+    fontSize: 20,
+    fontWeight: "bold",
   },
 });
 

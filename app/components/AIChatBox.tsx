@@ -163,7 +163,9 @@ const AIChatBox: React.FC<ChatBoxProps> = ({ visible, onClose }) => {
               keyboardShouldPersistTaps="handled"
             >
               {messages.length === 0 && (
-                <Text style={styles.message}>Hi! Ask me anything about fitness and health.</Text>
+                <Text style={styles.message}>
+                  Hi! Ask me anything about fitness and health.
+                </Text>
               )}
               {messages.map((msg, idx) => (
                 <View
@@ -243,7 +245,7 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     padding: 16,
     minWidth: 300,
-    height: 600,
+    height: "80%",
     width: "85%",
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 6 },
