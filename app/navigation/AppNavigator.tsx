@@ -14,7 +14,6 @@ import DietScreen from "../modules/diet/screens/DietScreen";
 import CommunityScreen from "../modules/community/screens/CommunityScreen";
 import StatisticScreen from "../modules/statistics/screens/StatisticScreen";
 import ProfileNavigator from "../modules/profile/navigation/ProfileNavigator";
-import CreatePostScreen from "../modules/community/screens/feed/CreatePostScreen";
 
 // Tab Navigation Types
 export type HomeTabParamList = {
@@ -31,7 +30,6 @@ export type RootStackParamList = {
   HomeTab: NavigatorScreenParams<HomeTabParamList>;
   Statistic: undefined;
   Profile: undefined;
-  CreatePost: undefined;
 };
 
 const RootStack = createNativeStackNavigator<RootStackParamList>();
@@ -132,7 +130,6 @@ export default function AppNavigator() {
         component={ProfileNavigator}
         options={{ headerShown: false }}
       />
-      <RootStack.Screen name="CreatePost" component={CreatePostScreen} />
     </RootStack.Navigator>
   );
 }

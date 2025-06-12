@@ -3,7 +3,9 @@ import { createMaterialTopTabNavigator } from "@react-navigation/material-top-ta
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import ChallengesTab from "../screens/challenges/ChallengesTab";
 import FeedTab from "../screens/feed/FeedTab";
+import CreatePostScreen from "../screens/feed/CreatePostScreen";
 import PostDetailsScreen from "../screens/feed/PostDetailsScreen";
+import EditPostScreen from "../screens/feed/EditPostScreen";
 // import ChallengeDetailsScreen from '../screens/challenges/ChallengeDetailsScreen';
 
 // Type definitions for navigation
@@ -16,6 +18,7 @@ export type FeedStackParamList = {
   FeedList: undefined;
   PostDetails: { post: any };
   CreatePost: undefined;
+  EditPost: { post: any };
 };
 
 export type ChallengesStackParamList = {
@@ -32,7 +35,9 @@ const FeedNavigator = () => {
   return (
     <FeedStack.Navigator screenOptions={{ headerShown: false }}>
       <FeedStack.Screen name="FeedList" component={FeedTab} />
+      <FeedStack.Screen name="CreatePost" component={CreatePostScreen} />
       <FeedStack.Screen name="PostDetails" component={PostDetailsScreen} />
+      <FeedStack.Screen name="EditPost" component={EditPostScreen} />
     </FeedStack.Navigator>
   );
 };
