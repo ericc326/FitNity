@@ -5,11 +5,9 @@ import {
   StyleSheet,
   Image,
   TouchableOpacity,
-  ScrollView,
   TextInput,
-  KeyboardAvoidingView,
-  Platform,
   Alert,
+  RefreshControl,
 } from "react-native";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { NativeStackScreenProps } from "@react-navigation/native-stack";
@@ -25,9 +23,11 @@ import {
   increment,
   deleteDoc,
   getDoc,
+  setDoc,
 } from "firebase/firestore";
 import { db, auth } from "../../../../../firebaseConfig";
 import LoadingIndicator from "../../../../components/LoadingIndicator";
+import { KeyboardAwareScrollView } from "react-native-keyboard-aware-scroll-view";
 
 type Props = NativeStackScreenProps<FeedStackParamList, "PostDetails">;
 
@@ -52,25 +52,44 @@ const PostDetailsScreen = ({ route, navigation }: Props) => {
     isLiked: false,
     count: post.likes || 0,
   });
-  const [loading, setLoading] = useState(true);
-  const [imageLoading, setImageLoading] = useState(true);
-
+  const [loading, setLoading] = useState(true); //for comments loading
+  const [imageLoading, setImageLoading] = useState(true); // for post image loading
+  const [refreshing, setRefreshing] = useState(false); // for pull-to-refresh
+  
   useEffect(() => {
     fetchComments();
-    initializeLikeState();
-  }, []);
+    checkIfLiked();
+  }, [post.id]);
 
-  const initializeLikeState = () => {
-    setLikeState({
-      isLiked: false,
-      count: post.likes,
-    });
+  const onRefresh = async () => {
+    setRefreshing(true);
+    // Fetch latest post data
+    const postDoc = await getDoc(doc(db, "posts", post.id));
+    if (postDoc.exists()) {
+      // Update like count from Firestore
+      setLikeState((prev) => ({
+        ...prev,
+        count: postDoc.data().likes || 0,
+      }));
+    }
+    // Fetch latest comments
+    await fetchComments();
+    setRefreshing(false);
+  };
+
+  const checkIfLiked = async () => {
+    if (!auth.currentUser) return;
+    const likeDocRef = doc(db, "posts", post.id, "likes", auth.currentUser.uid);
+    const likeDoc = await getDoc(likeDocRef);
+    setLikeState((prev) => ({
+      ...prev,
+      isLiked: likeDoc.exists(),
+    }));
   };
 
   const fetchComments = async () => {
     try {
       setLoading(true);
-      // Get comments from post's subcollection
       const commentsRef = collection(db, `posts/${post.id}/comments`);
       const commentsQuery = query(commentsRef, orderBy("createdAt", "desc"));
 
@@ -102,18 +121,16 @@ const PostDetailsScreen = ({ route, navigation }: Props) => {
         createdAt: new Date().toISOString(),
       };
 
-      // Add comment to post's subcollection
       const commentsRef = collection(db, `posts/${post.id}/comments`);
       await addDoc(commentsRef, commentData);
 
-      // Update post's comment count
       const postRef = doc(db, "posts", post.id);
       await updateDoc(postRef, {
         comments: increment(1),
       });
 
       setComment("");
-      fetchComments(); // Refresh comments
+      fetchComments();
     } catch (error) {
       console.error("Error adding comment:", error);
       Alert.alert("Error", "Unable to post comment. Please try again.", [
@@ -126,16 +143,14 @@ const PostDetailsScreen = ({ route, navigation }: Props) => {
     if (!auth.currentUser) return;
 
     try {
-      // Delete comment from subcollection
       await deleteDoc(doc(db, `posts/${post.id}/comments/${commentId}`));
 
-      // Update post's comment count
       const postRef = doc(db, "posts", post.id);
       await updateDoc(postRef, {
         comments: increment(-1),
       });
 
-      fetchComments(); // Refresh comments
+      fetchComments();
     } catch (error) {
       console.error("Error deleting comment:", error);
       Alert.alert("Error", "Unable to delete comment. Please try again.", [
@@ -151,26 +166,32 @@ const PostDetailsScreen = ({ route, navigation }: Props) => {
     }
 
     try {
+      const likeDocRef = doc(
+        db,
+        "posts",
+        post.id,
+        "likes",
+        auth.currentUser.uid
+      );
       const postRef = doc(db, "posts", post.id);
-      const postDoc = await getDoc(postRef);
 
-      if (!postDoc.exists()) {
-        console.error("Post not found");
-        return;
+      if (likeState.isLiked) {
+        await deleteDoc(likeDocRef);
+        await updateDoc(postRef, { likes: increment(-1) });
+        setLikeState((prev) => ({
+          ...prev,
+          isLiked: false,
+          count: prev.count - 1,
+        }));
+      } else {
+        await setDoc(likeDocRef, { likedAt: new Date().toISOString() });
+        await updateDoc(postRef, { likes: increment(1) });
+        setLikeState((prev) => ({
+          ...prev,
+          isLiked: true,
+          count: prev.count + 1,
+        }));
       }
-
-      const increment_value = likeState.isLiked ? -1 : 1;
-
-      // Update the likes count in Firestore
-      await updateDoc(postRef, {
-        likes: increment(increment_value),
-      });
-
-      // Update local state
-      setLikeState((prev) => ({
-        isLiked: !prev.isLiked,
-        count: prev.count + increment_value,
-      }));
     } catch (error) {
       console.error("Error toggling like:", error);
       Alert.alert("Error", "Failed to update like. Please try again.");
@@ -189,11 +210,21 @@ const PostDetailsScreen = ({ route, navigation }: Props) => {
   };
 
   return (
-    <KeyboardAvoidingView
-      style={styles.container}
-      behavior={Platform.OS === "ios" ? "padding" : "height"}
-    >
-      <ScrollView style={styles.scrollView}>
+    <View style={styles.container}>
+      <KeyboardAwareScrollView
+        style={styles.scrollView}
+        enableOnAndroid
+        extraScrollHeight={24}
+        keyboardShouldPersistTaps="handled"
+        showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            tintColor="rgba(255, 255, 255, 0.5)"
+          />
+        }
+      >
         {/* Post Header */}
         <View style={styles.header}>
           <TouchableOpacity
@@ -284,7 +315,28 @@ const PostDetailsScreen = ({ route, navigation }: Props) => {
                   />
                 </View>
                 <View style={styles.commentContent}>
-                  <Text style={styles.commentUserName}>{comment.userName}</Text>
+                  <View
+                    style={{
+                      flexDirection: "row",
+                      justifyContent: "space-between",
+                      alignItems: "center",
+                    }}
+                  >
+                    <Text style={styles.commentUserName}>
+                      {comment.userName}
+                    </Text>
+                    {comment.userId === auth.currentUser?.uid && (
+                      <TouchableOpacity
+                        onPress={() => handleDeleteComment(comment.id)}
+                      >
+                        <MaterialCommunityIcons
+                          name="delete"
+                          size={18}
+                          color="#e74c3c"
+                        />
+                      </TouchableOpacity>
+                    )}
+                  </View>
                   <Text style={styles.commentText}>{comment.text}</Text>
                   <Text style={styles.commentTime}>
                     {getTimeAgo(comment.createdAt)}
@@ -294,31 +346,31 @@ const PostDetailsScreen = ({ route, navigation }: Props) => {
             ))
           )}
         </View>
-      </ScrollView>
 
-      {/* Comment Input */}
-      <View style={styles.commentInputContainer}>
-        <TextInput
-          style={styles.commentInput}
-          placeholder="Add a comment..."
-          placeholderTextColor="#8a84a5"
-          value={comment}
-          onChangeText={setComment}
-          multiline
-        />
-        <TouchableOpacity
-          style={styles.sendButton}
-          onPress={handleComment}
-          disabled={!comment.trim()}
-        >
-          <MaterialCommunityIcons
-            name="send"
-            size={24}
-            color={comment.trim() ? "#4a90e2" : "#8a84a5"}
+        {/* Comment Input */}
+        <View style={styles.commentInputContainer}>
+          <TextInput
+            style={styles.commentInput}
+            placeholder="Add a comment..."
+            placeholderTextColor="#8a84a5"
+            value={comment}
+            onChangeText={setComment}
+            multiline
           />
-        </TouchableOpacity>
-      </View>
-    </KeyboardAvoidingView>
+          <TouchableOpacity
+            style={styles.sendButton}
+            onPress={handleComment}
+            disabled={!comment.trim()}
+          >
+            <MaterialCommunityIcons
+              name="send"
+              size={24}
+              color={comment.trim() ? "#4a90e2" : "#8a84a5"}
+            />
+          </TouchableOpacity>
+        </View>
+      </KeyboardAwareScrollView>
+    </View>
   );
 };
 

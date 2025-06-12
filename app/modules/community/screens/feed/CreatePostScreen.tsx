@@ -5,22 +5,17 @@ import {
   StyleSheet,
   TextInput,
   TouchableOpacity,
-  KeyboardAvoidingView,
-  Platform,
-  ScrollView,
-  TouchableWithoutFeedback,
-  Keyboard,
   Image,
   Alert,
 } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { useNavigation } from "@react-navigation/native";
 import * as ImagePicker from "expo-image-picker";
 import { auth, db, storage } from "../../../../../firebaseConfig";
 import { doc, collection, addDoc, getDoc } from "firebase/firestore";
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
-import LoadingIndicator from "../../../../components/LoadingIndicator"; // adjust path as needed
+import LoadingIndicator from "../../../../components/LoadingIndicator";
+import { KeyboardAwareScrollView } from "react-native-keyboard-aware-scroll-view";
 
 const PhotoButton = ({
   icon,
@@ -126,117 +121,102 @@ const CreatePostScreen = () => {
   };
 
   return (
-    <SafeAreaView style={styles.safeArea} edges={["top"]}>
-      <KeyboardAvoidingView
-        behavior={Platform.OS === "ios" ? "padding" : "height"}
-        style={styles.container}
-      >
-        {/* Header */}
-        <View style={styles.header}>
-          <TouchableOpacity onPress={() => navigation.goBack()}>
-            <MaterialCommunityIcons name="close" size={24} color="#fff" />
-          </TouchableOpacity>
-          <Text style={styles.headerTitle}>Create Post</Text>
-          <TouchableOpacity
-            style={[
-              styles.postButton,
-              (!postText && !selectedImage) || isPosting
-                ? styles.postButtonDisabled
-                : null,
-            ]}
-            disabled={(!postText && !selectedImage) || isPosting}
-            onPress={createPost}
-          >
-            {isPosting ? (
-              <LoadingIndicator size="small" color="#fff" />
-            ) : (
-              <Text
-                style={[
-                  styles.postButtonText,
-                  !postText && !selectedImage
-                    ? styles.postButtonTextDisabled
-                    : null,
-                ]}
-              >
-                Post
-              </Text>
-            )}
-          </TouchableOpacity>
-        </View>
+    <KeyboardAwareScrollView
+      style={styles.container}
+      contentContainerStyle={styles.contentContainer}
+      enableOnAndroid
+      extraScrollHeight={24}
+      keyboardShouldPersistTaps="handled"
+    >
+      {/* Header */}
+      <View style={styles.header}>
+        <TouchableOpacity onPress={() => navigation.goBack()}>
+          <MaterialCommunityIcons name="close" size={24} color="#fff" />
+        </TouchableOpacity>
+        <Text style={styles.headerTitle}>Create Post</Text>
+        <TouchableOpacity
+          style={[
+            styles.postButton,
+            (!postText && !selectedImage) || isPosting
+              ? styles.postButtonDisabled
+              : null,
+          ]}
+          disabled={(!postText && !selectedImage) || isPosting}
+          onPress={createPost}
+        >
+          {isPosting ? (
+            <LoadingIndicator size="small" color="#fff" />
+          ) : (
+            <Text
+              style={[
+                styles.postButtonText,
+                !postText && !selectedImage
+                  ? styles.postButtonTextDisabled
+                  : null,
+              ]}
+            >
+              Post
+            </Text>
+          )}
+        </TouchableOpacity>
+      </View>
 
-        {/* User Info Section */}
-        <View style={styles.userSection}>
-          <View style={styles.userInfo}>
-            <View style={styles.avatar}>
-              <MaterialCommunityIcons name="account" size={24} color="#fff" />
-            </View>
-            <Text style={styles.userName}>{userName}</Text>
+      {/* User Info Section */}
+      <View style={styles.userSection}>
+        <View style={styles.userInfo}>
+          <View style={styles.avatar}>
+            <MaterialCommunityIcons name="account" size={24} color="#fff" />
           </View>
+          <Text style={styles.userName}>{userName}</Text>
         </View>
+      </View>
 
-        {/* Content */}
-        <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
-          <ScrollView
-            style={styles.content}
-            contentContainerStyle={styles.contentContainer}
-            keyboardShouldPersistTaps="handled"
+      {/* Content */}
+      <TextInput
+        style={styles.input}
+        placeholder="What's on your mind?"
+        placeholderTextColor="#8a84a5"
+        multiline
+        value={postText}
+        onChangeText={setPostText}
+      />
+
+      {/* Image Preview */}
+      {selectedImage && (
+        <View style={styles.imagePreviewContainer}>
+          <Image source={{ uri: selectedImage }} style={styles.imagePreview} />
+          <TouchableOpacity
+            style={styles.removeImageButton}
+            onPress={removeImage}
           >
-            <TextInput
-              style={styles.input}
-              placeholder="What's on your mind?"
-              placeholderTextColor="#8a84a5"
-              multiline
-              value={postText}
-              onChangeText={setPostText}
+            <MaterialCommunityIcons
+              name="close-circle"
+              size={24}
+              color="#fff"
             />
+          </TouchableOpacity>
+        </View>
+      )}
 
-            {/* Image Preview */}
-            {selectedImage && (
-              <View style={styles.imagePreviewContainer}>
-                <Image
-                  source={{ uri: selectedImage }}
-                  style={styles.imagePreview}
-                />
-                <TouchableOpacity
-                  style={styles.removeImageButton}
-                  onPress={removeImage}
-                >
-                  <MaterialCommunityIcons
-                    name="close-circle"
-                    size={24}
-                    color="#fff"
-                  />
-                </TouchableOpacity>
-              </View>
-            )}
-
-            {/* Add Photo Buttons */}
-            <PhotoButton
-              icon="image-plus"
-              text="Add Photo"
-              onPress={() => handleImage(false)}
-            />
-            <PhotoButton
-              icon="camera"
-              text="Take Photo"
-              onPress={() => handleImage(true)}
-            />
-
-            <View style={styles.dismissKeyboardArea} />
-          </ScrollView>
-        </TouchableWithoutFeedback>
-      </KeyboardAvoidingView>
-    </SafeAreaView>
+      {/* Add Photo Buttons */}
+      <PhotoButton
+        icon="image-plus"
+        text="Add Photo"
+        onPress={() => handleImage(false)}
+      />
+      <PhotoButton
+        icon="camera"
+        text="Take Photo"
+        onPress={() => handleImage(true)}
+      />
+    </KeyboardAwareScrollView>
   );
 };
 
 const styles = StyleSheet.create({
-  safeArea: {
-    flex: 1,
-    backgroundColor: "#262135",
-  },
   container: {
     flex: 1,
+    backgroundColor: "#262135",
   },
   header: {
     flexDirection: "row",
@@ -291,23 +271,16 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: "600",
   },
-  content: {
-    flex: 1,
-  },
   contentContainer: {
-    padding: 16,
+    padding: 4,
     flexGrow: 1,
   },
   input: {
     color: "#fff",
     fontSize: 16,
     textAlignVertical: "top",
-    paddingTop: 0,
+    paddingTop: 10,
     minHeight: 200,
-  },
-  dismissKeyboardArea: {
-    flex: 1,
-    minHeight: 100,
   },
   imagePreviewContainer: {
     marginTop: 16,

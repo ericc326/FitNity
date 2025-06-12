@@ -5,7 +5,7 @@ import {
   StyleSheet,
   Image,
   TouchableOpacity,
-  ScrollView,
+  FlatList,
   RefreshControl,
   Alert,
 } from "react-native";
@@ -21,6 +21,7 @@ import {
   deleteDoc,
   doc,
   getDoc,
+  setDoc,
   updateDoc,
   increment,
 } from "firebase/firestore";
@@ -93,12 +94,25 @@ const FeedTab = () => {
       })) as PostType[];
       // Initialize likes state for all posts
       const newLikesState: LikeState = {};
-      fetchedPosts.forEach((post) => {
-        newLikesState[post.id] = {
-          isLiked: false, // You could fetch the user's like status here if needed
-          count: post.likes,
-        };
-      });
+      await Promise.all(
+        fetchedPosts.map(async (post) => {
+          if (auth.currentUser) {
+            const likeDocRef = doc(
+              db,
+              "posts",
+              post.id,
+              "likes",
+              auth.currentUser.uid
+            );
+            const likeDoc = await getDoc(likeDocRef);
+            newLikesState[post.id] = {
+              isLiked: likeDoc.exists(),
+              count: post.likes || 0,
+            };
+          }
+        })
+      );
+
       setLikesState(newLikesState);
       setPosts(fetchedPosts);
     } catch (error) {
@@ -154,7 +168,6 @@ const FeedTab = () => {
     );
   };
 
-  // const handleDeletePost = async () => {
   const handleDeletePost = (post: PostType) => {
     if (!post) return;
 
@@ -207,7 +220,7 @@ const FeedTab = () => {
 
   const handleEditPost = (post: PostType) => {
     if (!post) return;
-    // navigation.navigate("EditPost", { post: selectedPost });
+    navigation.navigate("EditPost", { post });
   };
 
   const toggleLike = async (post: PostType) => {
@@ -218,6 +231,13 @@ const FeedTab = () => {
 
     try {
       const postRef = doc(db, "posts", post.id);
+      const likeDocRef = doc(
+        db,
+        "posts",
+        post.id,
+        "likes",
+        auth.currentUser.uid
+      );
       const postDoc = await getDoc(postRef);
 
       if (!postDoc.exists()) {
@@ -227,6 +247,14 @@ const FeedTab = () => {
 
       const currentLikeState = likesState[post.id]?.isLiked || false;
       const increment_value = currentLikeState ? -1 : 1;
+
+      if (currentLikeState) {
+        // Unlike: remove like doc and decrement count
+        await deleteDoc(likeDocRef);
+      } else {
+        // Like: add like doc
+        await setDoc(likeDocRef, { likedAt: new Date().toISOString() });
+      }
 
       // Update the likes count in Firestore
       await updateDoc(postRef, {
@@ -247,8 +275,8 @@ const FeedTab = () => {
     }
   };
 
-  const renderPost = (post: PostType) => (
-    <View key={post.id} style={styles.postContainer}>
+  const renderPost = ({ item: post }: { item: PostType }) => (
+    <View style={styles.postContainer}>
       {/* Header Section - Clickable to view profile (if you want) */}
       <View style={styles.postHeader}>
         <View style={styles.userInfo}>
@@ -299,7 +327,10 @@ const FeedTab = () => {
               color={likesState[post.id]?.isLiked ? "#e74c3c" : "#fff"}
             />
             <Text style={styles.likeText}>
-              {likesState[post.id]?.count || post.likes} likes
+              {likesState[post.id]?.count !== undefined
+                ? likesState[post.id].count
+                : post.likes}{" "}
+              likes
             </Text>
           </TouchableOpacity>
 
@@ -331,8 +362,10 @@ const FeedTab = () => {
 
   return (
     <View style={styles.mainContainer}>
-      <ScrollView
-        style={styles.container}
+      <FlatList
+        data={posts}
+        keyExtractor={(item) => item.id}
+        renderItem={renderPost}
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
@@ -340,9 +373,8 @@ const FeedTab = () => {
             tintColor="rgba(255, 255, 255, 0.5)"
           />
         }
-      >
-        {posts.map(renderPost)}
-      </ScrollView>
+        contentContainerStyle={{ paddingBottom: 80 }}
+      />
 
       <TouchableOpacity
         style={styles.addButton}
@@ -442,10 +474,6 @@ const styles = StyleSheet.create({
     color: "#fff",
     fontSize: 14,
     marginLeft: 8,
-  },
-  responseSection: {
-    flexDirection: "row",
-    alignItems: "center",
   },
   avatarGroup: {
     flexDirection: "row",
