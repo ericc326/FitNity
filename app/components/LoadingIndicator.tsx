@@ -19,6 +19,7 @@ const LoadingIndicator: React.FC<LoadingIndicatorProps> = ({
 
 const styles = StyleSheet.create({
   container: {
+    ...StyleSheet.absoluteFillObject,
     justifyContent: "center",
     alignItems: "center",
     flex: 1,

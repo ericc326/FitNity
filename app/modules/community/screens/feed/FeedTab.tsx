@@ -58,9 +58,7 @@ const PostImage = ({ imageUrl }: { imageUrl: string }) => {
         onError={() => setImageLoading(false)}
       />
       {imageLoading && (
-        <View style={styles.imageLoadingContainer}>
-          <LoadingIndicator size="large" color="rgba(255, 255, 255, 0.5)" />
-        </View>
+        <LoadingIndicator size="large" color="rgba(255, 255, 255, 0.5)" />
       )}
     </View>
   );
@@ -509,11 +507,6 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     marginBottom: 12,
     overflow: "hidden",
-  },
-  imageLoadingContainer: {
-    ...StyleSheet.absoluteFillObject,
-    justifyContent: "center",
-    alignItems: "center",
   },
 });
 
