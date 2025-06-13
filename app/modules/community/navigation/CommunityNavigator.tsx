@@ -6,7 +6,9 @@ import FeedTab from "../screens/feed/FeedTab";
 import CreatePostScreen from "../screens/feed/CreatePostScreen";
 import PostDetailsScreen from "../screens/feed/PostDetailsScreen";
 import EditPostScreen from "../screens/feed/EditPostScreen";
-// import ChallengeDetailsScreen from '../screens/challenges/ChallengeDetailsScreen';
+import ChallengeDetailsScreen from "../screens/challenges/ChallengeDetailsScreen";
+import CreateChallengeScreen from "../screens/challenges/CreateChallengeScreen";
+import EditChallengeScreen from "../screens/challenges/EditChallengeScreen";
 
 // Type definitions for navigation
 export type CommunityTabParamList = {
@@ -23,7 +25,9 @@ export type FeedStackParamList = {
 
 export type ChallengesStackParamList = {
   ChallengesList: undefined;
-  ChallengeDetails: { challengeId: string };
+  ChallengeDetails: { challenge: any };
+  CreateChallenge: undefined;
+  EditChallenge: { challenge: any };
 };
 
 const Tab = createMaterialTopTabNavigator<CommunityTabParamList>();
@@ -47,10 +51,18 @@ const ChallengesNavigator = () => {
   return (
     <ChallengesStack.Navigator screenOptions={{ headerShown: false }}>
       <ChallengesStack.Screen name="ChallengesList" component={ChallengesTab} />
-      {/* <ChallengesStack.Screen 
-        name="ChallengeDetails" 
-        component={ChallengeDetailsScreen} 
-      /> */}
+      <ChallengesStack.Screen
+        name="ChallengeDetails"
+        component={ChallengeDetailsScreen}
+      />
+      <ChallengesStack.Screen
+        name="CreateChallenge"
+        component={CreateChallengeScreen}
+      />
+      <ChallengesStack.Screen
+        name="EditChallenge"
+        component={EditChallengeScreen}
+      />
     </ChallengesStack.Navigator>
   );
 };

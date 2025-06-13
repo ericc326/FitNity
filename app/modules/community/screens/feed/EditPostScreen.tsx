@@ -172,9 +172,7 @@ const EditPostScreen: React.FC<Props> = ({ route, navigation }) => {
             onError={() => setImageLoading(false)}
           />
           {imageLoading && (
-            <View style={styles.imageLoadingContainer}>
-              <LoadingIndicator size="large" color="rgba(255, 255, 255, 0.5)" />
-            </View>
+            <LoadingIndicator size="large" color="rgba(255, 255, 255, 0.5)" />
           )}
           <TouchableOpacity
             style={styles.removeImageButton}
@@ -279,11 +277,6 @@ const styles = StyleSheet.create({
     color: "#fff",
     fontWeight: "bold",
     fontSize: 18,
-  },
-  imageLoadingContainer: {
-    ...StyleSheet.absoluteFillObject,
-    justifyContent: "center",
-    alignItems: "center",
   },
 });
 

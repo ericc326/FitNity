@@ -103,7 +103,7 @@ const StatisticScreen = () => {
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: "#1c1633",
+    backgroundColor: "#262135",
   },
   container: {
     flex: 1,
