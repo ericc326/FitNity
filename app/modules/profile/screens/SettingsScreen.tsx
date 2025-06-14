@@ -1,9 +1,10 @@
-import React from "react";
+import React, { useState } from "react";
 import { View, Text, StyleSheet, TouchableOpacity, Switch } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 
 const SettingsScreen = () => {
+  const [pushEnabled, setPushEnabled] = useState(true);
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.content}>
@@ -11,11 +12,7 @@ const SettingsScreen = () => {
           <Text style={styles.sectionTitle}>Notifications</Text>
           <View style={styles.settingItem}>
             <Text style={styles.settingLabel}>Push Notifications</Text>
-            <Switch value={true} onValueChange={() => {}} />
-          </View>
-          <View style={styles.settingItem}>
-            <Text style={styles.settingLabel}>Email Notifications</Text>
-            <Switch value={false} onValueChange={() => {}} />
+            <Switch value={pushEnabled} onValueChange={setPushEnabled} />
           </View>
         </View>
 
