@@ -9,6 +9,8 @@ import {
   Pressable,
   TextInput,
   Alert,
+  KeyboardAvoidingView,
+  Platform,
 } from "react-native";
 import { db, auth } from "../../firebaseConfig";
 import {
@@ -147,85 +149,91 @@ const AIChatBox: React.FC<ChatBoxProps> = ({ visible, onClose }) => {
     <Modal visible={visible} transparent animationType="fade">
       <Pressable style={styles.modalOverlay} onPress={onClose}>
         <Pressable style={styles.chatModalBox} onPress={() => {}}>
-          {/* Header */}
-          <View style={styles.header}>
-            <Text style={styles.chatTitle}>AI Assistant</Text>
-            <TouchableOpacity onPress={onClose}>
-              <Text style={styles.closeBtn}>✕</Text>
-            </TouchableOpacity>
-          </View>
-          {/* Chat area placeholder */}
-          <View style={styles.chatContent}>
-            <ScrollView
-              ref={scrollViewRef}
-              style={{ width: "100%", flex: 1 }}
-              contentContainerStyle={{ paddingVertical: 10, flexGrow: 1 }}
-              keyboardShouldPersistTaps="handled"
-            >
-              {messages.length === 0 && (
-                <Text style={styles.message}>
-                  Hi! Ask me anything about fitness and health.
-                </Text>
-              )}
-              {messages.map((msg, idx) => (
-                <View
-                  key={idx}
-                  style={[
-                    styles.messageContainer,
-                    msg.sender === "user"
-                      ? styles.userMessageContainer
-                      : styles.aiMessageContainer,
-                  ]}
-                >
-                  <View
-                    style={[
-                      styles.messageBubble,
-                      msg.sender === "user"
-                        ? styles.userBubble
-                        : styles.aiBubble,
-                    ]}
-                  >
-                    <Text style={styles.senderLabel}>
-                      {msg.sender === "user" ? "You" : "AI"}
-                    </Text>
-                    <Text
-                      style={[
-                        styles.messageText,
-                        msg.sender === "user"
-                          ? styles.userMessageText
-                          : styles.aiMessageText,
-                      ]}
-                    >
-                      {msg.text}
-                    </Text>
-                  </View>
-                </View>
-              ))}
-              {loading && <Text style={styles.message}>AI is typing...</Text>}
-            </ScrollView>
-          </View>
-          {/* Input and Send Button */}
-          <View style={styles.inputContainer}>
-            <View style={styles.inputWrapper}>
-              <TextInput
-                value={inputText}
-                onChangeText={setInputText}
-                placeholder="Type your message..."
-                placeholderTextColor="#888"
-                style={styles.textInput}
-              />
-              <TouchableOpacity
-                onPress={handleSend}
-                style={[
-                  styles.sendButton,
-                  !inputText.trim() && { opacity: 0.5 }, // visually indicate disabled
-                ]}
-                disabled={!inputText.trim()}
-              >
-                <MaterialCommunityIcons name="send" size={20} color="#000" />
+          <KeyboardAvoidingView
+            style={{ flex: 1 }}
+            behavior={Platform.OS === "ios" ? "padding" : "height"}
+            keyboardVerticalOffset={Platform.OS === "ios" ? 100 : 0} // adjust if you have a header
+          >
+            {/* Header */}
+            <View style={styles.header}>
+              <Text style={styles.chatTitle}>AI Assistant</Text>
+              <TouchableOpacity onPress={onClose}>
+                <Text style={styles.closeBtn}>✕</Text>
               </TouchableOpacity>
             </View>
-          </View>
+            {/* Chat area */}
+            <View style={styles.chatContent}>
+              <ScrollView
+                ref={scrollViewRef}
+                style={{ width: "100%", flex: 1 }}
+                contentContainerStyle={{ paddingVertical: 10, flexGrow: 1 }}
+                keyboardShouldPersistTaps="handled"
+              >
+                {messages.length === 0 && (
+                  <Text style={styles.message}>
+                    Hi! Ask me anything about fitness and health.
+                  </Text>
+                )}
+                {messages.map((msg, idx) => (
+                  <View
+                    key={idx}
+                    style={[
+                      styles.messageContainer,
+                      msg.sender === "user"
+                        ? styles.userMessageContainer
+                        : styles.aiMessageContainer,
+                    ]}
+                  >
+                    <View
+                      style={[
+                        styles.messageBubble,
+                        msg.sender === "user"
+                          ? styles.userBubble
+                          : styles.aiBubble,
+                      ]}
+                    >
+                      <Text style={styles.senderLabel}>
+                        {msg.sender === "user" ? "You" : "AI"}
+                      </Text>
+                      <Text
+                        style={[
+                          styles.messageText,
+                          msg.sender === "user"
+                            ? styles.userMessageText
+                            : styles.aiMessageText,
+                        ]}
+                      >
+                        {msg.text}
+                      </Text>
+                    </View>
+                  </View>
+                ))}
+                {loading && <Text style={styles.message}>AI is typing...</Text>}
+              </ScrollView>
+            </View>
+            {/* Input and Send Button */}
+            <View style={styles.inputContainer}>
+              <View style={styles.inputWrapper}>
+                <TextInput
+                  value={inputText}
+                  onChangeText={setInputText}
+                  placeholder="Type your message..."
+                  placeholderTextColor="#888"
+                  style={styles.textInput}
+                />
+                <TouchableOpacity
+                  onPress={handleSend}
+                  style={[
+                    styles.sendButton,
+                    !inputText.trim() && { opacity: 0.5 },
+                  ]}
+                  disabled={!inputText.trim()}
+                >
+                  <MaterialCommunityIcons name="send" size={20} color="#000" />
+                </TouchableOpacity>
+              </View>
+            </View>
+          </KeyboardAvoidingView>
         </Pressable>
       </Pressable>
     </Modal>
