@@ -8,18 +8,20 @@ import AuthNavigator, {
   AuthStackParamList,
 } from "../modules/auth/navigation/AuthNavigator";
 import HomeScreen from "../modules/home/screens/HomeScreen";
-import ScheduleScreen from "../modules/schedule/screens/ScheduleScreen";
 import WorkoutScreen from "../modules/workout/screens/WorkoutScreen";
 import DietScreen from "../modules/diet/screens/DietScreen";
 import CommunityScreen from "../modules/community/screens/CommunityScreen";
 import StatisticScreen from "../modules/statistics/screens/StatisticScreen";
 import ProfileNavigator from "../modules/profile/navigation/ProfileNavigator";
+import ScheduleNavigator, {
+  ScheduleStackParamList,
+} from "../modules/schedule/navigation/ScheduleNavigator";
 
 // Tab Navigation Types
 export type HomeTabParamList = {
   Home: undefined;
   Schedule: undefined;
-  Workout: undefined;
+  Workout: NavigatorScreenParams<ScheduleStackParamList>;
   Diet: undefined;
   Community: undefined;
 };
@@ -65,7 +67,7 @@ function TabNavigator() {
       />
       <Tab.Screen
         name="Schedule"
-        component={ScheduleScreen}
+        component={ScheduleNavigator}
         options={{
           tabBarIcon: ({ color, size }) => (
             <MaterialCommunityIcons name="calendar" color={color} size={size} />

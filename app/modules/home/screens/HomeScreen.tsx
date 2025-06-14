@@ -21,7 +21,16 @@ import {
 } from "../../../navigation/AppNavigator";
 import { BottomTabNavigationProp } from "@react-navigation/bottom-tabs";
 import { auth, db } from "../../../../firebaseConfig";
-import { doc, getDoc } from "firebase/firestore";
+import {
+  doc,
+  getDoc,
+  collection,
+  query,
+  where,
+  onSnapshot,
+  orderBy,
+} from "firebase/firestore";
+import moment from "moment";
 
 type HomeScreenNavigationProp = CompositeNavigationProp<
   BottomTabNavigationProp<HomeTabParamList, "Home">,
@@ -49,29 +58,12 @@ const workouts = [
   },
 ];
 
-const todayTasks = [
-  {
-    id: "1",
-    time: "07:00 AM",
-    title: "Morning Workout",
-    type: "workout",
-    duration: "45 min",
-    completed: true,
-  },
-  {
-    id: "2",
-    time: "09:00 AM",
-    title: "Protein Breakfast",
-    type: "meal",
-    duration: "20 min",
-    completed: true,
-  },
-];
-
 const HomeScreen: React.FC = () => {
   const navigation = useNavigation<HomeScreenNavigationProp>();
   const [showChat, setShowChat] = useState(false);
   const [userName, setUserName] = useState<string>("");
+  const [todayTasks, setTodayTasks] = useState<any[]>([]);
+  const [loadingTasks, setLoadingTasks] = useState(true);
 
   useEffect(() => {
     const loadUserName = async () => {
@@ -93,6 +85,55 @@ const HomeScreen: React.FC = () => {
 
     loadUserName();
   }, [navigation]);
+
+  useEffect(() => {
+    let unsubscribe: (() => void) | undefined;
+
+    const fetchTodayTasks = async () => {
+      setLoadingTasks(true);
+      try {
+        const currentUser = auth.currentUser;
+        if (!currentUser) {
+          setTodayTasks([]);
+          setLoadingTasks(false);
+          return;
+        }
+        const startOfDay = moment().startOf("day").toDate();
+        const endOfDay = moment().endOf("day").toDate();
+        const schedulesRef = collection(
+          db,
+          "users",
+          currentUser.uid,
+          "schedules"
+        );
+        // Remove the completed filter to show all tasks
+        const q = query(
+          schedulesRef,
+          where("scheduledAt", ">=", startOfDay),
+          where("scheduledAt", "<=", endOfDay),
+          orderBy("scheduledAt", "asc")
+        );
+        unsubscribe = onSnapshot(q, (querySnapshot) => {
+          const tasks = querySnapshot.docs.map((doc) => ({
+            id: doc.id,
+            ...doc.data(),
+          }));
+          setTodayTasks(tasks);
+          setLoadingTasks(false);
+        });
+      } catch (error) {
+        setTodayTasks([]);
+        setLoadingTasks(false);
+        console.error("Error fetching today's tasks:", error);
+      }
+    };
+
+    fetchTodayTasks();
+
+    return () => {
+      if (unsubscribe) unsubscribe();
+    };
+  }, []);
 
   // Tab navigation
   const goToSchedule = () => navigation.navigate("Schedule");
@@ -185,31 +226,55 @@ const HomeScreen: React.FC = () => {
             showsHorizontalScrollIndicator={false}
             contentContainerStyle={styles.tasksScrollContainer}
           >
-            {todayTasks.map((task) => (
-              <TouchableOpacity key={task.id} style={styles.taskCard}>
-                <View style={styles.taskTimeColumn}>
-                  <Text style={styles.taskTime}>{task.time}</Text>
-                </View>
-                <View style={styles.taskContent}>
-                  <View style={styles.taskHeader}>
-                    <View style={styles.taskTitleContainer}>
-                      <MaterialCommunityIcons
-                        name={getTaskIcon(task.type)}
-                        size={20}
-                        color="#4a90e2"
-                      />
-                      <Text style={styles.taskTitle}>{task.title}</Text>
-                    </View>
-                    <MaterialCommunityIcons
-                      name={task.completed ? "check-circle" : "circle-outline"}
-                      size={24}
-                      color={task.completed ? "#4CAF50" : "#8a84a5"}
-                    />
+            {loadingTasks ? (
+              <Text style={{ color: "#fff", padding: 20 }}>Loading...</Text>
+            ) : todayTasks.length === 0 ? (
+              <Text style={{ color: "#fff", padding: 20 }}>
+                No schedule for today.
+              </Text>
+            ) : (
+              todayTasks.map((task) => (
+                <TouchableOpacity
+                  key={task.id}
+                  style={styles.taskCard}
+                  onPress={() => {
+                    goToSchedule();
+                  }}
+                >
+                  <View style={styles.taskTimeColumn}>
+                    <Text style={styles.taskTime}>
+                      {moment(
+                        task.scheduledAt.seconds
+                          ? task.scheduledAt.seconds * 1000
+                          : task.scheduledAt
+                      ).format("hh:mm A")}
+                    </Text>
                   </View>
-                  <Text style={styles.taskDuration}>{task.duration}</Text>
-                </View>
-              </TouchableOpacity>
-            ))}
+                  <View style={styles.taskContent}>
+                    <View style={styles.taskHeader}>
+                      <View style={styles.taskTitleContainer}>
+                        <MaterialCommunityIcons
+                          name={getTaskIcon(task.type || "workout")}
+                          size={20}
+                          color="#4a90e2"
+                        />
+                        <Text style={styles.taskTitle}>{task.title}</Text>
+                      </View>
+                      <MaterialCommunityIcons
+                        name={
+                          task.completed ? "check-circle" : "circle-outline"
+                        }
+                        size={24}
+                        color={task.completed ? "#4CAF50" : "#8a84a5"}
+                      />
+                    </View>
+                    <Text style={styles.taskDuration}>
+                      {task.duration || ""}
+                    </Text>
+                  </View>
+                </TouchableOpacity>
+              ))
+            )}
           </ScrollView>
         </View>
 
