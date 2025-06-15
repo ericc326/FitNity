@@ -275,7 +275,7 @@ const FeedTab = () => {
 
   const renderPost = ({ item: post }: { item: PostType }) => (
     <View style={styles.postContainer}>
-      {/* Header Section - Clickable to view profile (if you want) */}
+      {/* Header Section */}
       <View style={styles.postHeader}>
         <View style={styles.userInfo}>
           <View style={styles.avatar}>
@@ -302,7 +302,7 @@ const FeedTab = () => {
         </View>
       </View>
 
-      {/* Content Section - Clickable to view details */}
+      {/* Content Section */}
       <TouchableOpacity
         activeOpacity={0.7}
         onPress={() => navigation.navigate("PostDetails", { post })}

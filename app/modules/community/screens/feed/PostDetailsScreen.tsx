@@ -55,7 +55,7 @@ const PostDetailsScreen = ({ route, navigation }: Props) => {
   const [loading, setLoading] = useState(true); //for comments loading
   const [imageLoading, setImageLoading] = useState(true); // for post image loading
   const [refreshing, setRefreshing] = useState(false); // for pull-to-refresh
-  
+
   useEffect(() => {
     fetchComments();
     checkIfLiked();

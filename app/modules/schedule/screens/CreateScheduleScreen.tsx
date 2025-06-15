@@ -51,7 +51,7 @@ const CreateScheduleScreen = ({ navigation }: Props) => {
       return;
     }
 
-    setLoading(true); // Start loading
+    setLoading(true);
 
     try {
       // Reference to the user's specific 'schedules' subcollection
@@ -73,14 +73,14 @@ const CreateScheduleScreen = ({ navigation }: Props) => {
         // You would add fields for selected workout, custom repetitions, etc. here
       };
 
-      await addDoc(userSchedulesRef, newScheduleData); // Add document with auto-generated ID
+      await addDoc(userSchedulesRef, newScheduleData);
 
       Alert.alert("Success", "Schedule saved successfully!");
-      navigation.goBack(); // Navigate back after successful save
+      navigation.goBack();
     } catch (error: any) {
       Alert.alert("Error", `Failed to save schedule: ${error.message}`);
     } finally {
-      setLoading(false); // End loading
+      setLoading(false);
     }
   };
 
