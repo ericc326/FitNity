@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import {
   View,
   Text,
@@ -9,7 +9,7 @@ import {
   RefreshControl,
   Alert,
 } from "react-native";
-import { useNavigation } from "@react-navigation/native";
+import { useNavigation, useFocusEffect } from "@react-navigation/native";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { ChallengesStackParamList } from "../../navigation/CommunityNavigator";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
@@ -111,9 +111,11 @@ const ChallengesTab = () => {
     }
   };
 
-  useEffect(() => {
-    fetchChallenges();
-  }, []);
+  useFocusEffect(
+    React.useCallback(() => {
+      fetchChallenges();
+    }, [])
+  );
 
   const onRefresh = async () => {
     setRefreshing(true);

@@ -198,6 +198,17 @@ const FeedTab = () => {
                 }
               }
 
+              // Delete subcollections: likes and comments
+              const subcollections = ["likes", "comments"];
+              for (const sub of subcollections) {
+                const subColRef = collection(db, "posts", post.id, sub);
+                const subSnap = await getDocs(subColRef);
+                const deletePromises = subSnap.docs.map((d) =>
+                  deleteDoc(d.ref)
+                );
+                await Promise.all(deletePromises);
+              }
+
               // Then delete the post document
               await deleteDoc(doc(db, "posts", post.id));
 

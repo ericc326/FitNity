@@ -335,7 +335,9 @@ const styles = StyleSheet.create({
     backgroundColor: "#4a90e2",
     padding: 16,
     borderRadius: 20,
+    height: 48,
     alignItems: "center",
+    justifyContent: "center",
   },
   updateButtonDisabled: {
     backgroundColor: "#3d3654",
