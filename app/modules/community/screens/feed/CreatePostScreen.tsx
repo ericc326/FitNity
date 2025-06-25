@@ -236,6 +236,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 8,
     borderRadius: 20,
+    height: 40,
+    justifyContent: "center",
+    alignItems: "center",
     backgroundColor: "#6c5ce7",
   },
   postButtonDisabled: {

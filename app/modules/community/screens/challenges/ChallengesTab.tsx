@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import {
   View,
   Text,
@@ -9,7 +9,7 @@ import {
   RefreshControl,
   Alert,
 } from "react-native";
-import { useNavigation } from "@react-navigation/native";
+import { useNavigation, useFocusEffect } from "@react-navigation/native";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { ChallengesStackParamList } from "../../navigation/CommunityNavigator";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
@@ -45,7 +45,11 @@ type ChallengeCardProps = {
   onOptions: () => void;
 };
 
-const ChallengeCard: React.FC<ChallengeCardProps> = ({ item, onPress, onOptions }) => {
+const ChallengeCard: React.FC<ChallengeCardProps> = ({
+  item,
+  onPress,
+  onOptions,
+}) => {
   const isCreator = item.createdBy === auth.currentUser?.uid;
   const [imageLoading, setImageLoading] = useState(true);
 
@@ -107,9 +111,11 @@ const ChallengesTab = () => {
     }
   };
 
-  useEffect(() => {
-    fetchChallenges();
-  }, []);
+  useFocusEffect(
+    React.useCallback(() => {
+      fetchChallenges();
+    }, [])
+  );
 
   const onRefresh = async () => {
     setRefreshing(true);
@@ -122,82 +128,89 @@ const ChallengesTab = () => {
   };
 
   const handleOptions = (challenge: any) => {
-    Alert.alert("Challenge Options", "What would you like to do?", [
-      {
-        text: "Edit",
-        onPress: () => {
-          navigation.navigate("EditChallenge", { challenge });
+    Alert.alert(
+      "Challenge Options",
+      "What would you like to do?",
+      [
+        {
+          text: "Edit",
+          onPress: () => {
+            navigation.navigate("EditChallenge", { challenge });
+          },
         },
-      },
-      {
-        text: "Delete",
-        style: "destructive",
-        onPress: () => {
-          Alert.alert(
-            "Delete Challenge",
-            "Are you sure you want to delete this challenge?",
-            [
-              {
-                text: "Cancel",
-                style: "cancel",
-              },
-              {
-                text: "Delete",
-                style: "destructive",
-                onPress: async () => {
-                  try {
-                    // First, delete the image if it exists
-                    if (challenge.imageUrl) {
-                      try {
-                        // Extract the file path from the URL
-                        const imageUrl = new URL(challenge.imageUrl);
-                        const imagePath = decodeURIComponent(
-                          imageUrl.pathname.split("/o/")[1]
-                        );
-                        const imageRef = storageRef(storage, imagePath);
-
-                        await deleteObject(imageRef);
-                      } catch (imageError) {
-                        console.error("Error deleting image:", imageError);
-                      }
-                    }
-                    // Delete participants subcollection first
-                    const participantsRef = collection(
-                      db,
-                      "challenges",
-                      challenge.id,
-                      "participants"
-                    );
-                    const participantsSnapshot = await getDocs(participantsRef);
-
-                    // Delete all participant documents
-                    const deleteParticipantPromises =
-                      participantsSnapshot.docs.map((doc) =>
-                        deleteDoc(doc.ref)
-                      );
-                    await Promise.all(deleteParticipantPromises);
-                    // Then delete the challenge document
-                    await deleteDoc(doc(db, "challenges", challenge.id));
-
-                    // Refresh the challenges list
-                    fetchChallenges();
-
-                    // Show success message
-                    Alert.alert("Success", "Challenge deleted successfully");
-                  } catch (error) {
-                    Alert.alert("Error", "Failed to delete challenge");
-                  }
+        {
+          text: "Delete",
+          style: "destructive",
+          onPress: () => {
+            Alert.alert(
+              "Delete Challenge",
+              "Are you sure you want to delete this challenge?",
+              [
+                {
+                  text: "Cancel",
+                  style: "cancel",
                 },
-              },
-            ]
-          );
+                {
+                  text: "Delete",
+                  style: "destructive",
+                  onPress: async () => {
+                    try {
+                      // First, delete the image if it exists
+                      if (challenge.imageUrl) {
+                        try {
+                          // Extract the file path from the URL
+                          const imageUrl = new URL(challenge.imageUrl);
+                          const imagePath = decodeURIComponent(
+                            imageUrl.pathname.split("/o/")[1]
+                          );
+                          const imageRef = storageRef(storage, imagePath);
+
+                          await deleteObject(imageRef);
+                        } catch (imageError) {
+                          console.error("Error deleting image:", imageError);
+                        }
+                      }
+                      // Retrieve participants subcollection
+                      const participantsRef = collection(
+                        db,
+                        "challenges",
+                        challenge.id,
+                        "participants"
+                      );
+                      const participantsSnapshot = await getDocs(
+                        participantsRef
+                      );
+
+                      // Delete all participant documents
+                      const deleteParticipantPromises =
+                        participantsSnapshot.docs.map((doc) =>
+                          deleteDoc(doc.ref)
+                        );
+                      await Promise.all(deleteParticipantPromises);
+                      // Then delete the challenge document
+                      await deleteDoc(doc(db, "challenges", challenge.id));
+
+                      // Refresh the challenges list
+                      fetchChallenges();
+
+                      // Show success message
+                      Alert.alert("Success", "Challenge deleted successfully");
+                    } catch (error) {
+                      Alert.alert("Error", "Failed to delete challenge");
+                    }
+                  },
+                },
+              ]
+            );
+          },
         },
-      },
-      {
-        text: "Cancel",
-        style: "cancel",
-      },
-    ]);
+        {
+          text: "Cancel",
+          style: "cancel",
+        },
+      ],
+      { cancelable: true }
+    );
   };
 
   return (

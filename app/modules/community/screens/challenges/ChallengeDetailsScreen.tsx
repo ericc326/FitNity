@@ -43,13 +43,21 @@ const ProgressModal = ({
   onClose,
   onUpdate,
   loading,
+  initialProgress = 0,
 }: {
   visible: boolean;
   onClose: () => void;
   onUpdate: (progress: number) => void;
   loading: boolean;
+  initialProgress?: number;
 }) => {
-  const [localProgress, setLocalProgress] = useState(0);
+  const [localProgress, setLocalProgress] = useState(initialProgress);
+
+  useEffect(() => {
+    if (visible) {
+      setLocalProgress(initialProgress);
+    }
+  }, [visible, initialProgress]);
 
   return (
     <Modal
@@ -109,6 +117,7 @@ const ChallengeDetailsScreen = ({ route, navigation }: Props) => {
   const [participants, setParticipants] = useState<Participant[]>([]);
   const [loadingParticipants, setLoadingParticipants] = useState(true);
   const [showProgressModal, setShowProgressModal] = useState(false);
+  const [userProgress, setUserProgress] = useState(0);
   const [refreshing, setRefreshing] = useState(false);
   const [currentChallenge, setCurrentChallenge] = useState(challenge);
 
@@ -132,6 +141,15 @@ const ChallengeDetailsScreen = ({ route, navigation }: Props) => {
     fetchCreatorName(currentChallenge);
     fetchParticipants(currentChallenge);
   }, [currentChallenge]);
+
+  // Find and set the current user's progress when participants change
+  useEffect(() => {
+    const currentUser = auth.currentUser;
+    if (currentUser) {
+      const found = participants.find((p) => p.id === currentUser.uid);
+      setUserProgress(found ? found.progress : 0);
+    }
+  }, [participants]);
 
   const checkIfParticipant = () => {
     const currentUser = auth.currentUser;
@@ -454,6 +472,7 @@ const ChallengeDetailsScreen = ({ route, navigation }: Props) => {
             onClose={() => setShowProgressModal(false)}
             onUpdate={handleUpdateProgress}
             loading={loading}
+            initialProgress={userProgress}
           />
         </View>
       </ScrollView>

@@ -44,9 +44,9 @@ interface ScheduleItem {
   userId: string;
   userName: string;
   createdAt: Timestamp; // Firestore Timestamp type
-  icon?: keyof typeof MaterialCommunityIcons.glyphMap; // Make icon optional if not always set
-  completed?: boolean; // Make optional as it's not in newScheduleData
-  color?: string; // Make optional as it's not in newScheduleData
+  icon?: keyof typeof MaterialCommunityIcons.glyphMap;
+  completed?: boolean;
+  color?: string;
 }
 
 const ScheduleScreen = () => {
@@ -56,7 +56,7 @@ const ScheduleScreen = () => {
   const [loading, setLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
 
-  // Function to generate dates for the horizontal calendar (no change)
+  // To generate dates for the horizontal calendar
   const generateDates = (currentDate: moment.Moment) => {
     const dates = [];
     const startOfWeek = moment(currentDate).startOf("week");
@@ -165,9 +165,7 @@ const ScheduleScreen = () => {
             Alert.alert("Error", "Failed to mark as done: " + error.message);
           }
         },
-        // Only show if not already completed
         style: schedule.completed ? "default" : "default",
-        // You can filter this option out if completed
       },
       {
         text: "Delete",
@@ -225,7 +223,7 @@ const ScheduleScreen = () => {
 
     const isCompleted = !!schedule.completed;
 
-    // Optionally, filter out "Mark as Done" if already completed
+    // Filter out "Mark as Done" if already completed
     const filteredOptions = isCompleted
       ? options.filter((opt) => opt.text !== "Mark as Done")
       : options;
@@ -259,7 +257,7 @@ const ScheduleScreen = () => {
     );
   };
 
-  // renderScheduleItem to use ScheduleItem interface
+  // To use ScheduleItem interface
   const renderScheduleItem = ({ item }: { item: ScheduleItem }) => {
     const scheduledMoment =
       item.scheduledAt instanceof Timestamp
@@ -362,7 +360,7 @@ const ScheduleScreen = () => {
           style={styles.calendarFlatList}
         />
 
-        {/* Your Schedule Section */}
+        {/* Schedule Section */}
         <View style={styles.scheduleSection}>
           <View style={styles.yourScheduleHeader}>
             <Text style={styles.yourScheduleTitle}>Your Schedule</Text>

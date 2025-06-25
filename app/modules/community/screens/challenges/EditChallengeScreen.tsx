@@ -213,10 +213,7 @@ const EditChallengeScreen = ({ route, navigation }: Props) => {
               onError={() => setImageLoading(false)}
             />
             {imageLoading && (
-                <LoadingIndicator
-                  size="large"
-                  color="rgba(255, 255, 255, 0.5)"
-                />
+              <LoadingIndicator size="large" color="rgba(255, 255, 255, 0.5)" />
             )}
             <TouchableOpacity
               style={styles.removeImageButton}
@@ -338,7 +335,9 @@ const styles = StyleSheet.create({
     backgroundColor: "#4a90e2",
     padding: 16,
     borderRadius: 20,
+    height: 48,
     alignItems: "center",
+    justifyContent: "center",
   },
   updateButtonDisabled: {
     backgroundColor: "#3d3654",

@@ -198,6 +198,17 @@ const FeedTab = () => {
                 }
               }
 
+              // Delete subcollections: likes and comments
+              const subcollections = ["likes", "comments"];
+              for (const sub of subcollections) {
+                const subColRef = collection(db, "posts", post.id, sub);
+                const subSnap = await getDocs(subColRef);
+                const deletePromises = subSnap.docs.map((d) =>
+                  deleteDoc(d.ref)
+                );
+                await Promise.all(deletePromises);
+              }
+
               // Then delete the post document
               await deleteDoc(doc(db, "posts", post.id));
 
@@ -275,7 +286,7 @@ const FeedTab = () => {
 
   const renderPost = ({ item: post }: { item: PostType }) => (
     <View style={styles.postContainer}>
-      {/* Header Section - Clickable to view profile (if you want) */}
+      {/* Header Section */}
       <View style={styles.postHeader}>
         <View style={styles.userInfo}>
           <View style={styles.avatar}>
@@ -302,7 +313,7 @@ const FeedTab = () => {
         </View>
       </View>
 
-      {/* Content Section - Clickable to view details */}
+      {/* Content Section */}
       <TouchableOpacity
         activeOpacity={0.7}
         onPress={() => navigation.navigate("PostDetails", { post })}

@@ -65,7 +65,7 @@ const AIChatBox: React.FC<ChatBoxProps> = ({ visible, onClose }) => {
   const [loading, setLoading] = useState(false);
   const scrollViewRef = useRef<ScrollView>(null);
 
-  // Add this useEffect to load messages when component mounts
+  // To load messages when component mounts
   useEffect(() => {
     const loadMessages = async () => {
       const currentUser = auth.currentUser;
@@ -101,7 +101,7 @@ const AIChatBox: React.FC<ChatBoxProps> = ({ visible, onClose }) => {
     };
 
     loadMessages();
-  }, [visible]); // Reload when chat becomes visible
+  }, [visible]);
 
   useEffect(() => {
     scrollViewRef.current?.scrollToEnd({ animated: true });
@@ -262,7 +262,6 @@ const styles = StyleSheet.create({
     elevation: 10,
     justifyContent: "space-between",
   },
-
   // Header styles
   header: {
     flexDirection: "row",
@@ -279,7 +278,6 @@ const styles = StyleSheet.create({
     fontSize: 20,
     color: "#999",
   },
-
   // Chat content styles
   chatContent: {
     flex: 1,
@@ -331,7 +329,6 @@ const styles = StyleSheet.create({
   aiMessageText: {
     color: "#ffffff",
   },
-
   // Input area styles
   inputContainer: {
     flexDirection: "row",
