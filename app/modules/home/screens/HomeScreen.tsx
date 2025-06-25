@@ -136,9 +136,9 @@ const HomeScreen: React.FC = () => {
   }, []);
 
   // Tab navigation
-const goToSchedule = () => {
-  (navigation as any).navigate('Schedule', { screen: 'ScheduleList' });
-};
+  const goToSchedule = () => {
+    navigation.navigate("Schedule", { screen: "ScheduleList" });
+  };
 
   // Stack navigation
   const goToProfile = () => navigation.navigate("Profile");
@@ -281,12 +281,14 @@ const goToSchedule = () => {
         </View>
 
         {/* Create Workout Button */}
-<TouchableOpacity 
-  style={styles.createWorkoutBtn}
-  onPress={() => navigation.navigate('Workout', { screen: 'WorkoutSection' })}
->
-  <Text style={styles.createWorkoutText}>Create Workout</Text>
-</TouchableOpacity>
+        <TouchableOpacity
+          style={styles.createWorkoutBtn}
+          onPress={() =>
+            navigation.navigate("Workout", { screen: "WorkoutSection" })
+          }
+        >
+          <Text style={styles.createWorkoutText}>Create Workout</Text>
+        </TouchableOpacity>
 
         {/* Suggestion Workouts */}
         <Text style={styles.sectionTitle}>Suggestion Workouts</Text>
