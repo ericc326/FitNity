@@ -13,16 +13,23 @@ import DietScreen from "../modules/diet/screens/DietScreen";
 import CommunityScreen from "../modules/community/screens/CommunityScreen";
 import StatisticScreen from "../modules/statistics/screens/StatisticScreen";
 import ProfileNavigator from "../modules/profile/navigation/ProfileNavigator";
+import DietNavigator, {
+  DietStackParamList,
+} from "../modules/diet/navigation/DietNavigator";
 import ScheduleNavigator, {
   ScheduleStackParamList,
 } from "../modules/schedule/navigation/ScheduleNavigator";
+import WorkoutNavigator, {
+  WorkoutStackParamList
+}from "../modules/workout/navigation/WorkoutNavigator";
+import AiCoachScreen from "../modules/workout/screens/AiCoachScreen";
 
 // Tab Navigation Types
 export type HomeTabParamList = {
-  Home: undefined;
-  Schedule: undefined;
-  Workout: NavigatorScreenParams<ScheduleStackParamList>;
-  Diet: undefined;
+  Home: undefined; // Home shouldn't have nested navigator params
+  Schedule: NavigatorScreenParams<ScheduleStackParamList>;
+  Workout: NavigatorScreenParams<WorkoutStackParamList>; // Fixed to use WorkoutStackParamList
+  Diet: NavigatorScreenParams<DietStackParamList>;
   Community: undefined;
 };
 
@@ -32,6 +39,7 @@ export type RootStackParamList = {
   HomeTab: NavigatorScreenParams<HomeTabParamList>;
   Statistic: undefined;
   Profile: undefined;
+  AiCoach: undefined;
 };
 
 const RootStack = createNativeStackNavigator<RootStackParamList>();
@@ -76,7 +84,7 @@ function TabNavigator() {
       />
       <Tab.Screen
         name="Workout"
-        component={WorkoutScreen}
+        component={WorkoutNavigator}
         options={{
           tabBarIcon: ({ color, size }) => (
             <MaterialCommunityIcons name="dumbbell" color={color} size={size} />
@@ -85,7 +93,7 @@ function TabNavigator() {
       />
       <Tab.Screen
         name="Diet"
-        component={DietScreen}
+        component={DietNavigator}
         options={{
           tabBarIcon: ({ color, size }) => (
             <MaterialCommunityIcons
@@ -132,6 +140,7 @@ export default function AppNavigator() {
         component={ProfileNavigator}
         options={{ headerShown: false }}
       />
+       <RootStack.Screen name="AiCoach" component={AiCoachScreen} /> 
     </RootStack.Navigator>
   );
 }
