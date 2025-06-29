@@ -39,23 +39,22 @@ const DietNavigator: React.FC = () => {
         headerShown: false,
       }}
     >
-      <DietStack.Screen 
-        name="DietHome" 
-        component={DietScreen}
-      />
-      
-      <DietStack.Screen 
-        name="FoodDetails" 
+      <DietStack.Screen name="DietHome" component={DietScreen} />
+
+      <DietStack.Screen
+        name="FoodDetails"
         component={FoodDetailsScreen}
         options={{
           headerShown: true,
           title: "Food Details",
+          headerStyle: { backgroundColor: "#262135" },
+          headerTintColor: "#fff",
           headerBackTitle: "Back",
         }}
       />
-      
-      <DietStack.Screen 
-        name="FoodScanner" 
+
+      <DietStack.Screen
+        name="FoodScanner"
         component={FoodScannerScreen}
         options={{
           headerShown: true,
@@ -63,12 +62,14 @@ const DietNavigator: React.FC = () => {
           presentation: "modal",
         }}
       />
-      
-      <DietStack.Screen 
-        name="MealRecipes" 
+
+      <DietStack.Screen
+        name="MealRecipes"
         component={MealRecipesScreen}
         options={{
           headerShown: true,
+          headerStyle: { backgroundColor: "#262135" },
+          headerTintColor: "#fff",
           title: "Meal Recipes",
           headerBackTitle: "Back",
         }}

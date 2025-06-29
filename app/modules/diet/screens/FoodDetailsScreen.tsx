@@ -102,7 +102,7 @@ const FoodDetailsScreen = ({ route }: { route: FoodDetailsRouteProp }) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#ffffff',
+    backgroundColor: '#262135',
   },
   header: {
     position: 'absolute',
@@ -114,7 +114,7 @@ const styles = StyleSheet.create({
     height: 300,
   },
   contentContainer: {
-    backgroundColor: '#121212',
+    backgroundColor: '#262135',
     borderTopLeftRadius: 30,
     borderTopRightRadius: 30,
     marginTop: -30,
