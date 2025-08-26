@@ -99,7 +99,7 @@ const RegisterScreen: React.FC<RegisterScreenProps> = ({ navigation }) => {
       Alert.alert("Success", `Registered as ${name}`, [
         {
           text: "OK",
-          onPress: () => navigation.navigate("Auth", { screen: "Login" }),
+          onPress: () => navigation.replace("OnboardingGender"),
         },
       ]);
     } catch (error: any) {

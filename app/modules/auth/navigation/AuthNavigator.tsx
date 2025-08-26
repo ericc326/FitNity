@@ -6,6 +6,9 @@ import WelcomeScreen from "../screens/WelcomeScreen";
 import LoginScreen from "../screens/LoginScreen";
 import RegisterScreen from "../screens/RegisterScreen";
 import ForgotPasswordScreen from "../screens/ForgotPasswordScreen";
+import OnboardingGenderScreen from "../screens/OnboardingGenderScreen";
+import OnboardingBodyScreen from "../screens/OnboardingBodyScreen";
+import OnboardingHealthScreen from "../screens/OnboardingHealthScreen";
 
 export type AuthStackParamList = {
   Splash: undefined;
@@ -13,6 +16,9 @@ export type AuthStackParamList = {
   Login: undefined;
   Register: undefined;
   ForgotPassword: undefined;
+  OnboardingGender: undefined;
+  OnboardingBody: { gender: string };
+  OnboardingHealth: { gender: string; weight: string; height: string };
 };
 
 const AuthStack = createNativeStackNavigator<AuthStackParamList>();
@@ -27,6 +33,18 @@ export const AuthNavigator = () => {
       <AuthStack.Screen
         name="ForgotPassword"
         component={ForgotPasswordScreen}
+      />
+      <AuthStack.Screen
+        name="OnboardingGender"
+        component={OnboardingGenderScreen}
+      />
+      <AuthStack.Screen
+        name="OnboardingBody"
+        component={OnboardingBodyScreen}
+      />
+      <AuthStack.Screen
+        name="OnboardingHealth"
+        component={OnboardingHealthScreen}
       />
     </AuthStack.Navigator>
   );
