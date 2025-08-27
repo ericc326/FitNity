@@ -7,11 +7,14 @@ import {
   StyleSheet,
   Keyboard,
   TouchableWithoutFeedback,
+  Alert,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { NativeStackScreenProps } from "@react-navigation/native-stack";
 import { AuthStackParamList } from "../navigation/AuthNavigator";
+import { auth, db } from "../../../../firebaseConfig";
+import { collection, addDoc, serverTimestamp } from "firebase/firestore";
 
 type Props = NativeStackScreenProps<AuthStackParamList, "OnboardingHealth">;
 
@@ -19,13 +22,49 @@ const OnboardingHealthScreen: React.FC<Props> = ({ navigation, route }) => {
   const { gender, weight, height } = route.params;
   const [healthInfo, setHealthInfo] = useState("");
 
-  const handleFinish = () => {
-    // Save onboarding info to Firestore or AsyncStorage here if needed
-    console.log("Onboarding Complete:", { gender, weight, height, healthInfo });
-    navigation.getParent()?.reset({
-      index: 0,
-      routes: [{ name: "HomeTab" }],
-    });
+  const handleFinish = async () => {
+    const currentUser = auth.currentUser;
+    if (!currentUser) {
+      Alert.alert("Error", "You must be logged in to save health info.");
+      return;
+    }
+
+    try {
+      // Calculate BMI
+      const weightNum = parseFloat(weight);
+      const heightNum = parseFloat(height);
+      let bmi = null;
+      if (weightNum && heightNum) {
+        const heightM = heightNum / 100;
+        bmi = Number((weightNum / (heightM * heightM)).toFixed(1));
+      }
+      // Reference to the user's healthinfo subcollection
+      const healthInfoRef = collection(
+        db,
+        "users",
+        currentUser.uid,
+        "healthinfo"
+      );
+
+      const healthData = {
+        gender,
+        weight,
+        height,
+        bmi,
+        healthInfo,
+        createdAt: serverTimestamp(),
+      };
+
+      await addDoc(healthInfoRef, healthData);
+
+      // Navigate to HomeTab after saving
+      navigation.getParent()?.reset({
+        index: 0,
+        routes: [{ name: "HomeTab" }],
+      });
+    } catch (error: any) {
+      Alert.alert("Error", `Failed to save health info: ${error.message}`);
+    }
   };
 
   return (
