@@ -29,6 +29,7 @@ import {
   where,
   onSnapshot,
   orderBy,
+  getDocs,
 } from "firebase/firestore";
 import moment from "moment";
 
@@ -64,6 +65,46 @@ const HomeScreen: React.FC = () => {
   const [userName, setUserName] = useState<string>("");
   const [todayTasks, setTodayTasks] = useState<any[]>([]);
   const [loadingTasks, setLoadingTasks] = useState(true);
+  const [bmi, setBmi] = useState<number | null>(null);
+  const [bmiDesc, setBmiDesc] = useState<string>("");
+
+  useEffect(() => {
+    const fetchHealthInfo = async () => {
+      try {
+        const currentUser = auth.currentUser;
+        if (!currentUser) return;
+
+        // Get the healthinfo collection (assume only one doc)
+        const healthInfoRef = collection(
+          db,
+          "users",
+          currentUser.uid,
+          "healthinfo"
+        );
+        const snapshot = await getDocs(healthInfoRef);
+
+        if (!snapshot.empty) {
+          const data = snapshot.docs[0].data();
+          const weight = parseFloat(data.weight);
+          const heightCm = parseFloat(data.height);
+          setBmi(data.bmi ?? null);
+
+          // Set BMI description
+          let desc = "";
+          if (data.bmi === undefined || data.bmi === null) desc = "--";
+          else if (data.bmi < 18.5) desc = "Underweight";
+          else if (data.bmi < 25) desc = "You have a normal weight";
+          else if (data.bmi < 30) desc = "Overweight";
+          else desc = "Obese";
+          setBmiDesc(desc);
+        }
+      } catch (error) {
+        console.error("Error fetching health info:", error);
+      }
+    };
+
+    fetchHealthInfo();
+  }, []);
 
   useEffect(() => {
     const loadUserName = async () => {
@@ -200,8 +241,8 @@ const HomeScreen: React.FC = () => {
           <View style={styles.statisticsContent}>
             <View style={styles.bmiBox}>
               <Text style={styles.statLabel}>BMI (Body Mass Index)</Text>
-              <Text style={styles.statValue}>20.1</Text>
-              <Text style={styles.statDesc}>You have a normal weight</Text>
+              <Text style={styles.statValue}>{bmi !== null ? bmi : "--"}</Text>
+              <Text style={styles.statDesc}>{bmiDesc || "No health info"}</Text>
             </View>
             <View style={styles.calorieBox}>
               <Text style={styles.statLabel}>Calorie</Text>
