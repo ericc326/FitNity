@@ -85,8 +85,6 @@ const HomeScreen: React.FC = () => {
 
         if (!snapshot.empty) {
           const data = snapshot.docs[0].data();
-          const weight = parseFloat(data.weight);
-          const heightCm = parseFloat(data.height);
           setBmi(data.bmi ?? null);
 
           // Set BMI description
