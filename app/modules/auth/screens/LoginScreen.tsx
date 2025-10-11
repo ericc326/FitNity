@@ -104,7 +104,7 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ navigation }) => {
 
         <TextInput
           style={styles.input}
-          placeholder="Enter your email"
+          placeholder="Enter your email or username"
           placeholderTextColor="#888"
           autoCapitalize="none"
           keyboardType="email-address"
