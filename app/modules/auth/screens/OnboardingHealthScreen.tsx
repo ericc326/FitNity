@@ -19,7 +19,7 @@ import { collection, addDoc, serverTimestamp } from "firebase/firestore";
 type Props = NativeStackScreenProps<AuthStackParamList, "OnboardingHealth">;
 
 const OnboardingHealthScreen: React.FC<Props> = ({ navigation, route }) => {
-  const { gender, weight, height } = route.params;
+  const { gender, weight, height, level } = route.params;
   const [healthInfo, setHealthInfo] = useState("");
 
   const handleFinish = async () => {
@@ -50,6 +50,7 @@ const OnboardingHealthScreen: React.FC<Props> = ({ navigation, route }) => {
         gender,
         weight,
         height,
+        level,
         bmi,
         healthInfo,
         createdAt: serverTimestamp(),

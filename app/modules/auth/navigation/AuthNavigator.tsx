@@ -8,6 +8,7 @@ import ForgotPasswordScreen from "../screens/ForgotPasswordScreen";
 import OnboardingGenderScreen from "../screens/OnboardingGenderScreen";
 import OnboardingBodyScreen from "../screens/OnboardingBodyScreen";
 import OnboardingHealthScreen from "../screens/OnboardingHealthScreen";
+import OnboardingLevelScreen from "../screens/OnboardingLevelScreen";
 
 export type AuthStackParamList = {
   Splash: undefined;
@@ -17,7 +18,13 @@ export type AuthStackParamList = {
   ForgotPassword: undefined;
   OnboardingGender: undefined;
   OnboardingBody: { gender: string };
-  OnboardingHealth: { gender: string; weight: string; height: string };
+  OnboardingLevel: { gender: string; weight: string; height: string };
+  OnboardingHealth: {
+    gender: string;
+    weight: string;
+    height: string;
+    level: string;
+  };
 };
 
 const AuthStack = createNativeStackNavigator<AuthStackParamList>();
@@ -40,6 +47,10 @@ export const AuthNavigator = () => {
       <AuthStack.Screen
         name="OnboardingBody"
         component={OnboardingBodyScreen}
+      />
+      <AuthStack.Screen
+        name="OnboardingLevel"
+        component={OnboardingLevelScreen}
       />
       <AuthStack.Screen
         name="OnboardingHealth"

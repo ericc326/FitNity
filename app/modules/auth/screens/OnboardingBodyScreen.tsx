@@ -19,9 +19,9 @@ const OnboardingBodyScreen: React.FC<Props> = ({ navigation, route }) => {
   const [weight, setWeight] = useState("");
   const [height, setHeight] = useState("");
 
-  const handleNext = () => {
+const handleNext = () => {
     if (weight && height) {
-      navigation.navigate("OnboardingHealth", { gender, weight, height });
+      navigation.navigate("OnboardingLevel", { gender, weight, height });
     }
   };
 
