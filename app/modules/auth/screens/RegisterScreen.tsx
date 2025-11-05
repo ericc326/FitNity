@@ -27,6 +27,7 @@ import {
   SafeAreaView,
   useSafeAreaInsets,
 } from "react-native-safe-area-context";
+import LoadingIndicator from "../../../components/LoadingIndicator";
 
 type RegisterScreenNavigationProp = CompositeNavigationProp<
   NativeStackNavigationProp<AuthStackParamList, "Register">,
@@ -44,6 +45,7 @@ const RegisterScreen: React.FC<RegisterScreenProps> = ({ navigation }) => {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [passwordVisible, setPasswordVisible] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
 
   const handleRegister = async () => {
     if (!name || !email || !password) {
@@ -58,6 +60,7 @@ const RegisterScreen: React.FC<RegisterScreenProps> = ({ navigation }) => {
     }
 
     try {
+      setIsLoading(true);
       const usersRef = collection(db, "users");
 
       const emailQuery = query(
@@ -66,6 +69,7 @@ const RegisterScreen: React.FC<RegisterScreenProps> = ({ navigation }) => {
       );
       const emailSnapshot = await getDocs(emailQuery);
       if (!emailSnapshot.empty) {
+        setIsLoading(false);
         Alert.alert(
           "Email Already Registered",
           "Please use a different email."
@@ -76,6 +80,7 @@ const RegisterScreen: React.FC<RegisterScreenProps> = ({ navigation }) => {
       const nameQuery = query(usersRef, where("name", "==", name));
       const nameSnapshot = await getDocs(nameQuery);
       if (!nameSnapshot.empty) {
+        setIsLoading(false);
         Alert.alert("Name Already Taken", "Please choose a different name.");
         return;
       }
@@ -107,6 +112,8 @@ const RegisterScreen: React.FC<RegisterScreenProps> = ({ navigation }) => {
         "Registration Error",
         error.message || "Something went wrong"
       );
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -115,6 +122,7 @@ const RegisterScreen: React.FC<RegisterScreenProps> = ({ navigation }) => {
       <TouchableOpacity
         onPress={() => navigation.navigate("Auth", { screen: "Welcome" })}
         style={[styles.backButton, { top: insets.top + 10 }]}
+        disabled={isLoading}
       >
         <MaterialCommunityIcons name="arrow-left" size={28} color="#fff" />
       </TouchableOpacity>
@@ -132,6 +140,7 @@ const RegisterScreen: React.FC<RegisterScreenProps> = ({ navigation }) => {
           value={name}
           onChangeText={setName}
           placeholderTextColor="#888"
+          editable={!isLoading}
         />
         <TextInput
           style={styles.input}
@@ -141,6 +150,7 @@ const RegisterScreen: React.FC<RegisterScreenProps> = ({ navigation }) => {
           keyboardType="email-address"
           autoCapitalize="none"
           placeholderTextColor="#888"
+          editable={!isLoading}
         />
 
         <View style={styles.passwordContainer}>
@@ -152,11 +162,13 @@ const RegisterScreen: React.FC<RegisterScreenProps> = ({ navigation }) => {
             value={password}
             onChangeText={setPassword}
             autoCapitalize="none"
+            editable={!isLoading}
           />
           <TouchableOpacity
             onPress={() => setPasswordVisible(!passwordVisible)}
             style={styles.eyeIcon}
             activeOpacity={0.7}
+            disabled={isLoading}
           >
             <MaterialCommunityIcons
               name={passwordVisible ? "eye" : "eye-off"}
@@ -166,7 +178,11 @@ const RegisterScreen: React.FC<RegisterScreenProps> = ({ navigation }) => {
           </TouchableOpacity>
         </View>
 
-        <TouchableOpacity style={styles.button} onPress={handleRegister}>
+        <TouchableOpacity
+          style={styles.button}
+          onPress={handleRegister}
+          disabled={isLoading}
+        >
           <Text style={styles.buttonText}>Register</Text>
         </TouchableOpacity>
 
@@ -174,11 +190,13 @@ const RegisterScreen: React.FC<RegisterScreenProps> = ({ navigation }) => {
           <Text style={styles.promptText}>Already have an account?</Text>
           <TouchableOpacity
             onPress={() => navigation.navigate("Auth", { screen: "Login" })}
+            disabled={isLoading}
           >
             <Text style={styles.loginText}> Login now</Text>
           </TouchableOpacity>
         </View>
       </View>
+      {isLoading && <LoadingIndicator />}
     </SafeAreaView>
   );
 };
