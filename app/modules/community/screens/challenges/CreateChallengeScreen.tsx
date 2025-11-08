@@ -68,7 +68,8 @@ const CreateChallengeScreen = () => {
       if (image) {
         const response = await fetch(image);
         const blob = await response.blob();
-        const imageRef = ref(storage, `challenges/${Date.now()}`);
+        const filename = image.substring(image.lastIndexOf("/") + 1);
+        const imageRef = ref(storage, `challenges/${Date.now()}_${filename}`);
         await uploadBytes(imageRef, blob);
         imageUrl = await getDownloadURL(imageRef);
       }
