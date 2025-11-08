@@ -20,7 +20,7 @@ import moment from "moment";
 
 type Props = NativeStackScreenProps<ScheduleStackParamList, "CreateSchedule">;
 
-const CreateScheduleScreen = ({ navigation }: Props) => {
+const CreateScheduleScreen = ({ navigation, route }: Props) => {
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [date, setDate] = useState<Date>(new Date());
@@ -28,6 +28,7 @@ const CreateScheduleScreen = ({ navigation }: Props) => {
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [showTimePicker, setShowTimePicker] = useState(false);
   const [selectedWorkout, setSelectedWorkout] = useState("Front Square");
+  const fromHome = !!route?.params?.fromHome;
 
   const onChangeDate = (event: any, selectedDate?: Date) => {
     if (Platform.OS === "android") setShowDatePicker(false);
@@ -76,7 +77,12 @@ const CreateScheduleScreen = ({ navigation }: Props) => {
       await addDoc(userSchedulesRef, newScheduleData);
 
       Alert.alert("Success", "Schedule saved successfully!");
-      navigation.goBack();
+      // If opened from Home, go back to Home tab; otherwise pop back to ScheduleList
+      if (fromHome) {
+        navigation.getParent()?.navigate("Home");
+      } else {
+        navigation.goBack();
+      }
     } catch (error: any) {
       Alert.alert("Error", `Failed to save schedule: ${error.message}`);
     } finally {
@@ -90,7 +96,13 @@ const CreateScheduleScreen = ({ navigation }: Props) => {
         {/* Header */}
         <View style={styles.header}>
           <TouchableOpacity
-            onPress={() => navigation.goBack()}
+            onPress={() => {
+              if (fromHome) {
+                navigation.getParent()?.navigate("Home");
+              } else {
+                navigation.goBack();
+              }
+            }}
             style={styles.closeButton}
           >
             <MaterialCommunityIcons name="close" size={28} color="#fff" />
@@ -198,7 +210,7 @@ const CreateScheduleScreen = ({ navigation }: Props) => {
           {/* Details Workout Section */}
           <Text style={styles.detailsWorkoutHeader}>Details Workout</Text>
 
-          {/* Choose Workout Button */}
+          {/* Choose Workout Button (when clicked linked to select exercise screen*/}
           <TouchableOpacity
             style={styles.workoutDetailButton}
             disabled={loading}

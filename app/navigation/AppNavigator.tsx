@@ -20,8 +20,8 @@ import ScheduleNavigator, {
   ScheduleStackParamList,
 } from "../modules/schedule/navigation/ScheduleNavigator";
 import WorkoutNavigator, {
-  WorkoutStackParamList
-}from "../modules/workout/navigation/WorkoutNavigator";
+  WorkoutStackParamList,
+} from "../modules/workout/navigation/WorkoutNavigator";
 import AiCoachScreen from "../modules/workout/screens/AiCoachScreen";
 
 // Tab Navigation Types
@@ -81,6 +81,12 @@ function TabNavigator() {
             <MaterialCommunityIcons name="calendar" color={color} size={size} />
           ),
         }}
+        listeners={({ navigation }) => ({
+          tabPress: (e) => {
+            e.preventDefault();
+            navigation.navigate("Schedule", { screen: "ScheduleList" });
+          },
+        })}
       />
       <Tab.Screen
         name="Workout"
@@ -140,7 +146,7 @@ export default function AppNavigator() {
         component={ProfileNavigator}
         options={{ headerShown: false }}
       />
-       <RootStack.Screen name="AiCoach" component={AiCoachScreen} /> 
+      <RootStack.Screen name="AiCoach" component={AiCoachScreen} />
     </RootStack.Navigator>
   );
 }

@@ -307,7 +307,7 @@ const ScheduleScreen = () => {
   };
 
   const handleAddSchedule = () => {
-    navigation.navigate("CreateSchedule");
+    navigation.navigate("CreateSchedule", { fromHome: false });
   };
 
   return (
