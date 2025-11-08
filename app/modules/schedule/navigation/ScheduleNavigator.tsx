@@ -6,7 +6,7 @@ import EditScheduleScreen from "../screens/EditScheduleScreen";
 
 export type ScheduleStackParamList = {
   ScheduleList: undefined;
-  CreateSchedule: undefined;
+  CreateSchedule: { fromHome?: boolean };
   EditSchedule: { scheduleId: string };
 };
 

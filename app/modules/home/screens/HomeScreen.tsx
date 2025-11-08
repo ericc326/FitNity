@@ -323,7 +323,10 @@ const HomeScreen: React.FC = () => {
         <TouchableOpacity
           style={styles.createWorkoutBtn}
           onPress={() =>
-            navigation.navigate("Workout", { screen: "WorkoutSection" })
+            navigation.navigate("Schedule", {
+              screen: "CreateSchedule",
+              params: { fromHome: true },
+            })
           }
         >
           <Text style={styles.createWorkoutText}>Create Workout</Text>
