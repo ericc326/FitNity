@@ -12,7 +12,7 @@ import { useNavigation, CommonActions } from "@react-navigation/native";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { ProfileStackParamList } from "../navigation/ProfileNavigator";
-import { auth, db } from "../../../../firebaseConfig";
+import { app, auth, db } from "../../../../firebaseConfig";
 import { doc, getDoc } from "firebase/firestore";
 
 type ProfileScreenNavigationProp =
@@ -25,6 +25,7 @@ const ProfileScreen = () => {
     email: string;
     // Add other user fields as needed
   } | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
     const loadUserData = async () => {
@@ -75,6 +76,88 @@ const ProfileScreen = () => {
     } catch (error) {
       Alert.alert("Error", "Failed to logout. Please try again.");
     }
+  };
+
+  const callDeleteFunction = async () => {
+    if (!auth.currentUser) throw new Error("Client not signed in");
+    // refresh token to be safe
+    const idToken = await auth.currentUser.getIdToken(true);
+    const region = "us-central1"; // change if your function uses a different region
+    const project = app?.options?.projectId;
+    if (!project) throw new Error("Missing firebase project id");
+    const url = `https://${region}-${project}.cloudfunctions.net/deleteUserAndData`;
+
+    const res = await fetch(url, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${idToken}`,
+      },
+      body: JSON.stringify({}),
+    });
+
+    const text = await res.text();
+    if (res.status === 200) {
+      return text;
+    }
+
+    // parse error if possible
+    let msg = text;
+    try {
+      const json = JSON.parse(text);
+      msg = json?.error?.message || json?.error?.note || text;
+    } catch {}
+    throw new Error(`Function error ${res.status}: ${msg}`);
+  };
+
+  // confirmation wrapper used by UI
+  const handleDeleteAccount = () => {
+    const user = auth.currentUser;
+    if (!user) {
+      Alert.alert("Error", "No authenticated user.");
+      return;
+    }
+
+    Alert.alert(
+      "Delete account",
+      "Are you sure you want to permanently delete your account and all data? This cannot be undone.",
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Delete",
+          style: "destructive",
+          onPress: async () => {
+            setDeleting(true);
+            try {
+              await callDeleteFunction();
+              Alert.alert(
+                "Account deleted",
+                "Your account and all associated data were deleted successfully.",
+                [
+                  {
+                    text: "OK",
+                    onPress: async () => {
+                      await auth.signOut().catch(() => null);
+                      navigation.dispatch(
+                        CommonActions.reset({
+                          index: 0,
+                          routes: [{ name: "Auth" }],
+                        })
+                      );
+                    },
+                  },
+                ],
+                { cancelable: false }
+              );
+            } catch (err: any) {
+              Alert.alert("Delete failed", err.message || String(err));
+            } finally {
+              setDeleting(false);
+            }
+          },
+        },
+      ]
+    );
   };
 
   return (
@@ -144,22 +227,6 @@ const ProfileScreen = () => {
             />
           </TouchableOpacity>
 
-          <TouchableOpacity style={styles.menuItem}>
-            <View style={styles.menuItemLeft}>
-              <MaterialCommunityIcons
-                name="history"
-                size={24}
-                color="#4a90e2"
-              />
-              <Text style={styles.menuItemText}>Activity History</Text>
-            </View>
-            <MaterialCommunityIcons
-              name="chevron-right"
-              size={24}
-              color="#8a84a5"
-            />
-          </TouchableOpacity>
-
           <TouchableOpacity
             style={styles.menuItem}
             onPress={navigateToSettings}
@@ -180,9 +247,22 @@ const ProfileScreen = () => {
             onPress={handleLogout}
           >
             <View style={styles.menuItemLeft}>
-              <MaterialCommunityIcons name="logout" size={24} color="#FF6B6B" />
+              <MaterialCommunityIcons name="logout" size={24} color="#FFA726" />
               <Text style={[styles.menuItemText, styles.logoutText]}>
                 Logout
+              </Text>
+            </View>
+          </TouchableOpacity>
+          {/* Delete Account Button */}
+          <TouchableOpacity
+            style={[styles.menuItem, styles.logoutButton, { marginTop: 12 }]}
+            onPress={handleDeleteAccount}
+            disabled={deleting}
+          >
+            <View style={styles.menuItemLeft}>
+              <MaterialCommunityIcons name="delete" size={24} color="#FF4444" />
+              <Text style={[styles.menuItemText, styles.deleteAccText]}>
+                {deleting ? "Deleting..." : "Delete Account"}
               </Text>
             </View>
           </TouchableOpacity>
@@ -199,7 +279,7 @@ const styles = StyleSheet.create({
   },
   header: {
     alignItems: "center",
-    padding: 20,
+    padding: 10,
   },
   profileImage: {
     width: 100,
@@ -277,7 +357,10 @@ const styles = StyleSheet.create({
     backgroundColor: "#3C3952",
   },
   logoutText: {
-    color: "#FF6B6B",
+    color: "#FFA726",
+  },
+  deleteAccText: {
+    color: "#FF4444",
   },
 });
 
