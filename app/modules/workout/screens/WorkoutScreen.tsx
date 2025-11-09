@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   View,
   Text,
@@ -9,30 +9,27 @@ import {
   Image,
   FlatList,
   Dimensions,
+  ActivityIndicator,
 } from "react-native";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
-import { ImageSourcePropType } from "react-native";
-import YouTube from "react-native-youtube-iframe";
-import { WebView } from "react-native-webview";
 import { useNavigation } from "@react-navigation/native";
-import AiCoachScreen from "./AiCoachScreen";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { WorkoutStackParamList } from "../navigation/WorkoutNavigator";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 const { width } = Dimensions.get("window");
 
-interface Exercise {
-  id: string;
+export interface Exercise {
+  exerciseId?: string;
   name: string;
-  category: string;
-  calories: number;
-  difficulty: string;
-  description: string;
-  steps: string[];
-  image: ImageSourcePropType;
-  videoId: string;
+  bodyParts?: string[];
+  equipments?: string[];
+  targetMuscles?: string[];
+  secondaryMuscles?: string[];
+  gifUrl?: string;
+  instructions?: string[];
 }
+
 
 interface ProgressItem {
   id: string;
@@ -41,79 +38,7 @@ interface ProgressItem {
   weight: string;
   startingBest: number;
   currentBest: number;
-  growth?: string;
 }
-
-const exerciseData: Exercise[] = [
-  {
-    id: "1",
-    name: "Box Jumps",
-    category: "Legs",
-    calories: 120,
-    difficulty: "Medium",
-    description:
-      "Box jumps are a plyometric exercise that involves jumping onto a box or platform from a standing position.",
-    steps: [
-      "Stand facing the box with feet shoulder-width apart",
-      "Bend knees and swing arms back",
-      "Explosively jump onto the box",
-      "Land softly with knees slightly bent",
-    ],
-    image: require("../../../assets/boxjump.png"),
-    videoId: "hxldG9FX4j4",
-  },
-  {
-    id: "2",
-    name: "Squats",
-    category: "Legs",
-    calories: 80,
-    difficulty: "Easy",
-    description:
-      "A squat is a strength exercise in which the trainee lowers their hips from a standing position and then stands back up.",
-    steps: [
-      "Stand with feet shoulder-width apart",
-      "Lower your body as far as you can by pushing your hips back",
-      "Keep your chest up and your back straight",
-      "Press through your heels to return to starting position",
-    ],
-    image: require("../../../assets/squat.png"),
-    videoId: "hxldG9FX4j4",
-  },
-  {
-    id: "3",
-    name: "Deadlift",
-    category: "Back",
-    calories: 150,
-    difficulty: "Hard",
-    description:
-      "The deadlift is a weight training exercise in which a loaded barbell or bar is lifted off the ground to the level of the hips.",
-    steps: [
-      "Stand with your mid-foot under the barbell",
-      "Bend over and grab the bar with a shoulder-width grip",
-      "Bend your knees until your shins touch the bar",
-      "Lift the bar by straightening your back and legs",
-    ],
-    image: require("../../../assets/deadlift.png"),
-    videoId: "hxldG9FX4j4",
-  },
-  {
-    id: "4",
-    name: "Front Squat",
-    category: "Legs",
-    calories: 100,
-    difficulty: "Medium",
-    description:
-      "A front squat is a compound exercise that targets the muscles of the upper legs, hips, and buttocks.",
-    steps: [
-      "Rest the barbell on your front deltoids",
-      "Keep your elbows high and upper arms parallel to the floor",
-      "Descend into a squat position",
-      "Drive through your heels to return to standing position",
-    ],
-    image: require("../../../assets/frontsquat.png"),
-    videoId: "hxldG9FX4j4",
-  },
-];
 
 const progressData: ProgressItem[] = [
   {
@@ -123,75 +48,91 @@ const progressData: ProgressItem[] = [
     weight: "Body Weight",
     startingBest: 30,
     currentBest: 42,
-    growth: "+40%",
   },
   {
     id: "2",
-    exercise: "Incline Bench",
-    category: "Chest",
-    weight: "80kg",
-    startingBest: 3,
-    currentBest: 12,
-    growth: "+300%",
-  },
-  {
-    id: "3",
-    exercise: "Dumbbell Lateral Raise",
-    category: "Shoulders",
-    weight: "16kg",
-    startingBest: 12,
-    currentBest: 16,
-    growth: "+33%",
-  },
-  {
-    id: "4",
-    exercise: "Deadlift",
-    category: "Back",
-    weight: "100kg",
-    startingBest: 5,
-    currentBest: 8,
-    growth: "+60%",
-  },
-  {
-    id: "5",
     exercise: "Squats",
     category: "Legs",
     weight: "80kg",
     startingBest: 6,
     currentBest: 10,
-    growth: "+67%",
   },
 ];
 
 const WorkoutScreen = () => {
   const navigation =
     useNavigation<NativeStackNavigationProp<WorkoutStackParamList>>();
+
   const [activeTab, setActiveTab] = useState<"exercise" | "progress">(
     "exercise"
   );
   const [searchQuery, setSearchQuery] = useState("");
-  const [selectedCategory, setSelectedCategory] = useState<string>("All");
+  const [exercises, setExercises] = useState<Exercise[]>([]);
+  const [loading, setLoading] = useState(true);
   const [selectedExercise, setSelectedExercise] = useState<Exercise | null>(
     null
   );
-  const categories = [...new Set(progressData.map((item) => item.category))];
+  const [selectedBodyPart, setSelectedBodyPart] = useState<string>("All");
+  const allBodyPartsList = ["All", "Chest", "Back", "Legs", "Shoulders", "Arms", "Core", "Cardio"];
+  const [bodyParts, setBodyParts] = useState<string[]>(allBodyPartsList);
 
-  const filteredExercises = exerciseData.filter((exercise) =>
-    exercise.name.toLowerCase().includes(searchQuery.toLowerCase())
-  );
 
-  const filteredProgressData =
-    selectedCategory === "All"
-      ? progressData
-      : progressData.filter((item) => item.category === selectedCategory);
+const fetchExercises = async (bodyPart: string = "All") => {
+  setLoading(true);
+  try {
+    let url = "";
 
-  // Filter further by search query if needed
-  const searchedProgressData = filteredProgressData.filter((item) =>
-    item.exercise.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+    if (bodyPart === "All") {
+      // random 100 exercises
+      const randomOffset = Math.floor(Math.random() * 1400);
+      url = `https://exercisedb-api.vercel.app/api/v1/exercises?limit=100&offset=${randomOffset}`;
+    } else {
+      // fetch exercises for a specific body part
+      url = `https://exercisedb-api.vercel.app/api/v1/exercises/bodyPart/${bodyPart.toLowerCase()}`;
+    }
 
-  const calculateGrowth = (starting: number, current: number): string => {
-    const growth = ((current - starting) / starting) * 100;
+    const response = await fetch(url);
+    const json = await response.json();
+    console.log("Fetched exercises:", json);
+
+    if (!json.data || !Array.isArray(json.data)) {
+      setExercises([]);
+      return;
+    }
+
+    setExercises(json.data);
+  } catch (error) {
+    console.error("Error fetching exercises:", error);
+    setExercises([]);
+  } finally {
+    setLoading(false);
+  }
+};
+
+const handleBodyPartPress = (part: string) => {
+  setSelectedBodyPart(part);
+  fetchExercises(part);
+};
+
+  useEffect(() => {
+    fetchExercises();
+  }, []);
+
+
+const filteredExercises = exercises.filter((item: Exercise) => {
+  const matchesSearch = item.name
+    .toLowerCase()
+    .includes(searchQuery.toLowerCase());
+
+  const matchesBodyPart =
+    selectedBodyPart === "All" || item.bodyParts?.includes(selectedBodyPart);
+
+  return matchesSearch && matchesBodyPart;
+});
+
+  
+  const calculateGrowth = (start: number, current: number) => {
+    const growth = ((current - start) / start) * 100;
     return `${growth >= 0 ? "+" : ""}${Math.round(growth)}%`;
   };
 
@@ -200,103 +141,102 @@ const WorkoutScreen = () => {
       style={styles.exerciseItem}
       onPress={() => setSelectedExercise(item)}
     >
-      {/* Image on the left */}
       <View style={styles.imageContainer}>
-        <Image
-          source={item.image}
-          style={styles.exerciseImage}
-          resizeMode="cover"
-        />
+        {item.gifUrl ? (
+          <Image
+            source={{ uri: item.gifUrl }}
+            style={styles.exerciseImage}
+            resizeMode="cover"
+          />
+        ) : (
+          <MaterialCommunityIcons
+            name="dumbbell"
+            size={40}
+            color="#5A3BFF"
+            style={{ alignSelf: "center", marginTop: 10 }}
+          />
+        )}
       </View>
 
-      {/* Text content on the right */}
       <View style={styles.textContainer}>
         <Text style={styles.exerciseName}>{item.name}</Text>
-        <View style={styles.exerciseMeta}>
-          <Text style={styles.exerciseDifficulty}>{item.difficulty}</Text>
-          <Text style={styles.exerciseCalories}>
-            {" "}
-            | {item.calories} Calories Burn
-          </Text>
-        </View>
+        <Text style={styles.exerciseMeta}>
+          {item.bodyParts || "Unknown part"}
+        </Text>
       </View>
     </TouchableOpacity>
   );
 
-  const renderProgressItem = ({ item }: { item: ProgressItem }) => {
-    const growth = calculateGrowth(item.startingBest, item.currentBest);
+  const renderProgressItem = ({ item }: { item: ProgressItem }) => (
+    <View style={styles.progressRow}>
+      <Text style={styles.cell}>{item.exercise}</Text>
+      <Text style={styles.cell}>{item.weight}</Text>
+      <Text style={styles.cell}>{item.startingBest}</Text>
+      <Text style={styles.cell}>{item.currentBest}</Text>
+      <Text style={[styles.cell, styles.growthCell]}>
+        {calculateGrowth(item.startingBest, item.currentBest)}
+      </Text>
+    </View>
+  );
 
-    return (
-      <View style={styles.progressRow}>
-        <Text style={styles.cell}>{item.exercise}</Text>
-        <Text style={styles.cell}>{item.weight}</Text>
-        <Text style={styles.cell}>{item.startingBest}</Text>
-        <Text style={styles.cell}>{item.currentBest}</Text>
-        <Text style={[styles.cell, styles.growthCell]}>{growth}</Text>
-      </View>
-    );
-  };
+// ✅ Exercise Detail View
+if (selectedExercise) {
+  return (
+    <SafeAreaView style={{ flex: 1, backgroundColor: "#262135" }}>
+      <ScrollView>
+        <TouchableOpacity
+          style={styles.backButton}
+          onPress={() => setSelectedExercise(null)}
+        >
+          <MaterialCommunityIcons name="arrow-left" size={24} color="white" />
+          <Text style={styles.backText}>Back to Exercises</Text>
+        </TouchableOpacity>
 
-  if (selectedExercise) {
-    return (
-      <SafeAreaView style={{ flex: 1, backgroundColor: "#262135" }}>
-        <ScrollView>
-          <TouchableOpacity
-            style={styles.backButton}
-            onPress={() => setSelectedExercise(null)}
-          >
-            <MaterialCommunityIcons name="arrow-left" size={24} color="white" />
-            <Text style={styles.backText}>Back to Exercises</Text>
-          </TouchableOpacity>
+        <Text style={styles.exerciseTitle}>{selectedExercise.name}</Text>
 
-          <Text style={styles.exerciseTitle}>{selectedExercise.name}</Text>
-
+        {selectedExercise.gifUrl && (
           <View style={styles.videoContainer}>
-            <WebView
-              javaScriptEnabled={true}
-              allowsFullscreenVideo={true}
-              source={{
-                uri: `https://www.youtube.com/embed/${selectedExercise.videoId}?rel=0&autoplay=0&showinfo=0&controls=1`,
-              }}
-              style={{ flex: 1 }}
+            <Image
+              source={{ uri: selectedExercise.gifUrl }}
+              style={{ width: "100%", height: 250, borderRadius: 10 }}
             />
           </View>
+        )}
 
-          <View style={styles.exerciseHeader}>
-            <Text style={styles.exerciseDifficulty}>
-              {selectedExercise.difficulty}
-            </Text>
-            <Text style={styles.exerciseCalories}>
-              {" | "}
-              {selectedExercise.calories} Calories Burn
-            </Text>
-          </View>
+{/* ✅ Exercise Details Section */}
+<View style={{ marginHorizontal: 20, marginTop: 10 }}>
+  <Text style={styles.sectionTitle}>🎯 Target Muscles</Text>
+  <Text style={styles.descriptionText}>
+    {(selectedExercise.targetMuscles || []).join(", ") || "No details available"}
+  </Text>
 
-          <Text style={styles.sectionTitle}>Descriptions</Text>
-          <Text style={styles.descriptionText}>
-            {selectedExercise.description}
-          </Text>
-          <Text style={styles.readMore}>Read More...</Text>
+  <Text style={styles.sectionTitle}>💪 Body Parts</Text>
+  <Text style={styles.descriptionText}>
+    {(selectedExercise.bodyParts || []).join(", ") || "No details available"}
+  </Text>
 
-          <Text style={styles.sectionTitle}>
-            How To Do It {selectedExercise.steps.length} Steps
-          </Text>
+  <Text style={styles.sectionTitle}>🏋️ Equipment</Text>
+  <Text style={styles.descriptionText}>
+    {(selectedExercise.equipments || []).join(", ") || "No details available"}
+  </Text>
 
-          {selectedExercise.steps.map((step, index) => (
-            <View key={index} style={styles.stepContainer}>
-              <View style={styles.stepNumber}>
-                <Text style={styles.stepNumberText}>
-                  {index < 9 ? `0${index + 1}` : index + 1}
-                </Text>
-              </View>
-              <Text style={styles.stepText}>● {step}</Text>
-            </View>
-          ))}
+  <Text style={styles.sectionTitle}>📋 Instructions</Text>
+  {selectedExercise.instructions && selectedExercise.instructions.length > 0 ? (
+    selectedExercise.instructions.map((step, index) => (
+      <Text key={index} style={[styles.descriptionText, { marginBottom: 5 }]}>
+        {step}
+      </Text>
+    ))
+  ) : (
+    <Text style={styles.descriptionText}>No instructions available.</Text>
+  )}
 
-          <TouchableOpacity style={styles.aiCoachButton}>
-            <MaterialCommunityIcons name="robot" size={24} color="white" />
-            <Text style={styles.aiCoachText}>Analyze with AI Coach</Text>
-          </TouchableOpacity>
+  <TouchableOpacity style={styles.aiCoachButton}>
+    <MaterialCommunityIcons name="robot" size={24} color="white" />
+    <Text style={styles.aiCoachText}>Analyze with AI Coach</Text>
+  </TouchableOpacity>
+</View>
+
         </ScrollView>
       </SafeAreaView>
     );
@@ -304,6 +244,7 @@ const WorkoutScreen = () => {
 
   return (
     <View style={styles.container}>
+      {/* Tabs */}
       <View style={styles.tabContainer}>
         <TouchableOpacity
           style={[
@@ -325,135 +266,95 @@ const WorkoutScreen = () => {
         </TouchableOpacity>
       </View>
 
+      {/* Exercise Tab */}
       {activeTab === "exercise" ? (
         <>
-          {/* Search Bar */}
-          <View style={styles.searchContainer}>
-            <MaterialCommunityIcons
-              name="magnify"
-              size={24}
-              color="#888"
-              style={styles.searchIcon}
-            />
-            <TextInput
-              style={styles.searchInput}
-              placeholder="Search exercises..."
-              placeholderTextColor="#888"
-              value={searchQuery}
-              onChangeText={setSearchQuery}
-            />
-            <TouchableOpacity
-              style={styles.scanButton}
-              onPress={() => navigation.navigate("AiCoach")}
-            >
+{/* Search + Body Part Filter */}
+          <View style={{ marginHorizontal: 20, marginBottom: 10 }}>
+            <View style={styles.searchContainer}>
               <MaterialCommunityIcons
-                name="barcode-scan"
+                name="magnify"
                 size={24}
-                color="white"
+                color="#888"
+                style={styles.searchIcon}
               />
-            </TouchableOpacity>
+              <TextInput
+                style={styles.searchInput}
+                placeholder="Search exercises..."
+                placeholderTextColor="#888"
+                value={searchQuery}
+                onChangeText={setSearchQuery}
+              />
+            </View>
+
+            {/* Body Part Filter */}
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              style={styles.filterContainer}
+            >
+{bodyParts.map((part) => (
+  <TouchableOpacity
+    key={part}
+    style={[
+      styles.filterButton,
+      selectedBodyPart === part && styles.filterButtonActive,
+    ]}
+    onPress={() => handleBodyPartPress(part)}
+  >
+    <Text
+      style={{
+        color: selectedBodyPart === part ? "white" : "#aaa",
+        fontWeight: "bold",
+      }}
+    >
+      {part}
+    </Text>
+  </TouchableOpacity>
+))}
+
+            </ScrollView>
           </View>
 
-          {/* Exercise List */}
-          <FlatList
-            data={filteredExercises}
-            renderItem={renderExerciseItem}
-            keyExtractor={(item) => item.id}
-            contentContainerStyle={styles.exerciseList}
-          />
+          {loading ? (
+            <ActivityIndicator size="large" color="#5A3BFF" style={{ flex: 1 }} />
+          ) : filteredExercises.length > 0 ? (
+            <FlatList
+              data={filteredExercises}
+              renderItem={renderExerciseItem}
+              keyExtractor={(item) => item.exerciseId || item.name}
+              contentContainerStyle={styles.exerciseList}
+            />
+          ) : (
+            <Text style={styles.emptyStateText}>No exercises found.</Text>
+          )}
         </>
       ) : (
-        <ScrollView style={{ flex: 1 }}>
-          {/* Chest Section */}
+        // Progress Tab
+        <ScrollView>
           <View style={styles.progressSection}>
-            <Text style={styles.muscleGroupTitle}>Chest</Text>
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={styles.progressScrollContainer}
-            >
-              <View style={styles.progressTable}>
-                <View style={styles.progressHeaderRow}>
-                  <Text style={[styles.headerCell, { flex: 1.2 }]}>
-                    Exercise
-                  </Text>
-                  <Text style={styles.headerCell}>Weight</Text>
-                  <Text style={styles.headerCell}>Start</Text>
-                  <Text style={styles.headerCell}>Current</Text>
-                  <Text style={styles.headerCell}>Growth</Text>
-                </View>
-                {progressData
-                  .filter((item) => item.category === "Chest")
-                  .map((item) => (
-                    <View key={item.id}>{renderProgressItem({ item })}</View>
-                  ))}
+            <Text style={styles.muscleGroupTitle}>Your Progress</Text>
+            <View style={styles.progressTable}>
+              <View style={styles.progressHeaderRow}>
+                <Text style={[styles.headerCell, { flex: 1.2 }]}>Exercise</Text>
+                <Text style={styles.headerCell}>Weight</Text>
+                <Text style={styles.headerCell}>Start</Text>
+                <Text style={styles.headerCell}>Current</Text>
+                <Text style={styles.headerCell}>Growth</Text>
               </View>
-            </ScrollView>
-          </View>
 
-          {/* Legs Section */}
-          <View style={styles.progressSection}>
-            <Text style={styles.muscleGroupTitle}>Leg</Text>
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={styles.progressScrollContainer}
-            >
-              <View style={styles.progressTable}>
-                <View style={styles.progressHeaderRow}>
-                  <Text style={[styles.headerCell, { flex: 1.2 }]}>
-                    Exercise
-                  </Text>
-                  <Text style={styles.headerCell}>Weight</Text>
-                  <Text style={styles.headerCell}>Start</Text>
-                  <Text style={styles.headerCell}>Current</Text>
-                  <Text style={styles.headerCell}>Growth</Text>
-                </View>
-                {progressData
-                  .filter((item) => item.category === "Legs")
-                  .map((item) => (
-                    <View key={item.id}>{renderProgressItem({ item })}</View>
-                  ))}
-              </View>
-            </ScrollView>
+              {progressData.map((item) => (
+                <View key={item.id}>{renderProgressItem({ item })}</View>
+              ))}
+            </View>
           </View>
-
-          {/* Biceps Section */}
-          <View style={styles.progressSection}>
-            <Text style={styles.muscleGroupTitle}>Biceps</Text>
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={styles.progressScrollContainer}
-            >
-              <View style={styles.progressTable}>
-                <View style={styles.progressHeaderRow}>
-                  <Text style={[styles.headerCell, { flex: 1.2 }]}>
-                    Exercise
-                  </Text>
-                  <Text style={styles.headerCell}>Weight</Text>
-                  <Text style={styles.headerCell}>Start</Text>
-                  <Text style={styles.headerCell}>Current</Text>
-                  <Text style={styles.headerCell}>Growth</Text>
-                </View>
-                {progressData
-                  .filter((item) => item.category === "Biceps")
-                  .map((item) => (
-                    <View key={item.id}>{renderProgressItem({ item })}</View>
-                  ))}
-              </View>
-            </ScrollView>
-          </View>
-
-          <TouchableOpacity style={styles.addExerciseButton}>
-            <Text style={styles.addExerciseText}>+ Add New Exercise</Text>
-          </TouchableOpacity>
         </ScrollView>
       )}
     </View>
   );
 };
 
+// --- styles (same as before) ---
 const styles = StyleSheet.create({
   container: {
     flex: 1,
@@ -467,26 +368,19 @@ const styles = StyleSheet.create({
     borderRadius: 15,
     overflow: "hidden",
     backgroundColor: "#2a2a3a",
-    borderWidth: 1,
-    borderColor: "#2a2a3a", // Purple border
   },
   tabButton: {
     flex: 1,
     paddingVertical: 15,
     alignItems: "center",
-    backgroundColor: "transparent", // Make inactive tabs transparent
   },
   activeTab: {
-    backgroundColor: "#5A3BFF", // Purple background for active tab
+    backgroundColor: "#5A3BFF",
   },
   tabText: {
-    color: "#ffffff", // Light gray for inactive tabs
+    color: "white",
     fontWeight: "bold",
     fontSize: 16,
-  },
-  activeTabText: {
-    // Add this new style
-    color: "white", // White text for active tab
   },
   searchContainer: {
     flexDirection: "row",
@@ -500,43 +394,65 @@ const styles = StyleSheet.create({
   searchIcon: {
     marginRight: 10,
   },
+  videoContainer: {
+  marginHorizontal: 20,
+  marginBottom: 20,
+  borderRadius: 10,
+  overflow: "hidden",
+  height: 250, // same height used above
+},
+
   searchInput: {
     flex: 1,
     color: "white",
     height: 50,
   },
-  scanButton: {
-    backgroundColor: "#5A556B",
-    padding: 8,
-    borderRadius: 8,
+    filterContainer: {
+    flexDirection: "row",
+    marginTop: 10,
+  },
+  filterButton: {
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    backgroundColor: "#2a2a3a",
+    borderRadius: 20,
+    marginRight: 10,
+  },
+  filterButtonActive: {
+    backgroundColor: "#5A3BFF",
   },
   exerciseList: {
     paddingHorizontal: 20,
   },
   exerciseItem: {
-    flexDirection: "row", // Horizontal layout
-    alignItems: "center", // Center items vertically
+    flexDirection: "row",
+    alignItems: "center",
     backgroundColor: "#2a2a3a",
     borderRadius: 10,
     padding: 15,
     marginBottom: 10,
   },
+  imageContainer: {
+    width: 60,
+    height: 60,
+    borderRadius: 8,
+    overflow: "hidden",
+    marginRight: 15,
+  },
+  exerciseImage: {
+    width: "100%",
+    height: "100%",
+  },
+  textContainer: {
+    flex: 1,
+  },
   exerciseName: {
     color: "white",
     fontSize: 18,
     fontWeight: "bold",
-    marginBottom: 5,
   },
   exerciseMeta: {
-    flexDirection: "row",
-  },
-  exerciseDifficulty: {
-    color: "#4CAF50",
-    fontSize: 14,
-  },
-  exerciseCalories: {
-    color: "#888",
-    fontSize: 14,
+    color: "#aaa",
   },
   backButton: {
     flexDirection: "row",
@@ -555,11 +471,6 @@ const styles = StyleSheet.create({
     marginHorizontal: 20,
     marginBottom: 5,
   },
-  exerciseHeader: {
-    flexDirection: "row",
-    marginHorizontal: 20,
-    marginBottom: 20,
-  },
   sectionTitle: {
     color: "white",
     fontSize: 18,
@@ -571,35 +482,6 @@ const styles = StyleSheet.create({
   descriptionText: {
     color: "#aaa",
     marginHorizontal: 20,
-    lineHeight: 22,
-  },
-  readMore: {
-    color: "#5A556B",
-    marginHorizontal: 20,
-    marginTop: 5,
-  },
-  stepContainer: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginHorizontal: 20,
-    marginVertical: 10,
-  },
-  stepNumber: {
-    backgroundColor: "#5A556B",
-    width: 30,
-    height: 30,
-    borderRadius: 15,
-    justifyContent: "center",
-    alignItems: "center",
-    marginRight: 10,
-  },
-  stepNumberText: {
-    color: "white",
-    fontWeight: "bold",
-  },
-  stepText: {
-    color: "white",
-    flex: 1,
     lineHeight: 22,
   },
   aiCoachButton: {
@@ -618,110 +500,10 @@ const styles = StyleSheet.create({
     fontWeight: "bold",
     fontSize: 16,
   },
-  progressContainer: {
-    flex: 1,
-    paddingHorizontal: 20,
-  },
-  progressHeader: {
-    flexDirection: "row",
-    borderBottomWidth: 1,
-    borderBottomColor: "#5A556B",
-    paddingBottom: 10,
-    marginBottom: 10,
-  },
-  progressHeaderText: {
-    flex: 1,
-    color: "#888",
-    fontWeight: "bold",
-    textAlign: "center",
-  },
-  progressItem: {
-    flexDirection: "row",
-    paddingVertical: 15,
-    borderBottomWidth: 1,
-    borderBottomColor: "#2a2a3a",
-  },
-  progressExercise: {
-    flex: 1,
-    color: "white",
-    textAlign: "center",
-  },
-  progressWeight: {
-    flex: 1,
-    color: "white",
-    textAlign: "center",
-  },
-  progressStarting: {
-    flex: 1,
-    color: "white",
-    textAlign: "center",
-  },
-  progressCurrent: {
-    flex: 1,
-    color: "white",
-    textAlign: "center",
-  },
-  progressGrowth: {
-    flex: 1,
-    fontWeight: "bold",
-    textAlign: "center",
-  },
-  imageContainer: {
-    width: 60, // Fixed width for image
-    height: 60, // Fixed height for image
-    borderRadius: 8,
-    overflow: "hidden",
-    marginRight: 15, // Space between image and text
-  },
-  exerciseImage: {
-    width: "100%",
-    height: "100%",
-  },
-  textContainer: {
-    flex: 1, // Takes remaining space
-    flexDirection: "column", // Stack text vertically
-    justifyContent: "center", // Center text vertically
-  },
-  categoryContainer: {
-    paddingHorizontal: 15,
-    paddingVertical: 10,
-    backgroundColor: "#2a2a3a",
-  },
-  categoryButton: {
-    paddingHorizontal: 15,
-    paddingVertical: 8,
-    borderRadius: 20,
-    marginRight: 10,
-    backgroundColor: "#3a3a4a",
-  },
-  selectedCategoryButton: {
-    backgroundColor: "#5A556B",
-  },
-  categoryText: {
-    color: "#aaa",
-    fontWeight: "500",
-  },
-  selectedCategoryText: {
-    color: "white",
-    fontWeight: "bold",
-  },
-  emptyState: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-    padding: 20,
-  },
   emptyStateText: {
     color: "#888",
     textAlign: "center",
     fontSize: 16,
-  },
-  videoContainer: {
-    marginHorizontal: 20,
-    marginBottom: 20,
-    borderRadius: 10,
-    overflow: "hidden",
-    height: 220, // Fixed height for the video player
   },
   progressSection: {
     marginBottom: 25,
@@ -732,9 +514,6 @@ const styles = StyleSheet.create({
     fontWeight: "bold",
     marginLeft: 20,
     marginBottom: 15,
-  },
-  progressScrollContainer: {
-    paddingHorizontal: 15,
   },
   progressTable: {
     minWidth: Dimensions.get("window").width - 30,
@@ -765,17 +544,6 @@ const styles = StyleSheet.create({
   },
   growthCell: {
     color: "#4CAF50",
-    fontWeight: "bold",
-  },
-  addExerciseButton: {
-    backgroundColor: "#5A3BFF",
-    padding: 15,
-    borderRadius: 10,
-    margin: 20,
-    alignItems: "center",
-  },
-  addExerciseText: {
-    color: "white",
     fontWeight: "bold",
   },
 });

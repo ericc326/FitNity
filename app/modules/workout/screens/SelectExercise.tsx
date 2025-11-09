@@ -1,47 +1,51 @@
-import React, { useState } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, ScrollView, TextInput, FlatList, Image, Alert } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { 
+  View, Text, TouchableOpacity, StyleSheet, ScrollView, 
+  TextInput, FlatList, Image, Alert, ActivityIndicator 
+} from 'react-native';
 import { NativeStackScreenProps } from "@react-navigation/native-stack";
 import { WorkoutStackParamList } from "../navigation/WorkoutNavigator";
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 
 type Props = NativeStackScreenProps<WorkoutStackParamList, "SelectExercise">;
 
-const exerciseData = [
-  {
-    id: '1',
-    name: 'Box Jumps',
-    category: 'Legs',
-    image: require('../../../assets/boxjump.png')
-  },
-  {
-    id: '2',
-    name: 'Squats',
-    category: 'Legs',
-    image: require('../../../assets/squat.png')
-  },
-  {
-    id: '3',
-    name: 'Deadlift',
-    category: 'Back',
-    image: require('../../../assets/deadlift.png')
-  },
-  {
-    id: '4',
-    name: 'Front Squat',
-    category: 'Legs',
-    image: require('../../../assets/frontsquat.png')
-  },
-];
-
 const SelectExercise = ({ navigation }: Props) => {
   const [searchText, setSearchText] = useState('');
-    const [selectedExercises, setSelectedExercises] = useState<string[]>([]);
-  
+  const [selectedExercises, setSelectedExercises] = useState<string[]>([]);
+  const [exerciseData, setExerciseData] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  // Fetch data from ExerciseDB API
+  useEffect(() => {
+    const fetchExercises = async () => {
+      try {
+        const randomOffset = Math.floor(Math.random() * 1400);
+        const response = await fetch(`https://exercisedb-api.vercel.app/api/v1/exercises?limit=100&offset=${randomOffset}`);
+        const json = await response.json();
+
+        if (json.success && Array.isArray(json.data)) {
+          setExerciseData(json.data);
+        } else {
+          console.error("Invalid data format:", json);
+          Alert.alert("Error", "Failed to load exercise data");
+        }
+      } catch (error) {
+        console.error("Error fetching exercises:", error);
+        Alert.alert("Error", "Could not fetch exercises");
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchExercises();
+  }, []);
+
+  // Filter by search
   const filteredExercises = exerciseData.filter(exercise =>
     exercise.name.toLowerCase().includes(searchText.toLowerCase())
   );
 
-    const toggleExerciseSelection = (exerciseName: string) => {
+  const toggleExerciseSelection = (exerciseName: string) => {
     setSelectedExercises(prev => 
       prev.includes(exerciseName)
         ? prev.filter(name => name !== exerciseName)
@@ -49,7 +53,7 @@ const SelectExercise = ({ navigation }: Props) => {
     );
   };
 
-    const handleAddExercises = () => {
+  const handleAddExercises = () => {
     if (selectedExercises.length === 0) {
       Alert.alert('No Selection', 'Please select at least one exercise');
       return;
@@ -59,7 +63,16 @@ const SelectExercise = ({ navigation }: Props) => {
     });
   };
 
-  return (
+  if (loading) {
+    return (
+      <View style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
+        <ActivityIndicator size="large" color="#5A3BFF" />
+        <Text style={{ color: 'white', marginTop: 10 }}>Loading exercises...</Text>
+      </View>
+    );
+  }
+
+return (
     <View style={styles.container}>
       <View style={styles.header}>
         <Text style={styles.time}>9:41</Text>
@@ -110,11 +123,16 @@ const SelectExercise = ({ navigation }: Props) => {
             >
               <View style={styles.imageContainer}>
                 <Image 
-                  source={item.image} 
+                  source={{ uri: item.gifUrl }} 
                   style={styles.exerciseImage}
                 />
               </View>
-              <Text style={styles.exerciseText}>{item.name}</Text>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.exerciseText}>{item.name}</Text>
+                <Text style={styles.categoryText}>
+                  {item.bodyParts ? item.bodyParts.join(', ') : 'Unknown'}
+                </Text>
+              </View>
               {selectedExercises.includes(item.name) && (
                 <MaterialCommunityIcons 
                   name="check-circle" 
@@ -124,7 +142,7 @@ const SelectExercise = ({ navigation }: Props) => {
               )}
             </TouchableOpacity>
           )}
-          keyExtractor={item => item.id}
+          keyExtractor={item => item.exerciseId}
           scrollEnabled={false}
         />
 
@@ -142,6 +160,8 @@ const SelectExercise = ({ navigation }: Props) => {
     </View>
   );
 };
+
+// ---------------------------- STYLES ----------------------------
 
 const styles = StyleSheet.create({
   container: {
@@ -194,13 +214,11 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
   },
-  filterIcon: {
-    marginRight: 8,
-  },
   filterButtonText: {
     color: '#5A3BFF',
     fontSize: 14,
     fontWeight: '600',
+    marginLeft: 8,
   },
   exerciseItem: {
     flexDirection: 'row',
@@ -224,8 +242,12 @@ const styles = StyleSheet.create({
   exerciseText: {
     fontSize: 16,
     color: 'white',
-    flex: 1,
-  }, // Added missing closing brace
+  },
+  categoryText: {
+    fontSize: 12,
+    color: '#8E8E9E',
+    marginTop: 4,
+  },
   selectedExercise: {
     backgroundColor: '#2A2A3A',
   },
