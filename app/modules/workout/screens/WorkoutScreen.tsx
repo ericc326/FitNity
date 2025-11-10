@@ -16,6 +16,8 @@ import { useNavigation } from "@react-navigation/native";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { WorkoutStackParamList } from "../navigation/WorkoutNavigator";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { collection, getDocs, query, where } from "firebase/firestore";
+import { db } from "../../../../firebaseConfig";
 
 const { width } = Dimensions.get("window");
 
@@ -29,7 +31,6 @@ export interface Exercise {
   gifUrl?: string;
   instructions?: string[];
 }
-
 
 interface ProgressItem {
   id: string;
@@ -73,64 +74,87 @@ const WorkoutScreen = () => {
     null
   );
   const [selectedBodyPart, setSelectedBodyPart] = useState<string>("All");
-  const allBodyPartsList = ["All", "Chest", "Back", "Legs", "Shoulders", "Arms", "Core", "Cardio"];
-  const [bodyParts, setBodyParts] = useState<string[]>(allBodyPartsList);
+  const allBodyPartsList = [
+    "All",
+    "Chest",
+    "Back",
+    "Legs",
+    "Shoulders",
+    "Arms",
+    "Core",
+    "Cardio",
+  ];
+  const [bodyParts, setBodyParts] = useState<string[]>([]);
 
+  const fetchExercisesFromFirestore = async (bodyPart: string = "All") => {
+    setLoading(true);
+    try {
+      const exercisesRef = collection(db, "exercises");
+      let q;
 
-const fetchExercises = async (bodyPart: string = "All") => {
-  setLoading(true);
-  try {
-    let url = "";
+      if (bodyPart && bodyPart !== "All") {
+        // Filter exercises by body part
+        q = query(exercisesRef, where("bodyParts", "array-contains", bodyPart));
+      } else {
+        // Get all exercises
+        q = query(exercisesRef);
+      }
 
-    if (bodyPart === "All") {
-      // random 100 exercises
-      const randomOffset = Math.floor(Math.random() * 1400);
-      url = `https://exercisedb-api.vercel.app/api/v1/exercises?limit=100&offset=${randomOffset}`;
-    } else {
-      // fetch exercises for a specific body part
-      url = `https://exercisedb-api.vercel.app/api/v1/exercises/bodyPart/${bodyPart.toLowerCase()}`;
-    }
+      const snapshot = await getDocs(q);
+      const allExercises: any[] = snapshot.docs.map((doc) => doc.data());
 
-    const response = await fetch(url);
-    const json = await response.json();
-    console.log("Fetched exercises:", json);
-
-    if (!json.data || !Array.isArray(json.data)) {
+      console.log("Fetched exercises from Firestore:", allExercises.length);
+      setExercises(allExercises);
+    } catch (error) {
+      console.error("Error fetching exercises from Firestore:", error);
       setExercises([]);
-      return;
+    } finally {
+      setLoading(false);
     }
+  };
 
-    setExercises(json.data);
-  } catch (error) {
-    console.error("Error fetching exercises:", error);
-    setExercises([]);
-  } finally {
-    setLoading(false);
-  }
-};
+  const fetchBodyPartsFromFirestore = async () => {
+    try {
+      const exercisesRef = collection(db, "exercises");
+      const snapshot = await getDocs(exercisesRef);
 
-const handleBodyPartPress = (part: string) => {
-  setSelectedBodyPart(part);
-  fetchExercises(part);
-};
+      const partsSet = new Set<string>();
+
+      snapshot.forEach((doc) => {
+        const data = doc.data();
+        if (Array.isArray(data.bodyParts)) {
+          data.bodyParts.forEach((part: string) => partsSet.add(part));
+        }
+      });
+
+      setBodyParts(["All", ...Array.from(partsSet)]);
+      console.log("Fetched body parts:", Array.from(partsSet));
+    } catch (error) {
+      console.error("Error fetching body parts:", error);
+    }
+  };
 
   useEffect(() => {
-    fetchExercises();
+    fetchExercisesFromFirestore();
+    fetchBodyPartsFromFirestore();
   }, []);
 
+  const handleBodyPartPress = (part: string) => {
+    setSelectedBodyPart(part);
+    fetchExercisesFromFirestore(part);
+  };
 
-const filteredExercises = exercises.filter((item: Exercise) => {
-  const matchesSearch = item.name
-    .toLowerCase()
-    .includes(searchQuery.toLowerCase());
+  const filteredExercises = exercises.filter((item: Exercise) => {
+    const matchesSearch = item.name
+      .toLowerCase()
+      .includes(searchQuery.toLowerCase());
 
-  const matchesBodyPart =
-    selectedBodyPart === "All" || item.bodyParts?.includes(selectedBodyPart);
+    const matchesBodyPart =
+      selectedBodyPart === "All" || item.bodyParts?.includes(selectedBodyPart);
 
-  return matchesSearch && matchesBodyPart;
-});
+    return matchesSearch && matchesBodyPart;
+  });
 
-  
   const calculateGrowth = (start: number, current: number) => {
     const growth = ((current - start) / start) * 100;
     return `${growth >= 0 ? "+" : ""}${Math.round(growth)}%`;
@@ -179,64 +203,72 @@ const filteredExercises = exercises.filter((item: Exercise) => {
     </View>
   );
 
-// ✅ Exercise Detail View
-if (selectedExercise) {
-  return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: "#262135" }}>
-      <ScrollView>
-        <TouchableOpacity
-          style={styles.backButton}
-          onPress={() => setSelectedExercise(null)}
-        >
-          <MaterialCommunityIcons name="arrow-left" size={24} color="white" />
-          <Text style={styles.backText}>Back to Exercises</Text>
-        </TouchableOpacity>
+  // ✅ Exercise Detail View
+  if (selectedExercise) {
+    return (
+      <SafeAreaView style={{ flex: 1, backgroundColor: "#262135" }}>
+        <ScrollView>
+          <TouchableOpacity
+            style={styles.backButton}
+            onPress={() => setSelectedExercise(null)}
+          >
+            <MaterialCommunityIcons name="arrow-left" size={24} color="white" />
+            <Text style={styles.backText}>Back to Exercises</Text>
+          </TouchableOpacity>
 
-        <Text style={styles.exerciseTitle}>{selectedExercise.name}</Text>
+          <Text style={styles.exerciseTitle}>{selectedExercise.name}</Text>
 
-        {selectedExercise.gifUrl && (
-          <View style={styles.videoContainer}>
-            <Image
-              source={{ uri: selectedExercise.gifUrl }}
-              style={{ width: "100%", height: 250, borderRadius: 10 }}
-            />
+          {selectedExercise.gifUrl && (
+            <View style={styles.videoContainer}>
+              <Image
+                source={{ uri: selectedExercise.gifUrl }}
+                style={{ width: "100%", height: 250, borderRadius: 10 }}
+              />
+            </View>
+          )}
+
+          {/* ✅ Exercise Details Section */}
+          <View style={{ marginHorizontal: 20, marginTop: 10 }}>
+            <Text style={styles.sectionTitle}>🎯 Target Muscles</Text>
+            <Text style={styles.descriptionText}>
+              {(selectedExercise.targetMuscles || []).join(", ") ||
+                "No details available"}
+            </Text>
+
+            <Text style={styles.sectionTitle}>💪 Body Parts</Text>
+            <Text style={styles.descriptionText}>
+              {(selectedExercise.bodyParts || []).join(", ") ||
+                "No details available"}
+            </Text>
+
+            <Text style={styles.sectionTitle}>🏋️ Equipment</Text>
+            <Text style={styles.descriptionText}>
+              {(selectedExercise.equipments || []).join(", ") ||
+                "No details available"}
+            </Text>
+
+            <Text style={styles.sectionTitle}>📋 Instructions</Text>
+            {selectedExercise.instructions &&
+            selectedExercise.instructions.length > 0 ? (
+              selectedExercise.instructions.map((step, index) => (
+                <Text
+                  key={index}
+                  style={[styles.descriptionText, { marginBottom: 5 }]}
+                >
+                  {step}
+                </Text>
+              ))
+            ) : (
+              <Text style={styles.descriptionText}>
+                No instructions available.
+              </Text>
+            )}
+
+            <TouchableOpacity style={styles.aiCoachButton}>
+              <MaterialCommunityIcons name="robot" size={24} color="white" />
+              <Text style={styles.aiCoachText}>Analyze with AI Coach</Text>
+            </TouchableOpacity>
           </View>
-        )}
-
-{/* ✅ Exercise Details Section */}
-<View style={{ marginHorizontal: 20, marginTop: 10 }}>
-  <Text style={styles.sectionTitle}>🎯 Target Muscles</Text>
-  <Text style={styles.descriptionText}>
-    {(selectedExercise.targetMuscles || []).join(", ") || "No details available"}
-  </Text>
-
-  <Text style={styles.sectionTitle}>💪 Body Parts</Text>
-  <Text style={styles.descriptionText}>
-    {(selectedExercise.bodyParts || []).join(", ") || "No details available"}
-  </Text>
-
-  <Text style={styles.sectionTitle}>🏋️ Equipment</Text>
-  <Text style={styles.descriptionText}>
-    {(selectedExercise.equipments || []).join(", ") || "No details available"}
-  </Text>
-
-  <Text style={styles.sectionTitle}>📋 Instructions</Text>
-  {selectedExercise.instructions && selectedExercise.instructions.length > 0 ? (
-    selectedExercise.instructions.map((step, index) => (
-      <Text key={index} style={[styles.descriptionText, { marginBottom: 5 }]}>
-        {step}
-      </Text>
-    ))
-  ) : (
-    <Text style={styles.descriptionText}>No instructions available.</Text>
-  )}
-
-  <TouchableOpacity style={styles.aiCoachButton}>
-    <MaterialCommunityIcons name="robot" size={24} color="white" />
-    <Text style={styles.aiCoachText}>Analyze with AI Coach</Text>
-  </TouchableOpacity>
-</View>
-
         </ScrollView>
       </SafeAreaView>
     );
@@ -269,7 +301,7 @@ if (selectedExercise) {
       {/* Exercise Tab */}
       {activeTab === "exercise" ? (
         <>
-{/* Search + Body Part Filter */}
+          {/* Search + Body Part Filter */}
           <View style={{ marginHorizontal: 20, marginBottom: 10 }}>
             <View style={styles.searchContainer}>
               <MaterialCommunityIcons
@@ -293,31 +325,34 @@ if (selectedExercise) {
               showsHorizontalScrollIndicator={false}
               style={styles.filterContainer}
             >
-{bodyParts.map((part) => (
-  <TouchableOpacity
-    key={part}
-    style={[
-      styles.filterButton,
-      selectedBodyPart === part && styles.filterButtonActive,
-    ]}
-    onPress={() => handleBodyPartPress(part)}
-  >
-    <Text
-      style={{
-        color: selectedBodyPart === part ? "white" : "#aaa",
-        fontWeight: "bold",
-      }}
-    >
-      {part}
-    </Text>
-  </TouchableOpacity>
-))}
-
+              {bodyParts.map((part) => (
+                <TouchableOpacity
+                  key={part}
+                  style={[
+                    styles.filterButton,
+                    selectedBodyPart === part && styles.filterButtonActive,
+                  ]}
+                  onPress={() => handleBodyPartPress(part)}
+                >
+                  <Text
+                    style={{
+                      color: selectedBodyPart === part ? "white" : "#aaa",
+                      fontWeight: "bold",
+                    }}
+                  >
+                    {part}
+                  </Text>
+                </TouchableOpacity>
+              ))}
             </ScrollView>
           </View>
 
           {loading ? (
-            <ActivityIndicator size="large" color="#5A3BFF" style={{ flex: 1 }} />
+            <ActivityIndicator
+              size="large"
+              color="#5A3BFF"
+              style={{ flex: 1 }}
+            />
           ) : filteredExercises.length > 0 ? (
             <FlatList
               data={filteredExercises}
@@ -395,19 +430,19 @@ const styles = StyleSheet.create({
     marginRight: 10,
   },
   videoContainer: {
-  marginHorizontal: 20,
-  marginBottom: 20,
-  borderRadius: 10,
-  overflow: "hidden",
-  height: 250, // same height used above
-},
+    marginHorizontal: 20,
+    marginBottom: 20,
+    borderRadius: 10,
+    overflow: "hidden",
+    height: 250, // same height used above
+  },
 
   searchInput: {
     flex: 1,
     color: "white",
     height: 50,
   },
-    filterContainer: {
+  filterContainer: {
     flexDirection: "row",
     marginTop: 10,
   },
