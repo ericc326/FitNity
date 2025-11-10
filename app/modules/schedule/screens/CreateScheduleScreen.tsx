@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   View,
   Text,
@@ -29,6 +29,16 @@ const CreateScheduleScreen = ({ navigation, route }: Props) => {
   const [showTimePicker, setShowTimePicker] = useState(false);
   const [selectedWorkout, setSelectedWorkout] = useState("Front Square");
   const fromHome = !!route?.params?.fromHome;
+
+  // accept selected exercises returned from SelectExercise
+  useEffect(() => {
+    const sel = (route.params as any)?.selectedExercises as
+      | string[]
+      | undefined;
+    if (sel && sel.length) {
+      setSelectedWorkout(sel.join(", "));
+    }
+  }, [route.params]);
 
   const onChangeDate = (event: any, selectedDate?: Date) => {
     if (Platform.OS === "android") setShowDatePicker(false);
@@ -69,9 +79,9 @@ const CreateScheduleScreen = ({ navigation, route }: Props) => {
         scheduledAt: date,
         userId: currentUser.uid,
         userName: currentUser.displayName || "Anonymous",
-        createdAt: serverTimestamp(),
         completed: false,
-        // You would add fields for selected workout, custom repetitions, etc. here
+        // exerciseIds: selectedExerciseIds || [], // later need add for track
+        selectedWorkoutName: selectedWorkout,
       };
 
       await addDoc(userSchedulesRef, newScheduleData);
@@ -214,6 +224,13 @@ const CreateScheduleScreen = ({ navigation, route }: Props) => {
           <TouchableOpacity
             style={styles.workoutDetailButton}
             disabled={loading}
+            onPress={() => {
+              // navigate to SelectExercise inside Workout stack
+              navigation.getParent()?.navigate("Workout", {
+                screen: "SelectExercise",
+                params: { returnToCreateSchedule: true },
+              });
+            }}
           >
             <MaterialCommunityIcons name="dumbbell" size={20} color="#bdbdbd" />
             <Text style={styles.workoutDetailButtonText}>Choose Workout</Text>
