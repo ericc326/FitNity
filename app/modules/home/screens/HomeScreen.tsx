@@ -23,7 +23,6 @@ import { BottomTabNavigationProp } from "@react-navigation/bottom-tabs";
 import { auth, db } from "../../../../firebaseConfig";
 import {
   doc,
-  getDoc,
   collection,
   query,
   where,
@@ -61,6 +60,7 @@ const workouts = [
 
 const HomeScreen: React.FC = () => {
   const navigation = useNavigation<HomeScreenNavigationProp>();
+  const [profileImage, setProfileImage] = useState<string | null>(null);
   const [showChat, setShowChat] = useState(false);
   const [userName, setUserName] = useState<string>("");
   const [todayTasks, setTodayTasks] = useState<any[]>([]);
@@ -105,24 +105,42 @@ const HomeScreen: React.FC = () => {
   }, []);
 
   useEffect(() => {
-    const loadUserName = async () => {
-      try {
-        const currentUser = auth.currentUser;
-        if (!currentUser) {
-          navigation.navigate("Auth", { screen: "Login" });
-          return;
-        }
+    const currentUser = auth.currentUser;
+    if (!currentUser) {
+      navigation.navigate("Auth", { screen: "Login" });
+      return;
+    }
 
-        const userDoc = await getDoc(doc(db, "users", currentUser.uid));
-        if (userDoc.exists()) {
-          setUserName(userDoc.data().name);
+    const userRef = doc(db, "users", currentUser.uid);
+    const unsubscribe = onSnapshot(
+      userRef,
+      async (snap) => {
+        try {
+          if (snap.exists()) {
+            const d = snap.data() as any;
+            setUserName(d?.name ?? auth.currentUser?.displayName ?? "");
+
+            const photo = d?.photoURL;
+            // Use photoURL directly as profile image (cuz ady store in https://)
+            if (photo && typeof photo === "string") {
+              setProfileImage(photo);
+            } else {
+              setProfileImage(null);
+            }
+          } else {
+            setUserName(auth.currentUser?.displayName ?? "");
+            setProfileImage(null);
+          }
+        } catch (e) {
+          console.warn("Error handling user snapshot:", e);
         }
-      } catch (error) {
-        console.error("Error loading user name:", error);
+      },
+      (err) => {
+        console.warn("Failed to listen to user doc:", err);
       }
-    };
+    );
 
-    loadUserName();
+    return () => unsubscribe();
   }, [navigation]);
 
   useEffect(() => {
@@ -218,7 +236,11 @@ const HomeScreen: React.FC = () => {
           </View>
           <TouchableOpacity onPress={goToProfile}>
             <Image
-              source={require("../../../assets/profile.png")}
+              source={
+                profileImage
+                  ? { uri: profileImage }
+                  : require("../../../assets/profile.png")
+              }
               style={styles.profilePic}
             />
           </TouchableOpacity>
@@ -390,7 +412,7 @@ const styles = StyleSheet.create({
   },
   trainingBadge: { backgroundColor: "#f55" },
   communityBadge: { backgroundColor: "#4a90e2", color: "#fff" },
-  profilePic: { width: 100, height: 100, borderRadius: 25 },
+  profilePic: { width: 100, height: 100, borderRadius: 50 },
   statisticsHeader: {
     flexDirection: "row",
     justifyContent: "space-between",

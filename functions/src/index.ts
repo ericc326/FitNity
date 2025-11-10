@@ -1,5 +1,7 @@
 import * as functions from "firebase-functions";
 import * as admin from "firebase-admin";
+import { onDocumentUpdated } from "firebase-functions/v2/firestore";
+import * as logger from "firebase-functions/logger";
 
 admin.initializeApp();
 
@@ -368,3 +370,146 @@ export const deleteUserAndData = functions.https.onRequest(async (req, res) => {
     return;
   }
 });
+
+// Propagate user name changes to denormalized documents (e.g. posts.userName)
+export const propagateUserName = onDocumentUpdated(
+  "users/{uid}",
+  async (event) => {
+    const uid = String(event.params.uid);
+    const beforeSnap = event.data?.before;
+    const afterSnap = event.data?.after;
+
+    const before = beforeSnap ? beforeSnap.data() : undefined;
+    const after = afterSnap ? afterSnap.data() : undefined;
+
+    const oldName = before?.name ?? before?.displayName;
+    const newName = after?.name ?? after?.displayName;
+
+    if (!newName || newName === oldName) {
+      logger.info(`No name change for uid=${uid}`);
+      return;
+    }
+
+    logger.info(
+      `propagateUserName: uid=${uid} name changed: "${oldName}" -> "${newName}"`
+    );
+
+    try {
+      // Helper to update a top-level collection where documents have userId field
+      async function updateCollectionUserName(
+        collectionName: string,
+        userIdField = "userId",
+        targetField = "userName"
+      ) {
+        const qSnap = await db
+          .collection(collectionName)
+          .where(userIdField, "==", uid)
+          .get();
+        if (qSnap.empty) return;
+        const docs = qSnap.docs;
+        const batches: admin.firestore.WriteBatch[] = [];
+        let batch = db.batch();
+        let opCount = 0;
+
+        for (const d of docs) {
+          batch.update(d.ref, { [targetField]: newName });
+          opCount++;
+          if (opCount === 500) {
+            batches.push(batch);
+            batch = db.batch();
+            opCount = 0;
+          }
+        }
+        if (opCount > 0) batches.push(batch);
+
+        await Promise.all(batches.map((b) => b.commit()));
+        logger.info(
+          `Updated ${docs.length} documents in ${collectionName} for uid=${uid}`
+        );
+      }
+
+      async function updateCollectionGroupUserName(
+        subcollectionName: string,
+        userIdField = "userId",
+        targetField = "userName"
+      ) {
+        const pageSize = 500;
+        let lastDoc: admin.firestore.QueryDocumentSnapshot | null = null;
+        let totalUpdated = 0;
+
+        logger.info(
+          `Scanning collectionGroup(${subcollectionName}) pages to update ${targetField} for uid=${uid}`
+        );
+
+        while (true) {
+          let q = db.collectionGroup(subcollectionName).limit(pageSize);
+          if (lastDoc) q = q.startAfter(lastDoc);
+
+          const snap = await q.get();
+          logger.info(
+            `collectionGroup page returned ${snap.size} docs for ${subcollectionName}`
+          );
+          if (snap.empty) break;
+
+          let batch = db.batch();
+          let ops = 0;
+
+          for (const docSnap of snap.docs) {
+            try {
+              const data = docSnap.data() as any;
+              // only check the configured userIdField == uid
+              const isMatch =
+                data &&
+                Object.prototype.hasOwnProperty.call(data, userIdField) &&
+                String(data[userIdField]) === String(uid);
+
+              if (!isMatch) continue;
+
+              batch.update(docSnap.ref, { [targetField]: newName });
+              ops++;
+              if (ops === 500) {
+                await batch.commit();
+                totalUpdated += ops;
+                batch = db.batch();
+                ops = 0;
+              }
+            } catch (e) {
+              logger.error(
+                `Failed preparing update for ${docSnap.ref.path}:`,
+                e
+              );
+            }
+          }
+
+          if (ops > 0) {
+            await batch.commit();
+            totalUpdated += ops;
+          }
+
+          lastDoc = snap.docs[snap.docs.length - 1];
+          if (snap.size < pageSize) break;
+        }
+
+        logger.info(
+          `collectionGroup(${subcollectionName}) update finished, totalUpdated=${totalUpdated}`
+        );
+      }
+
+      // Update posts
+      await updateCollectionUserName("posts", "userId", "userName");
+
+      // Optionally update other collections that denormalize user name:
+      // await updateCollectionUserName("comments", "userId", "userName");
+      // await updateCollectionUserName("challenges", "createdBy", "creatorName");
+
+      // Update comments inside posts/{postId}/comments and any other comments subcollections
+      await updateCollectionGroupUserName("comments", "userId", "userName");
+      await updateCollectionGroupUserName("schedules", "userId", "userName");
+
+      return;
+    } catch (err) {
+      logger.error("propagateUserName error:", err);
+      return;
+    }
+  }
+);
