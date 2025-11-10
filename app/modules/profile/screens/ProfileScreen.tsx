@@ -13,7 +13,7 @@ import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { ProfileStackParamList } from "../navigation/ProfileNavigator";
 import { app, auth, db } from "../../../../firebaseConfig";
-import { doc, getDoc } from "firebase/firestore";
+import { doc, onSnapshot } from "firebase/firestore";
 
 type ProfileScreenNavigationProp =
   NativeStackNavigationProp<ProfileStackParamList>;
@@ -23,37 +23,55 @@ const ProfileScreen = () => {
   const [userData, setUserData] = useState<{
     name: string;
     email: string;
+    profileImage: string | null;
     // Add other user fields as needed
   } | null>(null);
   const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
-    const loadUserData = async () => {
-      try {
-        const currentUser = auth.currentUser;
-        if (!currentUser) {
-          navigation.dispatch(
-            CommonActions.reset({
-              index: 0,
-              routes: [{ name: "Auth" }],
-            })
-          );
-          return;
-        }
+    const currentUser = auth.currentUser;
+    if (!currentUser) {
+      navigation.dispatch(
+        CommonActions.reset({
+          index: 0,
+          routes: [{ name: "Auth" }],
+        })
+      );
+      return;
+    }
 
-        const userDoc = await getDoc(doc(db, "users", currentUser.uid));
-        if (userDoc.exists()) {
-          setUserData({
-            name: userDoc.data().name,
-            email: userDoc.data().email,
-          });
+    const userRef = doc(db, "users", currentUser.uid);
+
+    const unsubscribe = onSnapshot(
+      userRef,
+      async (snap) => {
+        try {
+          if (snap.exists()) {
+            const d = snap.data() as any;
+            setUserData({
+              name: d?.name ?? auth.currentUser?.displayName ?? "",
+              email: d?.email ?? auth.currentUser?.email ?? "",
+              profileImage: d?.photoURL ?? null,
+            });
+          } else {
+            // fallback to auth profile if no doc
+            setUserData({
+              name: auth.currentUser?.displayName ?? "",
+              email: auth.currentUser?.email ?? "",
+              profileImage: null,
+            });
+          }
+        } catch (e) {
+          console.warn("Error handling user snapshot:", e);
         }
-      } catch (error) {
+      },
+      (err) => {
+        console.warn("user onSnapshot error", err);
         Alert.alert("Error", "Failed to load user data");
       }
-    };
+    );
 
-    loadUserData();
+    return () => unsubscribe();
   }, [navigation]);
 
   const navigateToEditProfile = () => {
@@ -166,7 +184,11 @@ const ProfileScreen = () => {
         {/* Profile Header */}
         <View style={styles.header}>
           <Image
-            source={require("../../../assets/profile.png")}
+            source={
+              userData?.profileImage
+                ? { uri: userData.profileImage }
+                : require("../../../assets/profile.png")
+            }
             style={styles.profileImage}
           />
           <Text style={styles.userName}>{userData?.name || "Loading..."}</Text>
