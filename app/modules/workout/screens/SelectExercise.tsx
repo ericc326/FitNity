@@ -9,72 +9,106 @@ import {
   FlatList,
   Image,
   Alert,
-  ActivityIndicator,
+  ScrollView,
 } from "react-native";
 import LoadingIndicator from "../../../components/LoadingIndicator";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { NativeStackScreenProps } from "@react-navigation/native-stack";
 import { WorkoutStackParamList } from "../navigation/WorkoutNavigator";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
+import { collection, getDocs } from "firebase/firestore";
+import { db } from "../../../../firebaseConfig";
 
 type Props = NativeStackScreenProps<WorkoutStackParamList, "SelectExercise">;
 
 const SelectExercise = ({ navigation }: Props) => {
-  // ...existing state...
   const route = useRoute() as any;
   const returnToCreate = !!route?.params?.returnToCreateSchedule;
   const [searchText, setSearchText] = useState("");
   const [selectedExercises, setSelectedExercises] = useState<string[]>([]);
   const [exerciseData, setExerciseData] = useState<any[]>([]);
+  const [filteredExercises, setFilteredExercises] = useState<any[]>([]);
+  const [bodyParts, setBodyParts] = useState<string[]>([]);
+  const [selectedBodyPart, setSelectedBodyPart] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
-  // Reset and refetch when screen is focused so previous selections are cleared and list refreshes
+  // 🔥 Fetch exercises from Firestore
   useFocusEffect(
     React.useCallback(() => {
       let mounted = true;
       setSelectedExercises([]);
       setSearchText("");
       setLoading(true);
-      setExerciseData([]);
 
-      const fetchExercises = async () => {
+      const fetchExercisesFromFirestore = async () => {
         try {
-          const randomOffset = Math.floor(Math.random() * 1400);
-          const response = await fetch(
-            `https://exercisedb-api.vercel.app/api/v1/exercises?limit=100&offset=${randomOffset}`,
-          );
-          const json = await response.json();
-          if (!mounted) return;
-          if (json && Array.isArray(json)) {
-            // some endpoints return array directly
-            setExerciseData(json);
-          } else if (json && Array.isArray((json as any).data)) {
-            setExerciseData((json as any).data);
-          } else {
-            console.error("Invalid data format:", json);
-            Alert.alert("Error", "Failed to load exercise data");
+          const querySnapshot = await getDocs(collection(db, "exercises"));
+          const data = querySnapshot.docs.map((doc) => ({
+            id: doc.id,
+            ...doc.data(),
+          }));
+
+          if (mounted) {
+            setExerciseData(data);
+            setFilteredExercises(data);
+
+            // ✅ Extract unique body parts (handle both bodyPart and bodyParts[])
+            const uniqueBodyParts = new Set<string>();
+            data.forEach((item: any) => {
+              if (Array.isArray(item.bodyParts)) {
+                item.bodyParts.forEach((bp: string) =>
+                  uniqueBodyParts.add(bp)
+                );
+              } else if (typeof item.bodyPart === "string") {
+                uniqueBodyParts.add(item.bodyPart);
+              }
+            });
+
+            setBodyParts(["All", ...Array.from(uniqueBodyParts)]);
           }
         } catch (error) {
-          if (!mounted) return;
-          console.error("Error fetching exercises:", error);
+          console.error("Error fetching exercises from Firestore:", error);
           Alert.alert("Error", "Could not fetch exercises");
         } finally {
           if (mounted) setLoading(false);
         }
       };
 
-      fetchExercises();
+      fetchExercisesFromFirestore();
       return () => {
         mounted = false;
       };
     }, []),
   );
 
-  // Filter by search
-  const filteredExercises = exerciseData.filter((exercise) =>
-    exercise.name.toLowerCase().includes(searchText.toLowerCase()),
-  );
+  // 🔍 Filter exercises by body part and search text
+  React.useEffect(() => {
+    let filtered = exerciseData;
 
+    if (selectedBodyPart && selectedBodyPart !== "All") {
+      filtered = filtered.filter((ex: any) => {
+        if (Array.isArray(ex.bodyParts)) {
+          return ex.bodyParts.some(
+            (bp: string) =>
+              bp.toLowerCase() === selectedBodyPart.toLowerCase()
+          );
+        } else if (typeof ex.bodyPart === "string") {
+          return ex.bodyPart.toLowerCase() === selectedBodyPart.toLowerCase();
+        }
+        return false;
+      });
+    }
+
+    if (searchText.trim()) {
+      filtered = filtered.filter((ex: any) =>
+        ex.name?.toLowerCase().includes(searchText.toLowerCase())
+      );
+    }
+
+    setFilteredExercises(filtered);
+  }, [searchText, selectedBodyPart, exerciseData]);
+
+  // ✅ Select exercise toggle
   const toggleExerciseSelection = (exerciseName: string) => {
     setSelectedExercises((prev) =>
       prev.includes(exerciseName)
@@ -83,18 +117,17 @@ const SelectExercise = ({ navigation }: Props) => {
     );
   };
 
+  // ✅ Add button handler
   const handleAddExercises = () => {
     if (selectedExercises.length === 0) {
       Alert.alert("No Selection", "Please select at least one exercise");
       return;
     }
     if (returnToCreate) {
-      // navigate back into Schedule stack -> CreateSchedule with selectedExercises
       navigation.getParent()?.navigate("Schedule", {
         screen: "CreateSchedule",
         params: { selectedExercises },
       } as any);
-      return;
     }
   };
 
@@ -110,23 +143,19 @@ const SelectExercise = ({ navigation }: Props) => {
 
   if (loading) {
     return (
-      <SafeAreaView style={styles.safeArea} edges={["top", "left", "right"]}>
+      <SafeAreaView style={styles.safeArea}>
         <LoadingIndicator />
       </SafeAreaView>
     );
   }
 
   return (
-    <SafeAreaView style={styles.safeArea} edges={["top", "left", "right"]}>
+    <SafeAreaView style={styles.safeArea}>
       <View style={styles.container}>
-        {/* Fixed header: title, search and filters (does not scroll) */}
+        {/* HEADER */}
         <View style={styles.headerBlock}>
           <View style={styles.headerRow}>
-            <TouchableOpacity
-              onPress={handleBack}
-              style={styles.backButton}
-              accessibilityLabel="Back"
-            >
+            <TouchableOpacity onPress={handleBack} style={styles.backButton}>
               <MaterialCommunityIcons
                 name="chevron-left"
                 size={30}
@@ -136,6 +165,7 @@ const SelectExercise = ({ navigation }: Props) => {
             <Text style={styles.title}>Select Exercise</Text>
           </View>
 
+          {/* Search */}
           <View style={styles.searchContainer}>
             <MaterialCommunityIcons
               name="magnify"
@@ -152,22 +182,39 @@ const SelectExercise = ({ navigation }: Props) => {
             />
           </View>
 
-          <View style={styles.filterRow}>
-            <TouchableOpacity
-              style={styles.filterButton}
-              onPress={() => navigation.navigate("FilterExercise")}
-            >
-              <MaterialCommunityIcons
-                name="filter-variant"
-                size={20}
-                color="#5A3BFF"
-              />
-              <Text style={styles.filterButtonText}>Filter</Text>
-            </TouchableOpacity>
-          </View>
+          {/* 🔘 Body Part Filter Bar */}
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            style={styles.filterContainer}
+          >
+            {bodyParts.map((part) => (
+              <TouchableOpacity
+                key={part}
+                style={[
+                  styles.filterButton,
+                  selectedBodyPart === part && styles.filterButtonActive,
+                ]}
+                onPress={() =>
+                  setSelectedBodyPart(
+                    selectedBodyPart === part ? null : part
+                  )
+                }
+              >
+                <Text
+                  style={{
+                    color: selectedBodyPart === part ? "white" : "#aaa",
+                    fontWeight: "bold",
+                  }}
+                >
+                  {part}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
         </View>
 
-        {/* Scrollable list only */}
+        {/* EXERCISE LIST */}
         <FlatList
           data={filteredExercises}
           renderItem={({ item }) => (
@@ -188,7 +235,9 @@ const SelectExercise = ({ navigation }: Props) => {
               <View style={{ flex: 1 }}>
                 <Text style={styles.exerciseText}>{item.name}</Text>
                 <Text style={styles.categoryText}>
-                  {item.bodyParts ? item.bodyParts.join(", ") : "Unknown"}
+                  {item.bodyParts?.join(", ") ||
+                    item.bodyPart ||
+                    "Unknown"}
                 </Text>
               </View>
               {selectedExercises.includes(item.name) && (
@@ -200,102 +249,58 @@ const SelectExercise = ({ navigation }: Props) => {
               )}
             </TouchableOpacity>
           )}
-          keyExtractor={(item) => item.exerciseId}
+          keyExtractor={(item) => item.id}
           contentContainerStyle={{
             paddingHorizontal: 20,
-            paddingBottom: 0,
+            paddingBottom: 100, // space for fixed Add button
           }}
-          style={{ flex: 1 }}
-          ListFooterComponent={
-            selectedExercises.length > 0 ? (
-              <TouchableOpacity
-                style={styles.addButton}
-                onPress={handleAddExercises}
-              >
-                <Text style={styles.addButtonText}>
-                  Add {selectedExercises.length} Exercise(s)
-                </Text>
-              </TouchableOpacity>
-            ) : null
-          }
         />
+
+        {/* 🧷 FIXED Add Button */}
+        {selectedExercises.length > 0 && (
+          <View style={styles.fixedAddContainer}>
+            <TouchableOpacity
+              style={styles.addButton}
+              onPress={handleAddExercises}
+            >
+              <Text style={styles.addButtonText}>
+                Add {selectedExercises.length} Exercise
+                {selectedExercises.length > 1 ? "s" : ""}
+              </Text>
+            </TouchableOpacity>
+          </View>
+        )}
       </View>
     </SafeAreaView>
   );
 };
 
-// ---------------------------- STYLES ----------------------------
-
 const styles = StyleSheet.create({
-  safeArea: {
-    flex: 1,
-    backgroundColor: "#262135",
-  },
-  container: {
-    flex: 1,
-    backgroundColor: "#262135",
-  },
-  headerBlock: {
-    paddingHorizontal: 20,
-    paddingTop: 12,
-  },
-  headerRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginBottom: 8,
-  },
-  backButton: {
-    paddingRight: 12,
-    paddingVertical: 4,
-  },
-  time: {
-    fontSize: 16,
-    color: "#8E8E9E",
-  },
-  content: {
-    padding: 20,
-  },
-  title: {
-    fontSize: 24,
-    fontWeight: "bold",
-    // marginBottom: 20,
-    color: "white",
-  },
+  safeArea: { flex: 1, backgroundColor: "#262135" },
+  container: { flex: 1, backgroundColor: "#262135" },
+  headerBlock: { paddingHorizontal: 20, paddingTop: 12 },
+  headerRow: { flexDirection: "row", alignItems: "center", marginBottom: 8 },
+  backButton: { paddingRight: 12, paddingVertical: 4 },
+  title: { fontSize: 24, fontWeight: "bold", color: "white" },
   searchContainer: {
     flexDirection: "row",
     alignItems: "center",
     backgroundColor: "#1E1E2D",
     borderRadius: 12,
     paddingHorizontal: 16,
-    marginBottom: 16,
+    marginBottom: 12,
   },
-  searchIcon: {
-    marginRight: 12,
-  },
-  searchInput: {
-    flex: 1,
-    color: "white",
-    height: 50,
-    fontSize: 16,
-  },
-  filterRow: {
-    alignItems: "flex-end",
-    marginBottom: 20,
-  },
+  searchIcon: { marginRight: 12 },
+  searchInput: { flex: 1, color: "white", height: 50, fontSize: 16 },
+  filterContainer: { marginBottom: 10 },
   filterButton: {
     backgroundColor: "#1E1E2D",
     paddingVertical: 10,
     paddingHorizontal: 16,
     borderRadius: 20,
-    flexDirection: "row",
-    alignItems: "center",
+    marginRight: 10,
   },
-  filterButtonText: {
-    color: "#5A3BFF",
-    fontSize: 14,
-    fontWeight: "600",
-    marginLeft: 8,
-  },
+  filterButtonActive: { backgroundColor: "#5A3BFF" },
   exerciseItem: {
     flexDirection: "row",
     alignItems: "center",
@@ -311,34 +316,23 @@ const styles = StyleSheet.create({
     overflow: "hidden",
     marginRight: 16,
   },
-  exerciseImage: {
-    width: "100%",
-    height: "100%",
-  },
-  exerciseText: {
-    fontSize: 16,
-    color: "white",
-  },
-  categoryText: {
-    fontSize: 12,
-    color: "#8E8E9E",
-    marginTop: 4,
-  },
-  selectedExercise: {
-    backgroundColor: "#2A2A3A",
+  exerciseImage: { width: "100%", height: "100%" },
+  exerciseText: { fontSize: 16, color: "white" },
+  categoryText: { fontSize: 12, color: "#8E8E9E", marginTop: 4 },
+  selectedExercise: { backgroundColor: "#2A2A3A" },
+  fixedAddContainer: {
+    position: "absolute",
+    bottom: 20,
+    left: 20,
+    right: 20,
   },
   addButton: {
     backgroundColor: "#5A3BFF",
     padding: 16,
     borderRadius: 12,
     alignItems: "center",
-    marginTop: 20,
   },
-  addButtonText: {
-    color: "white",
-    fontSize: 16,
-    fontWeight: "bold",
-  },
+  addButtonText: { color: "white", fontSize: 16, fontWeight: "bold" },
 });
 
 export default SelectExercise;
