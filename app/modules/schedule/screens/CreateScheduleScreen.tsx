@@ -228,7 +228,7 @@ const CreateScheduleScreen = ({ navigation, route }: Props) => {
               // navigate to SelectExercise inside Workout stack
               navigation.getParent()?.navigate("Workout", {
                 screen: "SelectExercise",
-                params: { returnToCreateSchedule: true },
+                params: { returnToCreateSchedule: true, fromHome },
               });
             }}
           >

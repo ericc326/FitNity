@@ -24,6 +24,7 @@ type Props = NativeStackScreenProps<WorkoutStackParamList, "SelectExercise">;
 const SelectExercise = ({ navigation }: Props) => {
   const route = useRoute() as any;
   const returnToCreate = !!route?.params?.returnToCreateSchedule;
+  const fromHome = !!route?.params?.fromHome;
   const [searchText, setSearchText] = useState("");
   const [selectedExercises, setSelectedExercises] = useState<string[]>([]);
   const [exerciseData, setExerciseData] = useState<any[]>([]);
@@ -56,9 +57,7 @@ const SelectExercise = ({ navigation }: Props) => {
             const uniqueBodyParts = new Set<string>();
             data.forEach((item: any) => {
               if (Array.isArray(item.bodyParts)) {
-                item.bodyParts.forEach((bp: string) =>
-                  uniqueBodyParts.add(bp)
-                );
+                item.bodyParts.forEach((bp: string) => uniqueBodyParts.add(bp));
               } else if (typeof item.bodyPart === "string") {
                 uniqueBodyParts.add(item.bodyPart);
               }
@@ -78,7 +77,7 @@ const SelectExercise = ({ navigation }: Props) => {
       return () => {
         mounted = false;
       };
-    }, []),
+    }, [])
   );
 
   // 🔍 Filter exercises by body part and search text
@@ -89,8 +88,7 @@ const SelectExercise = ({ navigation }: Props) => {
       filtered = filtered.filter((ex: any) => {
         if (Array.isArray(ex.bodyParts)) {
           return ex.bodyParts.some(
-            (bp: string) =>
-              bp.toLowerCase() === selectedBodyPart.toLowerCase()
+            (bp: string) => bp.toLowerCase() === selectedBodyPart.toLowerCase()
           );
         } else if (typeof ex.bodyPart === "string") {
           return ex.bodyPart.toLowerCase() === selectedBodyPart.toLowerCase();
@@ -113,7 +111,7 @@ const SelectExercise = ({ navigation }: Props) => {
     setSelectedExercises((prev) =>
       prev.includes(exerciseName)
         ? prev.filter((name) => name !== exerciseName)
-        : [...prev, exerciseName],
+        : [...prev, exerciseName]
     );
   };
 
@@ -126,7 +124,7 @@ const SelectExercise = ({ navigation }: Props) => {
     if (returnToCreate) {
       navigation.getParent()?.navigate("Schedule", {
         screen: "CreateSchedule",
-        params: { selectedExercises },
+        params: { selectedExercises, fromHome },
       } as any);
     }
   };
@@ -135,6 +133,7 @@ const SelectExercise = ({ navigation }: Props) => {
     if (returnToCreate) {
       navigation.getParent()?.navigate("Schedule", {
         screen: "CreateSchedule",
+        params: { fromHome },
       } as any);
     } else {
       navigation.goBack();
@@ -196,9 +195,7 @@ const SelectExercise = ({ navigation }: Props) => {
                   selectedBodyPart === part && styles.filterButtonActive,
                 ]}
                 onPress={() =>
-                  setSelectedBodyPart(
-                    selectedBodyPart === part ? null : part
-                  )
+                  setSelectedBodyPart(selectedBodyPart === part ? null : part)
                 }
               >
                 <Text
@@ -235,9 +232,7 @@ const SelectExercise = ({ navigation }: Props) => {
               <View style={{ flex: 1 }}>
                 <Text style={styles.exerciseText}>{item.name}</Text>
                 <Text style={styles.categoryText}>
-                  {item.bodyParts?.join(", ") ||
-                    item.bodyPart ||
-                    "Unknown"}
+                  {item.bodyParts?.join(", ") || item.bodyPart || "Unknown"}
                 </Text>
               </View>
               {selectedExercises.includes(item.name) && (

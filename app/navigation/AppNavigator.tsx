@@ -96,6 +96,13 @@ function TabNavigator() {
             <MaterialCommunityIcons name="dumbbell" color={color} size={size} />
           ),
         }}
+        listeners={({ navigation }) => ({
+          tabPress: (e) => {
+            e.preventDefault();
+            // always reset/focus the Workout stack to the root screen
+            navigation.navigate("Workout", { screen: "WorkoutMain" });
+          },
+        })}
       />
       <Tab.Screen
         name="Diet"
