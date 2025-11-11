@@ -347,7 +347,7 @@ const HomeScreen: React.FC = () => {
           onPress={() =>
             navigation.navigate("Schedule", {
               screen: "CreateSchedule",
-              params: { fromHome: true },
+              params: { fromHome: true, resetKey: Date.now() },
             })
           }
         >

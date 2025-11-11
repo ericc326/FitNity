@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import {
   View,
   Text,
@@ -8,6 +8,8 @@ import {
   ScrollView,
   Platform,
   Alert,
+  Modal,
+  Pressable,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
@@ -15,10 +17,15 @@ import DateTimePicker from "@react-native-community/datetimepicker";
 import { NativeStackScreenProps } from "@react-navigation/native-stack";
 import { ScheduleStackParamList } from "../navigation/ScheduleNavigator";
 import { db, auth } from "../../../../firebaseConfig";
-import { collection, addDoc, serverTimestamp } from "firebase/firestore";
+import { collection, addDoc } from "firebase/firestore";
 import moment from "moment";
 
 type Props = NativeStackScreenProps<ScheduleStackParamList, "CreateSchedule">;
+type CreateScheduleParams = {
+  fromHome?: boolean;
+  resetKey?: number;
+  selectedExercises?: string[];
+};
 
 const CreateScheduleScreen = ({ navigation, route }: Props) => {
   const [title, setTitle] = useState("");
@@ -28,7 +35,39 @@ const CreateScheduleScreen = ({ navigation, route }: Props) => {
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [showTimePicker, setShowTimePicker] = useState(false);
   const [selectedWorkout, setSelectedWorkout] = useState("Front Square");
-  const fromHome = !!route?.params?.fromHome;
+  const scrollRef = useRef<ScrollView | null>(null);
+  const params = route?.params as
+    | CreateScheduleParams
+    | { scheduleId: string }
+    | undefined;
+  const fromHome = !!(params as CreateScheduleParams)?.fromHome;
+  const resetKey = (params as CreateScheduleParams)?.resetKey;
+
+  console.log("route.params:", route.params);
+
+  // custom repetitions/session state
+  const [showCustomModal, setShowCustomModal] = useState(false);
+  const [customSets, setCustomSets] = useState<number | null>(null); //determine sets
+  const [customReps, setCustomReps] = useState<number | null>(null); //determine rep in one set
+  const [customRestSec, setCustomRestSec] = useState<number | null>(null);
+  const [customLabel, setCustomLabel] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (fromHome && resetKey) {
+      setTitle("");
+      setDescription("");
+      setDate(new Date());
+      setSelectedWorkout("Front Square");
+      setCustomSets(null);
+      setCustomReps(null);
+      setCustomRestSec(null);
+      setCustomLabel(null);
+      // ensure the ScrollView is at top after reset
+      setTimeout(() => {
+        scrollRef.current?.scrollTo({ y: 0, animated: false });
+      }, 0);
+    }
+  }, [fromHome, resetKey]);
 
   // accept selected exercises returned from SelectExercise
   useEffect(() => {
@@ -80,8 +119,11 @@ const CreateScheduleScreen = ({ navigation, route }: Props) => {
         userId: currentUser.uid,
         userName: currentUser.displayName || "Anonymous",
         completed: false,
-        // exerciseIds: selectedExerciseIds || [], // later need add for track
         selectedWorkoutName: selectedWorkout,
+        customSets: customSets ?? undefined,
+        customReps: customReps ?? undefined,
+        customRestSeconds: customRestSec ?? undefined,
+        customLabel: customLabel ?? undefined,
       };
 
       await addDoc(userSchedulesRef, newScheduleData);
@@ -122,6 +164,7 @@ const CreateScheduleScreen = ({ navigation, route }: Props) => {
         </View>
 
         <ScrollView
+          ref={scrollRef}
           contentContainerStyle={styles.formContent}
           keyboardShouldPersistTaps="handled"
         >
@@ -233,9 +276,19 @@ const CreateScheduleScreen = ({ navigation, route }: Props) => {
             }}
           >
             <MaterialCommunityIcons name="dumbbell" size={20} color="#bdbdbd" />
-            <Text style={styles.workoutDetailButtonText}>Choose Workout</Text>
+            <Text
+              style={styles.workoutDetailButtonText}
+              numberOfLines={1}
+              ellipsizeMode="tail"
+            >
+              Choose Workout
+            </Text>
             <View style={styles.workoutDetailRight}>
-              <Text style={styles.workoutDetailRightText}>
+              <Text
+                style={styles.workoutDetailRightText}
+                numberOfLines={1}
+                ellipsizeMode="tail"
+              >
                 {selectedWorkout}
               </Text>
               <MaterialCommunityIcons
@@ -250,6 +303,7 @@ const CreateScheduleScreen = ({ navigation, route }: Props) => {
           <TouchableOpacity
             style={styles.workoutDetailButton}
             disabled={loading}
+            onPress={() => setShowCustomModal(true)}
           >
             <MaterialCommunityIcons
               name="chart-bar"
@@ -260,6 +314,9 @@ const CreateScheduleScreen = ({ navigation, route }: Props) => {
               Custom Repetitions and Session
             </Text>
             <View style={styles.workoutDetailRight}>
+              <Text style={styles.workoutDetailRightText}>
+                {customLabel ?? "Set reps & rest"}
+              </Text>
               <MaterialCommunityIcons
                 name="chevron-right"
                 size={22}
@@ -267,6 +324,79 @@ const CreateScheduleScreen = ({ navigation, route }: Props) => {
               />
             </View>
           </TouchableOpacity>
+
+          {/* Custom modal */}
+          <Modal visible={showCustomModal} transparent animationType="fade">
+            <View style={styles.modalContainer}>
+              <View style={styles.modalContent}>
+                <Text style={styles.modalTitle}>Custom Reps & Rest</Text>
+
+                <View style={styles.modalRow}>
+                  <Text style={{ color: "#fff", marginBottom: 6 }}>Sets</Text>
+                  <TextInput
+                    style={styles.numberInput}
+                    value={customSets?.toString() ?? ""}
+                    onChangeText={(t) => setCustomSets(t ? Number(t) : null)}
+                    keyboardType="numeric"
+                    placeholder="e.g. 3"
+                    placeholderTextColor="#777"
+                  />
+                </View>
+
+                <View style={styles.modalRow}>
+                  <Text style={{ color: "#fff", marginBottom: 6 }}>
+                    Reps / Set
+                  </Text>
+                  <TextInput
+                    style={styles.numberInput}
+                    value={customReps?.toString() ?? ""}
+                    onChangeText={(t) => setCustomReps(t ? Number(t) : null)}
+                    keyboardType="numeric"
+                    placeholder="e.g. 10"
+                    placeholderTextColor="#777"
+                  />
+                </View>
+
+                <View style={styles.modalRow}>
+                  <Text style={{ color: "#fff", marginBottom: 6 }}>
+                    Rest (sec)
+                  </Text>
+                  <TextInput
+                    style={styles.numberInput}
+                    value={customRestSec?.toString() ?? ""}
+                    onChangeText={(t) => setCustomRestSec(t ? Number(t) : null)}
+                    keyboardType="numeric"
+                    placeholder="e.g. 60"
+                    placeholderTextColor="#777"
+                  />
+                </View>
+
+                <View style={styles.modalButtons}>
+                  <Pressable
+                    style={[styles.modalButton, { backgroundColor: "#444" }]}
+                    onPress={() => setShowCustomModal(false)}
+                  >
+                    <Text style={styles.modalButtonText}>Cancel</Text>
+                  </Pressable>
+                  <Pressable
+                    style={[styles.modalButton, { backgroundColor: "#7b68ee" }]}
+                    onPress={() => {
+                      // apply and close
+                      const sets = customSets ?? 0;
+                      const reps = customReps ?? 0;
+                      const rest = customRestSec ?? 0;
+                      const label = `${sets}×${reps} • rest ${rest}s`;
+                      setCustomLabel(label);
+                      // optionally update selectedWorkout to indicate custom
+                      setShowCustomModal(false);
+                    }}
+                  >
+                    <Text style={styles.modalButtonText}>Apply</Text>
+                  </Pressable>
+                </View>
+              </View>
+            </View>
+          </Modal>
 
           {/* Save Button */}
           <TouchableOpacity
@@ -384,21 +514,69 @@ const styles = StyleSheet.create({
     elevation: 2,
   },
   workoutDetailButtonText: {
-    flex: 1,
     color: "#fff",
     fontSize: 15,
     marginLeft: 12,
     fontWeight: "500",
+    flex: 1,
+    marginRight: 12,
   },
   workoutDetailRight: {
     flexDirection: "row",
     alignItems: "center",
+    marginLeft: "auto",
+    maxWidth: 180,
   },
   workoutDetailRightText: {
     color: "#bdbdbd",
     fontSize: 13,
     marginRight: 4,
     fontWeight: "500",
+    maxWidth: 140,
+    flexShrink: 1,
+    textAlign: "right",
+  },
+  modalContainer: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.6)",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  modalContent: {
+    width: "90%",
+    backgroundColor: "#2b2435",
+    borderRadius: 12,
+    padding: 16,
+  },
+  modalTitle: {
+    color: "#fff",
+    fontSize: 16,
+    fontWeight: "600",
+    marginBottom: 12,
+  },
+  modalRow: {
+    marginBottom: 12,
+  },
+  numberInput: {
+    backgroundColor: "rgba(255,255,255,0.06)",
+    borderRadius: 8,
+    padding: 10,
+    color: "#fff",
+  },
+  modalButtons: {
+    flexDirection: "row",
+    justifyContent: "flex-end",
+    marginTop: 8,
+  },
+  modalButton: {
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    borderRadius: 8,
+    marginLeft: 8,
+  },
+  modalButtonText: {
+    color: "#fff",
+    fontWeight: "600",
   },
   saveButton: {
     marginTop: 32,
