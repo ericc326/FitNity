@@ -40,6 +40,7 @@ interface ScheduleItem {
   id: string; // Document ID from Firestore
   title: string;
   description: string;
+  selectedWorkoutName: string;
   scheduledAt: Timestamp; // Firestore Timestamp type
   userId: string;
   userName: string;
@@ -266,6 +267,7 @@ const ScheduleScreen = () => {
 
     const itemColor = item.color || "#f0f8ff";
     const itemIcon = item.icon || "run";
+    console.log("Rendering schedule item:", item);
 
     return (
       <View style={styles.scheduleItemWrapper}>
@@ -283,6 +285,9 @@ const ScheduleScreen = () => {
             </Text>
             <Text style={styles.scheduleTitle}>{item.title}</Text>
             <Text style={styles.scheduleDescription}>{item.description}</Text>
+            <Text style={styles.scheduleDescription}>
+              {item.selectedWorkoutName}
+            </Text>
           </View>
           <View style={styles.scheduleCardActions}>
             <MaterialCommunityIcons
