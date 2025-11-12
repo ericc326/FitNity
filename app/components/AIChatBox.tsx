@@ -6,11 +6,11 @@ import {
   ScrollView,
   Modal,
   StyleSheet,
-  Pressable,
   TextInput,
   Alert,
   KeyboardAvoidingView,
   Platform,
+  Keyboard,
 } from "react-native";
 import { db, auth } from "../../firebaseConfig";
 import {
@@ -20,6 +20,7 @@ import {
   query,
   orderBy,
   getDocs,
+  limit,
 } from "firebase/firestore";
 import { GoogleGenAI } from "@google/genai";
 import { GEMINI_API_KEY } from "@env";
@@ -64,6 +65,193 @@ const AIChatBox: React.FC<ChatBoxProps> = ({ visible, onClose }) => {
   >([]);
   const [loading, setLoading] = useState(false);
   const scrollViewRef = useRef<ScrollView>(null);
+  const shouldShowSuggest =
+    !loading &&
+    (messages.length === 0 || messages[messages.length - 1]?.sender === "ai");
+
+  // analyze recent workouts and return a brief summary  deterministic recommendations (modify this cuz now store the exercise in schedule instead of workout collections)
+  async function analyzeWorkoutsAndRecommend(uid: string) {
+    try {
+      // Read latest 10 schedules created by this user (created via CreateSchedule)
+      const schedulesRef = collection(db, `users/${uid}/schedules`);
+      const q = query(schedulesRef, orderBy("scheduledAt", "desc"), limit(10));
+      const snap = await getDocs(q);
+
+      if (snap.empty) {
+        return {
+          summary: "No recent schedules found.",
+          recommendation:
+            "No schedule history — general recovery: light stretching, hydrate (300-500ml), 24h rest.",
+          meta: null,
+        };
+      }
+
+      // Collect names for the last 10 workouts and aggregate metrics across them
+      const workoutNames: string[] = [];
+      let totalVolume = 0; // aggregated sets * reps
+      let totalRest = 0; // aggregated rest seconds
+      let totalCount = 0;
+      let lastVolume: number | null = null; // volume from the most recent doc (index 0)
+
+      snap.docs.forEach((d, idx) => {
+        console.log("analyzeWorkoutsAndRecommend doc data:", d.data());
+        const data = d.data() as any;
+        const name = String(data?.selectedWorkoutName ?? "unspecified");
+        workoutNames.push(name);
+
+        const sets = Number(data?.customSets) || 0;
+        const reps = Number(data?.customReps) || 0;
+        const rest = Number(data?.customRestSeconds) || 0;
+        const volume = sets > 0 && reps > 0 ? sets * reps : 0;
+
+        if (idx === 0) lastVolume = volume || null;
+        totalVolume += volume;
+        totalRest += rest;
+        totalCount++;
+      });
+
+      const avgVolume =
+        Math.round((totalVolume / Math.max(1, totalCount)) * 10) / 10;
+      const avgRest =
+        Math.round((totalRest / Math.max(1, totalCount)) * 10) / 10;
+
+      // Deterministic recommendation rules based on aggregated averages
+      let recommendation = "";
+      if (lastVolume && lastVolume >= 100) {
+        recommendation =
+          "High volume recently — Recovery: 48–72h active rest, prioritize sleep, extra hydration (500–1000ml), mobility and foam rolling 10–15min.";
+      } else if (avgVolume >= 60) {
+        recommendation =
+          "Generally high volume — Recovery: 48h light activity, mobility, 500ml hydration after session, protein snack within 60 minutes.";
+      } else if (avgVolume >= 30) {
+        recommendation =
+          "Moderate volume — Recovery: 24–48h light activity, 300–500ml hydration post-workout, 5–10min stretching.";
+      } else {
+        recommendation =
+          "Low volume — Recovery: short cooldown, 15–20min mobility or stretching, normal hydration and sleep.";
+      }
+
+      if (avgRest > 120) {
+        recommendation +=
+          " Note: long rest intervals recorded — consider pacing intensity.";
+      } else if (avgRest > 60) {
+        recommendation += " Rest intervals appear moderate.";
+      }
+
+      const summary = `Analyzed ${totalCount} recent sessions. Workouts (latest first): ${workoutNames.join(
+        ", "
+      )}. Avg volume (sets×reps): ${avgVolume}. Avg rest: ${avgRest}s.`;
+
+      return {
+        summary,
+        recommendation,
+        meta: {
+          workoutNames,
+          avgVolume,
+          avgRest,
+          lastVolume,
+          count: totalCount,
+        },
+      };
+    } catch (err) {
+      console.error("analyzeWorkoutsAndRecommend error:", err);
+      return {
+        summary: "Error reading schedule history",
+        recommendation:
+          "General recovery: light stretching, hydrate, 24h rest.",
+        meta: null,
+      };
+    }
+  }
+
+  const handleSuggestRecovery = async () => {
+    const currentUser = auth.currentUser;
+    if (!currentUser) {
+      Alert.alert(
+        "Sign in required",
+        "Please sign in to get personalized recovery tips."
+      );
+      return;
+    }
+    setLoading(true);
+
+    const placeholder = "Generating recovery tips...";
+
+    try {
+      // run analysis first so we know whether to tag RECOVERY_REQUEST_GEMINI or RECOVERY_REQUEST
+      const analysis = await analyzeWorkoutsAndRecommend(currentUser.uid);
+      const hasWorkouts = !!(
+        analysis.meta &&
+        analysis.meta.count &&
+        analysis.meta.count > 0
+      );
+      const docTag = hasWorkouts
+        ? "RECOVERY_REQUEST_GEMINI"
+        : "RECOVERY_REQUEST";
+
+      // append user tag + ai placeholder so UI shows the user tag immediately
+      setMessages((prev) => [
+        ...prev,
+        { sender: "user", text: docTag },
+        { sender: "ai", text: placeholder },
+      ]);
+
+      // prepare final text (call Gemini only if we have workouts)
+      let finalText = analysis.recommendation;
+      if (hasWorkouts) {
+        const prompt = `You are an expert fitness coach. Based on this workout summary produce a concise, actionable post-workout recovery plan. 
+        Workout summary: ${analysis.summary} 
+        Context suggestion: ${analysis.recommendation} 
+        Return a 1-2 sentence summary followed by short bullets for stretching, hydration (amount & timing), rest duration, and quick nutrition tips.`;
+        try {
+          const aiText = await askGemini(prompt);
+          if (aiText && !aiText.toLowerCase().includes("sorry, i can only")) {
+            finalText = aiText.trim();
+          }
+        } catch (e) {
+          console.warn(
+            "Gemini refine failed, using fallback recommendation",
+            e
+          );
+        }
+      }
+
+      const combinedMessage = hasWorkouts
+        ? finalText
+        : `No Workout Found.\n\nGeneral recovery: ${finalText}`;
+
+      // replace the last placeholder with the final AI text
+      setMessages((prev) => {
+        const copy = [...prev];
+        const idx = copy.map((m) => m.text).lastIndexOf(placeholder);
+        if (idx >= 0) copy[idx] = { sender: "ai", text: combinedMessage };
+        else copy.push({ sender: "ai", text: combinedMessage });
+        return copy;
+      });
+
+      // persist the doc
+      await addDoc(collection(db, `users/${currentUser.uid}/aimessages`), {
+        user: docTag,
+        ai: combinedMessage,
+        createdAt: serverTimestamp(),
+        userId: currentUser.uid,
+        recovery: true,
+      });
+    } catch (err) {
+      console.error("handleSuggestRecovery error:", err);
+      setMessages((prev) => {
+        const copy = [...prev];
+        const idx = copy.map((m) => m.text).lastIndexOf(placeholder);
+        const errText = "Failed to generate recovery tips.";
+        if (idx >= 0) copy[idx] = { sender: "ai", text: errText };
+        else copy.push({ sender: "ai", text: errText });
+        return copy;
+      });
+      Alert.alert("Error", "Failed to generate recovery tips.");
+    } finally {
+      setLoading(false);
+    }
+  };
 
   // To load messages when component mounts
   useEffect(() => {
@@ -107,6 +295,30 @@ const AIChatBox: React.FC<ChatBoxProps> = ({ visible, onClose }) => {
     scrollViewRef.current?.scrollToEnd({ animated: true });
   }, [messages]);
 
+  useEffect(() => {
+    const onKeyboardShow = () => {
+      // small delay so layout has updated before scrolling
+      setTimeout(() => {
+        scrollViewRef.current?.scrollToEnd({ animated: true });
+      }, 280);
+    };
+
+    const showEvent =
+      Platform.OS === "ios" ? "keyboardWillShow" : "keyboardDidShow";
+    const hideEvent =
+      Platform.OS === "ios" ? "keyboardWillHide" : "keyboardDidHide";
+
+    const showSub = Keyboard.addListener(showEvent, onKeyboardShow);
+    const hideSub = Keyboard.addListener(hideEvent, () => {
+      /* noop for now - kept to remove subscription properly */
+    });
+
+    return () => {
+      showSub.remove();
+      hideSub.remove();
+    };
+  }, []);
+
   const handleSend = async () => {
     const currentUser = auth.currentUser;
     if (!currentUser) {
@@ -147,12 +359,14 @@ const AIChatBox: React.FC<ChatBoxProps> = ({ visible, onClose }) => {
 
   return (
     <Modal visible={visible} transparent animationType="fade">
-      <Pressable style={styles.modalOverlay} onPress={onClose}>
-        <Pressable style={styles.chatModalBox} onPress={() => {}}>
+      <View style={styles.modalOverlay}>
+        <View style={styles.chatModalBox}>
           <KeyboardAvoidingView
-            style={{ flex: 1 }}
+            style={{
+              flex: 1,
+            }}
             behavior={Platform.OS === "ios" ? "padding" : "height"}
-            keyboardVerticalOffset={Platform.OS === "ios" ? 100 : 0} // adjust if you have a header
+            keyboardVerticalOffset={Platform.OS === "ios" ? 100 : 0}
           >
             {/* Header */}
             <View style={styles.header}>
@@ -169,6 +383,7 @@ const AIChatBox: React.FC<ChatBoxProps> = ({ visible, onClose }) => {
                 contentContainerStyle={{ paddingVertical: 10, flexGrow: 1 }}
                 keyboardShouldPersistTaps="handled"
               >
+                {/* ...existing messages rendering and suggest button ... */}
                 {messages.length === 0 && (
                   <Text style={styles.message}>
                     Hi! Ask me anything about fitness and health.
@@ -208,6 +423,18 @@ const AIChatBox: React.FC<ChatBoxProps> = ({ visible, onClose }) => {
                     </View>
                   </View>
                 ))}
+                {shouldShowSuggest && (
+                  <View style={styles.suggestButtonContainer}>
+                    <TouchableOpacity
+                      onPress={handleSuggestRecovery}
+                      style={styles.suggestButton}
+                    >
+                      <Text style={styles.suggestButtonText}>
+                        Suggest recovery tips
+                      </Text>
+                    </TouchableOpacity>
+                  </View>
+                )}
                 {loading && <Text style={styles.message}>AI is typing...</Text>}
               </ScrollView>
             </View>
@@ -234,8 +461,8 @@ const AIChatBox: React.FC<ChatBoxProps> = ({ visible, onClose }) => {
               </View>
             </View>
           </KeyboardAvoidingView>
-        </Pressable>
-      </Pressable>
+        </View>
+      </View>
     </Modal>
   );
 };
@@ -328,6 +555,23 @@ const styles = StyleSheet.create({
   },
   aiMessageText: {
     color: "#ffffff",
+  },
+  suggestButton: {
+    backgroundColor: "#4a90e2",
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 12,
+    marginLeft: 8,
+    height: 30,
+  },
+  suggestButtonText: {
+    color: "#fff",
+    fontSize: 12,
+    fontWeight: "600",
+  },
+  suggestButtonContainer: {
+    alignItems: "center",
+    marginVertical: 12,
   },
   // Input area styles
   inputContainer: {
