@@ -24,12 +24,11 @@ type Props = NativeStackScreenProps<ScheduleStackParamList, "CreateSchedule">;
 type CreateScheduleParams = {
   fromHome?: boolean;
   resetKey?: number;
-  selectedExercises?: string[];
+  selectedExercise?: string;
 };
 
 const CreateScheduleScreen = ({ navigation, route }: Props) => {
   const [title, setTitle] = useState("");
-  const [description, setDescription] = useState("");
   const [date, setDate] = useState<Date>(new Date());
   const [loading, setLoading] = useState(false);
   const [showDatePicker, setShowDatePicker] = useState(false);
@@ -55,7 +54,6 @@ const CreateScheduleScreen = ({ navigation, route }: Props) => {
   useEffect(() => {
     if (fromHome && resetKey) {
       setTitle("");
-      setDescription("");
       setDate(new Date());
       setSelectedWorkout("Front Square");
       setCustomSets(null);
@@ -69,14 +67,10 @@ const CreateScheduleScreen = ({ navigation, route }: Props) => {
     }
   }, [fromHome, resetKey]);
 
-  // accept selected exercises returned from SelectExercise
+  // accept selected exercise returned from SelectExercise
   useEffect(() => {
-    const sel = (route.params as any)?.selectedExercises as
-      | string[]
-      | undefined;
-    if (sel && sel.length) {
-      setSelectedWorkout(sel.join(", "));
-    }
+    const sel = (route.params as any)?.selectedExercise as string | undefined;
+    if (sel) setSelectedWorkout(sel);
   }, [route.params]);
 
   const onChangeDate = (event: any, selectedDate?: Date) => {
@@ -96,8 +90,8 @@ const CreateScheduleScreen = ({ navigation, route }: Props) => {
       return;
     }
 
-    if (!title.trim() || !description.trim()) {
-      Alert.alert("Validation Error", "Title and Description cannot be empty.");
+    if (!title.trim()) {
+      Alert.alert("Validation Error", "Title cannot be empty.");
       return;
     }
 
@@ -114,7 +108,6 @@ const CreateScheduleScreen = ({ navigation, route }: Props) => {
 
       const newScheduleData = {
         title: title.trim(),
-        description: description.trim(),
         scheduledAt: date,
         userId: currentUser.uid,
         userName: currentUser.displayName || "Anonymous",
@@ -176,19 +169,6 @@ const CreateScheduleScreen = ({ navigation, route }: Props) => {
             placeholderTextColor="#aaa"
             value={title}
             onChangeText={setTitle}
-            editable={!loading} // Disable while saving
-          />
-
-          {/* Description Input */}
-          <Text style={styles.label}>Description</Text>
-          <TextInput
-            style={styles.input}
-            placeholder="Enter description"
-            placeholderTextColor="#aaa"
-            value={description}
-            onChangeText={setDescription}
-            multiline={true}
-            numberOfLines={4}
             editable={!loading} // Disable while saving
           />
 
@@ -387,7 +367,6 @@ const CreateScheduleScreen = ({ navigation, route }: Props) => {
                       const rest = customRestSec ?? 0;
                       const label = `${sets}×${reps} • rest ${rest}s`;
                       setCustomLabel(label);
-                      // optionally update selectedWorkout to indicate custom
                       setShowCustomModal(false);
                     }}
                   >

@@ -24,20 +24,23 @@ type Props = NativeStackScreenProps<WorkoutStackParamList, "SelectExercise">;
 const SelectExercise = ({ navigation }: Props) => {
   const route = useRoute() as any;
   const returnToCreate = !!route?.params?.returnToCreateSchedule;
+  const returnToEdit = !!route?.params?.returnToEditSchedule;
+  const scheduleId: string | undefined = route?.params?.scheduleId;
   const fromHome = !!route?.params?.fromHome;
+
   const [searchText, setSearchText] = useState("");
-  const [selectedExercises, setSelectedExercises] = useState<string[]>([]);
+  const [selectedExercise, setSelectedExercise] = useState<string | null>(null);
   const [exerciseData, setExerciseData] = useState<any[]>([]);
   const [filteredExercises, setFilteredExercises] = useState<any[]>([]);
   const [bodyParts, setBodyParts] = useState<string[]>([]);
   const [selectedBodyPart, setSelectedBodyPart] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
-  // 🔥 Fetch exercises from Firestore
+  // Fetch exercises from Firestore
   useFocusEffect(
     React.useCallback(() => {
       let mounted = true;
-      setSelectedExercises([]);
+      setSelectedExercise(null);
       setSearchText("");
       setLoading(true);
 
@@ -53,7 +56,6 @@ const SelectExercise = ({ navigation }: Props) => {
             setExerciseData(data);
             setFilteredExercises(data);
 
-            // ✅ Extract unique body parts (handle both bodyPart and bodyParts[])
             const uniqueBodyParts = new Set<string>();
             data.forEach((item: any) => {
               if (Array.isArray(item.bodyParts)) {
@@ -80,7 +82,7 @@ const SelectExercise = ({ navigation }: Props) => {
     }, [])
   );
 
-  // 🔍 Filter exercises by body part and search text
+  // Filter exercises by body part + search
   React.useEffect(() => {
     let filtered = exerciseData;
 
@@ -106,26 +108,31 @@ const SelectExercise = ({ navigation }: Props) => {
     setFilteredExercises(filtered);
   }, [searchText, selectedBodyPart, exerciseData]);
 
-  // ✅ Select exercise toggle
+  // Single-select toggle
   const toggleExerciseSelection = (exerciseName: string) => {
-    setSelectedExercises((prev) =>
-      prev.includes(exerciseName)
-        ? prev.filter((name) => name !== exerciseName)
-        : [...prev, exerciseName]
+    setSelectedExercise((prev) =>
+      prev === exerciseName ? null : exerciseName
     );
   };
 
-  // ✅ Add button handler
+  // Add button handler
   const handleAddExercises = () => {
-    if (selectedExercises.length === 0) {
-      Alert.alert("No Selection", "Please select at least one exercise");
+    if (!selectedExercise) {
+      Alert.alert("No Selection", "Please select one exercise");
       return;
     }
     if (returnToCreate) {
       navigation.getParent()?.navigate("Schedule", {
         screen: "CreateSchedule",
-        params: { selectedExercises, fromHome },
+        params: { selectedExercise, fromHome },
       } as any);
+    } else if (returnToEdit && scheduleId) {
+      navigation.getParent()?.navigate("Schedule", {
+        screen: "EditSchedule",
+        params: { scheduleId, selectedExercise },
+      } as any);
+    } else {
+      navigation.goBack();
     }
   };
 
@@ -134,6 +141,11 @@ const SelectExercise = ({ navigation }: Props) => {
       navigation.getParent()?.navigate("Schedule", {
         screen: "CreateSchedule",
         params: { fromHome },
+      } as any);
+    } else if (returnToEdit && scheduleId) {
+      navigation.getParent()?.navigate("Schedule", {
+        screen: "EditSchedule",
+        params: { scheduleId },
       } as any);
     } else {
       navigation.goBack();
@@ -181,7 +193,7 @@ const SelectExercise = ({ navigation }: Props) => {
             />
           </View>
 
-          {/* 🔘 Body Part Filter Bar */}
+          {/* Body Part Filter Bar */}
           <ScrollView
             horizontal
             showsHorizontalScrollIndicator={false}
@@ -214,54 +226,50 @@ const SelectExercise = ({ navigation }: Props) => {
         {/* EXERCISE LIST */}
         <FlatList
           data={filteredExercises}
-          renderItem={({ item }) => (
-            <TouchableOpacity
-              style={[
-                styles.exerciseItem,
-                selectedExercises.includes(item.name) &&
-                  styles.selectedExercise,
-              ]}
-              onPress={() => toggleExerciseSelection(item.name)}
-            >
-              <View style={styles.imageContainer}>
-                <Image
-                  source={{ uri: item.gifUrl }}
-                  style={styles.exerciseImage}
-                />
-              </View>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.exerciseText}>{item.name}</Text>
-                <Text style={styles.categoryText}>
-                  {item.bodyParts?.join(", ") || item.bodyPart || "Unknown"}
-                </Text>
-              </View>
-              {selectedExercises.includes(item.name) && (
-                <MaterialCommunityIcons
-                  name="check-circle"
-                  size={24}
-                  color="#5A3BFF"
-                />
-              )}
-            </TouchableOpacity>
-          )}
-          keyExtractor={(item) => item.id}
-          contentContainerStyle={{
-            paddingHorizontal: 20,
-            paddingBottom: 100, // space for fixed Add button
+          renderItem={({ item }) => {
+            const isSelected = selectedExercise === item.name;
+            return (
+              <TouchableOpacity
+                style={[
+                  styles.exerciseItem,
+                  isSelected && styles.selectedExercise,
+                ]}
+                onPress={() => toggleExerciseSelection(item.name)}
+              >
+                <View style={styles.imageContainer}>
+                  <Image
+                    source={{ uri: item.gifUrl }}
+                    style={styles.exerciseImage}
+                  />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.exerciseText}>{item.name}</Text>
+                  <Text style={styles.categoryText}>
+                    {item.bodyParts?.join(", ") || item.bodyPart || "Unknown"}
+                  </Text>
+                </View>
+                {isSelected && (
+                  <MaterialCommunityIcons
+                    name="check-circle"
+                    size={24}
+                    color="#5A3BFF"
+                  />
+                )}
+              </TouchableOpacity>
+            );
           }}
+          keyExtractor={(item) => item.id}
+          contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 100 }}
         />
 
-        {/* 🧷 FIXED Add Button */}
-        {selectedExercises.length > 0 && (
+        {/* Fixed Add Button */}
+        {selectedExercise && (
           <View style={styles.fixedAddContainer}>
             <TouchableOpacity
               style={styles.addButton}
               onPress={handleAddExercises}
             >
-              <Text style={styles.addButtonText}>
-                Add {selectedExercises.length} Exercise
-                {selectedExercises.length > 1 ? "s" : ""}
-              </Text>
+              <Text style={styles.addButtonText}>Add Exercise</Text>
             </TouchableOpacity>
           </View>
         )}
