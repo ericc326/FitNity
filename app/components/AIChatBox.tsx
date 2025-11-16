@@ -28,31 +28,6 @@ import { MaterialCommunityIcons } from "@expo/vector-icons";
 
 const gemini = new GoogleGenAI({ apiKey: GEMINI_API_KEY });
 
-async function askGemini(prompt: string): Promise<string> {
-  const systemInstruction = `
-You are a helpful assistant that only answers questions related to fitness, sport, exercise, health, nutrition, or diet. 
-If the question is not related to these topics, politely reply: "Sorry, I can only answer fitness and diet related questions."
-`;
-
-  const fullPrompt = `${systemInstruction}\nUser: ${prompt}`;
-
-  try {
-    const response = await gemini.models.generateContent({
-      model: "gemini-2.0-flash",
-      contents: fullPrompt,
-    });
-
-    if (!response || !response.text) {
-      return "No valid response from Gemini.";
-    }
-
-    const text = response.text.trim();
-    return text;
-  } catch (err: any) {
-    return "Failed to fetch response from Gemini.";
-  }
-}
-
 type ChatBoxProps = {
   visible: boolean;
   onClose: () => void;
@@ -68,6 +43,93 @@ const AIChatBox: React.FC<ChatBoxProps> = ({ visible, onClose }) => {
   const shouldShowSuggest =
     !loading &&
     (messages.length === 0 || messages[messages.length - 1]?.sender === "ai");
+  const [healthInfoSummary, setHealthInfoSummary] = useState<string | null>(
+    null
+  );
+
+  // Load health info when modal becomes visible
+  useEffect(() => {
+    const uid = auth.currentUser?.uid;
+    if (visible && uid) {
+      loadHealthInfo(uid);
+    }
+  }, [visible]);
+
+  async function loadHealthInfo(uid: string) {
+    try {
+      const colRef = collection(db, `users/${uid}/healthinfo`);
+      const snap = await getDocs(query(colRef, limit(1)));
+
+      if (snap.empty) {
+        setHealthInfoSummary(null);
+        return;
+      }
+
+      const data = snap.docs[0].data() as any;
+
+      // Build concise summary from your schema (bmi, gender, healthInfo, height, level, weight)
+      const parts: string[] = [];
+      if (data.healthInfo) parts.push(`conditions: ${String(data.healthInfo)}`);
+      if (data.gender) parts.push(`gender: ${String(data.gender)}`);
+
+      const heightVal = data.height != null ? String(data.height).trim() : "";
+      const weightVal = data.weight != null ? String(data.weight).trim() : "";
+
+      if (heightVal) {
+        const h = Number(heightVal.replace(/[^\d.]/g, ""));
+        parts.push(`height: ${isNaN(h) ? heightVal : `${h} cm`}`);
+      }
+      if (weightVal) {
+        const w = Number(weightVal.replace(/[^\d.]/g, ""));
+        parts.push(`weight: ${isNaN(w) ? weightVal : `${w} kg`}`);
+      }
+      if (data.bmi !== undefined && data.bmi !== null) {
+        const bmiNum = Number(data.bmi);
+        parts.push(
+          `BMI: ${isNaN(bmiNum) ? String(data.bmi) : bmiNum.toFixed(1)}`
+        );
+      }
+      if (data.level) parts.push(`level: ${String(data.level)}`);
+
+      const summary = parts.join(", ");
+      setHealthInfoSummary(summary || null);
+    } catch (err) {
+      console.error("loadHealthInfo error:", err);
+      setHealthInfoSummary(null);
+    }
+  }
+
+  async function askGemini(prompt: string): Promise<string> {
+    const healthSegment = healthInfoSummary
+      ? `User health info: ${healthInfoSummary}`
+      : `User health info: (none recorded)`;
+    const systemInstruction = `
+You are a helpful fitness & nutrition assistant. Always consider the user's recorded health conditions when giving advice.
+If a suggestion may conflict with a condition (e.g., diabetes and sugary drinks), clearly warn and offer safer alternatives.
+If the user's question is not about fitness, sport, exercise, health, nutrition, or diet, reply: "Sorry, I can only answer fitness and diet related questions."
+Never give medical diagnoses; recommend consulting a healthcare professional for medical concerns.
+`;
+
+    const fullPrompt = `${systemInstruction.trim()}
+    ${healthSegment}
+    User question: ${prompt}`;
+
+    try {
+      const response = await gemini.models.generateContent({
+        model: "gemini-2.0-flash",
+        contents: fullPrompt,
+      });
+
+      if (!response || !response.text) {
+        return "No valid response from Gemini.";
+      }
+
+      const text = response.text.trim();
+      return text;
+    } catch (err: any) {
+      return "Failed to fetch response from Gemini.";
+    }
+  }
 
   // analyze recent workouts and return a brief summary  deterministic recommendations (modify this cuz now store the exercise in schedule instead of workout collections)
   async function analyzeWorkoutsAndRecommend(uid: string) {
