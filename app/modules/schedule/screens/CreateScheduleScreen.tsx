@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useMemo } from "react";
 import {
   View,
   Text,
@@ -25,6 +25,7 @@ type CreateScheduleParams = {
   fromHome?: boolean;
   resetKey?: number;
   selectedExercise?: string;
+  selectedExerciseId?: string;
 };
 
 const CreateScheduleScreen = ({ navigation, route }: Props) => {
@@ -34,6 +35,9 @@ const CreateScheduleScreen = ({ navigation, route }: Props) => {
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [showTimePicker, setShowTimePicker] = useState(false);
   const [selectedWorkout, setSelectedWorkout] = useState("Front Square");
+  const [selectedWorkoutId, setSelectedWorkoutId] = useState<string | null>(
+    null
+  );
   const scrollRef = useRef<ScrollView | null>(null);
   const params = route?.params as
     | CreateScheduleParams
@@ -51,11 +55,26 @@ const CreateScheduleScreen = ({ navigation, route }: Props) => {
   const [customRestSec, setCustomRestSec] = useState<number | null>(null);
   const [customLabel, setCustomLabel] = useState<string | null>(null);
 
+  // validation field helpers
+  const isPositiveInt = (n: number | null) =>
+    typeof n === "number" && Number.isFinite(n) && n > 0;
+
+  const canSave = useMemo(() => {
+    return (
+      title.trim().length > 0 &&
+      !!selectedWorkoutId && // ensure user chose a workout from SelectExercise
+      isPositiveInt(customSets) &&
+      isPositiveInt(customReps) &&
+      isPositiveInt(customRestSec)
+    );
+  }, [title, selectedWorkoutId, customSets, customReps, customRestSec]);
+
   useEffect(() => {
     if (fromHome && resetKey) {
       setTitle("");
       setDate(new Date());
       setSelectedWorkout("Front Square");
+      setSelectedWorkoutId(null);
       setCustomSets(null);
       setCustomReps(null);
       setCustomRestSec(null);
@@ -69,8 +88,10 @@ const CreateScheduleScreen = ({ navigation, route }: Props) => {
 
   // accept selected exercise returned from SelectExercise
   useEffect(() => {
-    const sel = (route.params as any)?.selectedExercise as string | undefined;
+    const p = route.params as CreateScheduleParams | undefined;
+    const sel = p?.selectedExercise;
     if (sel) setSelectedWorkout(sel);
+    if (p?.selectedExerciseId) setSelectedWorkoutId(p.selectedExerciseId);
   }, [route.params]);
 
   const onChangeDate = (event: any, selectedDate?: Date) => {
@@ -90,8 +111,11 @@ const CreateScheduleScreen = ({ navigation, route }: Props) => {
       return;
     }
 
-    if (!title.trim()) {
-      Alert.alert("Validation Error", "Title cannot be empty.");
+    if (!canSave) {
+      Alert.alert(
+        "Incomplete",
+        "Please fill Title, choose a Workout, and set Sets/Reps/Rest."
+      );
       return;
     }
 
@@ -113,6 +137,7 @@ const CreateScheduleScreen = ({ navigation, route }: Props) => {
         userName: currentUser.displayName || "Anonymous",
         completed: false,
         selectedWorkoutName: selectedWorkout,
+        selectedWorkoutId: selectedWorkoutId ?? null,
         customSets: customSets ?? undefined,
         customReps: customReps ?? undefined,
         customRestSeconds: customRestSec ?? undefined,
@@ -379,9 +404,12 @@ const CreateScheduleScreen = ({ navigation, route }: Props) => {
 
           {/* Save Button */}
           <TouchableOpacity
-            style={styles.saveButton}
+            style={[
+              styles.saveButton,
+              (loading || !canSave) && { opacity: 0.5 },
+            ]}
             onPress={handleSave}
-            disabled={loading}
+            disabled={loading || !canSave}
           >
             <Text style={styles.saveButtonText}>
               {loading ? "Saving..." : "Save"}{" "}

@@ -32,6 +32,9 @@ const EditScheduleScreen = ({ navigation, route }: Props) => {
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [showTimePicker, setShowTimePicker] = useState(false);
   const [selectedWorkout, setSelectedWorkout] = useState("Front Square");
+  const [selectedWorkoutId, setSelectedWorkoutId] = useState<string | null>(
+    null
+  );
 
   // custom repetitions/session state
   const [showCustomModal, setShowCustomModal] = useState(false);
@@ -64,6 +67,11 @@ const EditScheduleScreen = ({ navigation, route }: Props) => {
             data.scheduledAt?.toDate ? data.scheduledAt.toDate() : new Date()
           );
           setSelectedWorkout(data.selectedWorkoutName || "Front Square");
+          setSelectedWorkoutId(
+            typeof data.selectedWorkoutId === "string"
+              ? data.selectedWorkoutId
+              : null
+          );
           setCustomSets(data.customSets ?? null);
           setCustomReps(data.customReps ?? null);
           setCustomRestSec(data.customRestSeconds ?? null);
@@ -86,6 +94,10 @@ const EditScheduleScreen = ({ navigation, route }: Props) => {
   useEffect(() => {
     const sel = (route.params as any)?.selectedExercise as string | undefined;
     if (sel) setSelectedWorkout(sel);
+    const selId = (route.params as any)?.selectedExerciseId as
+      | string
+      | undefined;
+    if (selId) setSelectedWorkoutId(selId);
   }, [route.params]);
 
   const onChangeDate = (event: any, selectedDate?: Date) => {
@@ -125,6 +137,7 @@ const EditScheduleScreen = ({ navigation, route }: Props) => {
         title: title.trim(),
         scheduledAt: Timestamp.fromDate(date),
         selectedWorkoutName: selectedWorkout,
+        selectedWorkoutId: selectedWorkoutId ?? null,
         customSets: customSets ?? undefined,
         customReps: customReps ?? undefined,
         customRestSeconds: customRestSec ?? undefined,

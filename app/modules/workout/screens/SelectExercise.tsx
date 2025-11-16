@@ -29,7 +29,10 @@ const SelectExercise = ({ navigation }: Props) => {
   const fromHome = !!route?.params?.fromHome;
 
   const [searchText, setSearchText] = useState("");
-  const [selectedExercise, setSelectedExercise] = useState<string | null>(null);
+  const [selectedExercise, setSelectedExercise] = useState<string | null>(null); //name of selected exercise
+  const [selectedExerciseId, setSelectedExerciseId] = useState<string | null>(
+    null
+  ); // id of selected exercise
   const [exerciseData, setExerciseData] = useState<any[]>([]);
   const [filteredExercises, setFilteredExercises] = useState<any[]>([]);
   const [bodyParts, setBodyParts] = useState<string[]>([]);
@@ -41,6 +44,7 @@ const SelectExercise = ({ navigation }: Props) => {
     React.useCallback(() => {
       let mounted = true;
       setSelectedExercise(null);
+      setSelectedExerciseId(null);
       setSearchText("");
       setLoading(true);
 
@@ -109,27 +113,31 @@ const SelectExercise = ({ navigation }: Props) => {
   }, [searchText, selectedBodyPart, exerciseData]);
 
   // Single-select toggle
-  const toggleExerciseSelection = (exerciseName: string) => {
+  const toggleExerciseSelection = (
+    exerciseName: string,
+    exerciseId: string
+  ) => {
     setSelectedExercise((prev) =>
       prev === exerciseName ? null : exerciseName
     );
+    setSelectedExerciseId((prev) => (prev === exerciseId ? null : exerciseId));
   };
 
   // Add button handler
   const handleAddExercises = () => {
-    if (!selectedExercise) {
+    if (!selectedExercise || !selectedExerciseId) {
       Alert.alert("No Selection", "Please select one exercise");
       return;
     }
     if (returnToCreate) {
       navigation.getParent()?.navigate("Schedule", {
         screen: "CreateSchedule",
-        params: { selectedExercise, fromHome },
+        params: { selectedExercise, selectedExerciseId, fromHome },
       } as any);
     } else if (returnToEdit && scheduleId) {
       navigation.getParent()?.navigate("Schedule", {
         screen: "EditSchedule",
-        params: { scheduleId, selectedExercise },
+        params: { scheduleId, selectedExercise, selectedExerciseId },
       } as any);
     } else {
       navigation.goBack();
@@ -227,14 +235,14 @@ const SelectExercise = ({ navigation }: Props) => {
         <FlatList
           data={filteredExercises}
           renderItem={({ item }) => {
-            const isSelected = selectedExercise === item.name;
+            const isSelected = selectedExerciseId === item.id;
             return (
               <TouchableOpacity
                 style={[
                   styles.exerciseItem,
                   isSelected && styles.selectedExercise,
                 ]}
-                onPress={() => toggleExerciseSelection(item.name)}
+                onPress={() => toggleExerciseSelection(item.name, item.id)}
               >
                 <View style={styles.imageContainer}>
                   <Image
@@ -263,7 +271,7 @@ const SelectExercise = ({ navigation }: Props) => {
         />
 
         {/* Fixed Add Button */}
-        {selectedExercise && (
+        {selectedExerciseId && (
           <View style={styles.fixedAddContainer}>
             <TouchableOpacity
               style={styles.addButton}
