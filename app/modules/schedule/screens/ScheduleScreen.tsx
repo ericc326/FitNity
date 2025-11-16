@@ -275,14 +275,30 @@ const ScheduleScreen = () => {
           />
           <View style={styles.line} />
         </View>
-        <View style={[styles.scheduleCard, { backgroundColor: itemColor }]}>
-          <View>
+        <TouchableOpacity
+          activeOpacity={0.85}
+          style={[styles.scheduleCard, { backgroundColor: itemColor }]}
+          onPress={() =>
+            navigation.navigate("ScheduleDetail", { scheduleId: item.id })
+          }
+        >
+          <View style={styles.scheduleCardContent}>
             <Text style={styles.scheduleTime}>
               {scheduledMoment.format("MMMM DD, YYYY, h:mma")}{" "}
               {/* Display formatted time */}
             </Text>
-            <Text style={styles.scheduleTitle}>{item.title}</Text>
-            <Text style={styles.scheduleDescription}>
+            <Text
+              style={styles.scheduleTitle}
+              numberOfLines={1}
+              ellipsizeMode="tail"
+            >
+              {item.title}
+            </Text>
+            <Text
+              style={styles.scheduleDescription}
+              numberOfLines={1}
+              ellipsizeMode="tail"
+            >
               {item.selectedWorkoutName}
             </Text>
           </View>
@@ -303,7 +319,7 @@ const ScheduleScreen = () => {
               />
             </TouchableOpacity>
           </View>
-        </View>
+        </TouchableOpacity>
       </View>
     );
   };
@@ -562,12 +578,14 @@ const styles = StyleSheet.create({
     fontSize: 12,
   },
   scheduleTitle: {
+    flexShrink: 1,
     color: "#000",
     fontSize: 18,
     fontWeight: "bold",
     marginTop: 5,
   },
   scheduleDescription: {
+    flexShrink: 1,
     color: "#555",
     fontSize: 14,
     marginTop: 3,

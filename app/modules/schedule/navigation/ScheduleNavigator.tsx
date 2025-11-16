@@ -1,11 +1,13 @@
 import React from "react";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import ScheduleScreen from "../screens/ScheduleScreen"; // Import ScheduleStackParamList
-import CreateScheduleScreen from "../screens/CreateScheduleScreen"; // Import the new screen
+import CreateScheduleScreen from "../screens/CreateScheduleScreen";
 import EditScheduleScreen from "../screens/EditScheduleScreen";
+import ScheduleDetailScreen from "../screens/ScheduleDetailScreen";
 
 export type ScheduleStackParamList = {
   ScheduleList: undefined;
+  ScheduleDetail: { scheduleId: string, fromHome?: boolean };
   CreateSchedule:
     | { fromHome?: boolean; resetKey?: number; selectedExercises?: string[] }
     | { scheduleId: string }
@@ -23,6 +25,10 @@ const ScheduleNavigator = () => {
       }}
     >
       <ScheduleStack.Screen name="ScheduleList" component={ScheduleScreen} />
+      <ScheduleStack.Screen
+        name="ScheduleDetail"
+        component={ScheduleDetailScreen}
+      />
       <ScheduleStack.Screen
         name="CreateSchedule"
         component={CreateScheduleScreen}
