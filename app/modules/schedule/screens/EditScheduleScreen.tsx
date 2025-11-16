@@ -9,6 +9,8 @@ import {
   Platform,
   Alert,
   ActivityIndicator,
+  Modal,
+  Pressable,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
@@ -23,15 +25,20 @@ type Props = NativeStackScreenProps<ScheduleStackParamList, "EditSchedule">;
 
 const EditScheduleScreen = ({ navigation, route }: Props) => {
   const { scheduleId } = route.params as { scheduleId: string };
-
   const [title, setTitle] = useState("");
-  const [description, setDescription] = useState("");
   const [date, setDate] = useState<Date>(new Date());
   const [loading, setLoading] = useState(false);
   const [fetching, setFetching] = useState(true);
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [showTimePicker, setShowTimePicker] = useState(false);
   const [selectedWorkout, setSelectedWorkout] = useState("Front Square");
+
+  // custom repetitions/session state
+  const [showCustomModal, setShowCustomModal] = useState(false);
+  const [customSets, setCustomSets] = useState<number | null>(null); //determine sets
+  const [customReps, setCustomReps] = useState<number | null>(null); //determine rep in one set
+  const [customRestSec, setCustomRestSec] = useState<number | null>(null);
+  const [customLabel, setCustomLabel] = useState<string | null>(null);
 
   useEffect(() => {
     const fetchSchedule = async () => {
@@ -53,11 +60,14 @@ const EditScheduleScreen = ({ navigation, route }: Props) => {
         if (snap.exists()) {
           const data = snap.data();
           setTitle(data.title || "");
-          setDescription(data.description || "");
           setDate(
             data.scheduledAt?.toDate ? data.scheduledAt.toDate() : new Date()
           );
-          // setSelectedWorkout(data.selectedWorkout || "Front Square");
+          setSelectedWorkout(data.selectedWorkoutName || "Front Square");
+          setCustomSets(data.customSets ?? null);
+          setCustomReps(data.customReps ?? null);
+          setCustomRestSec(data.customRestSeconds ?? null);
+          setCustomLabel(data.customLabel ?? null);
         } else {
           Alert.alert("Error", "Schedule not found.");
           navigation.goBack();
@@ -71,6 +81,12 @@ const EditScheduleScreen = ({ navigation, route }: Props) => {
     };
     fetchSchedule();
   }, [scheduleId]);
+
+  // accept selected exercises returned from SelectExercise
+  useEffect(() => {
+    const sel = (route.params as any)?.selectedExercise as string | undefined;
+    if (sel) setSelectedWorkout(sel);
+  }, [route.params]);
 
   const onChangeDate = (event: any, selectedDate?: Date) => {
     if (Platform.OS === "android") setShowDatePicker(false);
@@ -89,8 +105,8 @@ const EditScheduleScreen = ({ navigation, route }: Props) => {
       return;
     }
 
-    if (!title.trim() || !description.trim()) {
-      Alert.alert("Validation Error", "Title and Description cannot be empty.");
+    if (!title.trim()) {
+      Alert.alert("Validation Error", "Title cannot be empty.");
       return;
     }
 
@@ -107,10 +123,12 @@ const EditScheduleScreen = ({ navigation, route }: Props) => {
 
       await updateDoc(scheduleRef, {
         title: title.trim(),
-        description: description.trim(),
         scheduledAt: Timestamp.fromDate(date),
-        // selectedWorkout,
-        // Add other fields as needed
+        selectedWorkoutName: selectedWorkout,
+        customSets: customSets ?? undefined,
+        customReps: customReps ?? undefined,
+        customRestSeconds: customRestSec ?? undefined,
+        customLabel: customLabel ?? undefined,
       });
 
       Alert.alert("Success", "Schedule updated successfully!");
@@ -159,19 +177,6 @@ const EditScheduleScreen = ({ navigation, route }: Props) => {
             placeholderTextColor="#aaa"
             value={title}
             onChangeText={setTitle}
-            editable={!loading}
-          />
-
-          {/* Description Input */}
-          <Text style={styles.label}>Description</Text>
-          <TextInput
-            style={styles.input}
-            placeholder="Enter description"
-            placeholderTextColor="#aaa"
-            value={description}
-            onChangeText={setDescription}
-            multiline={true}
-            numberOfLines={4}
             editable={!loading}
           />
 
@@ -250,11 +255,28 @@ const EditScheduleScreen = ({ navigation, route }: Props) => {
           <TouchableOpacity
             style={styles.workoutDetailButton}
             disabled={loading}
+            onPress={() => {
+              // navigate to SelectExercise inside Workout stack
+              navigation.getParent()?.navigate("Workout", {
+                screen: "SelectExercise",
+                params: { returnToEditSchedule: true, scheduleId },
+              });
+            }}
           >
             <MaterialCommunityIcons name="dumbbell" size={20} color="#bdbdbd" />
-            <Text style={styles.workoutDetailButtonText}>Choose Workout</Text>
+            <Text
+              style={styles.workoutDetailButtonText}
+              numberOfLines={1}
+              ellipsizeMode="tail"
+            >
+              Choose Workout
+            </Text>
             <View style={styles.workoutDetailRight}>
-              <Text style={styles.workoutDetailRightText}>
+              <Text
+                style={styles.workoutDetailRightText}
+                numberOfLines={1}
+                ellipsizeMode="tail"
+              >
                 {selectedWorkout}
               </Text>
               <MaterialCommunityIcons
@@ -269,6 +291,7 @@ const EditScheduleScreen = ({ navigation, route }: Props) => {
           <TouchableOpacity
             style={styles.workoutDetailButton}
             disabled={loading}
+            onPress={() => setShowCustomModal(true)}
           >
             <MaterialCommunityIcons
               name="chart-bar"
@@ -279,6 +302,9 @@ const EditScheduleScreen = ({ navigation, route }: Props) => {
               Custom Repetitions and Session
             </Text>
             <View style={styles.workoutDetailRight}>
+              <Text style={styles.workoutDetailRightText}>
+                {customLabel ?? "Set reps & rest"}
+              </Text>
               <MaterialCommunityIcons
                 name="chevron-right"
                 size={22}
@@ -286,6 +312,78 @@ const EditScheduleScreen = ({ navigation, route }: Props) => {
               />
             </View>
           </TouchableOpacity>
+
+          {/* Custom modal */}
+          <Modal visible={showCustomModal} transparent animationType="fade">
+            <View style={styles.modalContainer}>
+              <View style={styles.modalContent}>
+                <Text style={styles.modalTitle}>Custom Reps & Rest</Text>
+
+                <View style={styles.modalRow}>
+                  <Text style={{ color: "#fff", marginBottom: 6 }}>Sets</Text>
+                  <TextInput
+                    style={styles.numberInput}
+                    value={customSets?.toString() ?? ""}
+                    onChangeText={(t) => setCustomSets(t ? Number(t) : null)}
+                    keyboardType="numeric"
+                    placeholder="e.g. 3"
+                    placeholderTextColor="#777"
+                  />
+                </View>
+
+                <View style={styles.modalRow}>
+                  <Text style={{ color: "#fff", marginBottom: 6 }}>
+                    Reps / Set
+                  </Text>
+                  <TextInput
+                    style={styles.numberInput}
+                    value={customReps?.toString() ?? ""}
+                    onChangeText={(t) => setCustomReps(t ? Number(t) : null)}
+                    keyboardType="numeric"
+                    placeholder="e.g. 10"
+                    placeholderTextColor="#777"
+                  />
+                </View>
+
+                <View style={styles.modalRow}>
+                  <Text style={{ color: "#fff", marginBottom: 6 }}>
+                    Rest (sec)
+                  </Text>
+                  <TextInput
+                    style={styles.numberInput}
+                    value={customRestSec?.toString() ?? ""}
+                    onChangeText={(t) => setCustomRestSec(t ? Number(t) : null)}
+                    keyboardType="numeric"
+                    placeholder="e.g. 60"
+                    placeholderTextColor="#777"
+                  />
+                </View>
+
+                <View style={styles.modalButtons}>
+                  <Pressable
+                    style={[styles.modalButton, { backgroundColor: "#444" }]}
+                    onPress={() => setShowCustomModal(false)}
+                  >
+                    <Text style={styles.modalButtonText}>Cancel</Text>
+                  </Pressable>
+                  <Pressable
+                    style={[styles.modalButton, { backgroundColor: "#7b68ee" }]}
+                    onPress={() => {
+                      // apply and close
+                      const sets = customSets ?? 0;
+                      const reps = customReps ?? 0;
+                      const rest = customRestSec ?? 0;
+                      const label = `${sets}×${reps} • rest ${rest}s`;
+                      setCustomLabel(label);
+                      setShowCustomModal(false);
+                    }}
+                  >
+                    <Text style={styles.modalButtonText}>Apply</Text>
+                  </Pressable>
+                </View>
+              </View>
+            </View>
+          </Modal>
 
           {/* Save Button */}
           <TouchableOpacity
@@ -402,21 +500,69 @@ const styles = StyleSheet.create({
     elevation: 2,
   },
   workoutDetailButtonText: {
-    flex: 1,
     color: "#fff",
     fontSize: 15,
     marginLeft: 12,
     fontWeight: "500",
+    flex: 1,
+    marginRight: 12,
   },
   workoutDetailRight: {
     flexDirection: "row",
     alignItems: "center",
+    marginLeft: "auto",
+    maxWidth: 180,
   },
   workoutDetailRightText: {
     color: "#bdbdbd",
     fontSize: 13,
     marginRight: 4,
     fontWeight: "500",
+    maxWidth: 140,
+    flexShrink: 1,
+    textAlign: "right",
+  },
+  modalContainer: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.6)",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  modalContent: {
+    width: "90%",
+    backgroundColor: "#2b2435",
+    borderRadius: 12,
+    padding: 16,
+  },
+  modalTitle: {
+    color: "#fff",
+    fontSize: 16,
+    fontWeight: "600",
+    marginBottom: 12,
+  },
+  modalRow: {
+    marginBottom: 12,
+  },
+  numberInput: {
+    backgroundColor: "rgba(255,255,255,0.06)",
+    borderRadius: 8,
+    padding: 10,
+    color: "#fff",
+  },
+  modalButtons: {
+    flexDirection: "row",
+    justifyContent: "flex-end",
+    marginTop: 8,
+  },
+  modalButton: {
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    borderRadius: 8,
+    marginLeft: 8,
+  },
+  modalButtonText: {
+    color: "#fff",
+    fontWeight: "600",
   },
   saveButton: {
     marginTop: 32,
