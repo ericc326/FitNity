@@ -1,48 +1,91 @@
-import React from "react";
+import React, { useEffect } from "react";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
-import WorkoutScreen from "../screens/WorkoutScreen"; // Your original screen
-import WorkoutSection from "../screens/WorkoutSection"; // Create workout flow
+import { useNavigation, useRoute, RouteProp } from "@react-navigation/native";
+import WorkoutScreen from "../screens/WorkoutScreen";
+import WorkoutSection from "../screens/WorkoutSection";
 import SelectExercise from "../screens/SelectExercise";
 import FilterExercise from "../screens/FilterExercise";
-import HomeScreen from "../../home/screens/HomeScreen"; 
+import HomeScreen from "../../home/screens/HomeScreen";
 import AiCoachScreen from "../screens/AiCoachScreen";
+import WorkoutOverviewScreen from "../screens/WorkoutOverviewScreen";
+import ActiveWorkoutScreen from "../screens/ActiveWorkoutScreen";
 
+/**
+ * 🧭 Workout Stack Route Types
+ * These define all parameters passed between screens.
+ */
 export type WorkoutStackParamList = {
-  WorkoutMain: undefined;      // Your original screen
-  WorkoutSection: undefined | {  // Make entire params optional
-    selectedExercise?: string;
-    selectedExercises?: string[];
-  };
-  SelectExercise: undefined;
+  WorkoutMain: undefined;
+  WorkoutSection:
+    | {
+        selectedExercise?: string;
+        selectedExercises?: string[];
+      }
+    | undefined;
+  SelectExercise: { fromHome?: boolean } | undefined;
   FilterExercise: undefined;
   HomeScreen: undefined;
   AiCoach: undefined;
+  WorkoutOverview: {
+    workout: any;
+    level?: "Beginner" | "Intermediate" | "Advanced"; // optional for flexibility
+  };
+  ActiveWorkout: {
+    workout: any;
+    sets: number;
+    reps: number;
+    rest: number;
+  };
 };
 
-const WorkoutStack = createNativeStackNavigator<WorkoutStackParamList>();
+const Stack = createNativeStackNavigator<WorkoutStackParamList>();
 
-const WorkoutNavigator = () => {
+const WorkoutNavigator: React.FC = () => {
+  const navigation = useNavigation();
+  const route = useRoute<
+    RouteProp<Record<string, { resetToMain?: boolean }>, string>
+  >();
+
+  /**
+   * ✅ Automatically reset navigation to WorkoutMain if resetToMain param is passed
+   */
+  useEffect(() => {
+    if (route.params?.resetToMain) {
+      navigation.reset({
+        index: 0,
+        routes: [{ name: "WorkoutMain" as never }],
+      });
+    }
+  }, [route, navigation]);
+
   return (
-    <WorkoutStack.Navigator
+    <Stack.Navigator
       screenOptions={{
         headerShown: false,
         animation: "slide_from_right",
       }}
-      initialRouteName="WorkoutMain"  // Show WorkoutScreen first
+      initialRouteName="WorkoutMain"
     >
-      {/* Main Workout Screen */}
-      <WorkoutStack.Screen 
-        name="WorkoutMain" 
-        component={WorkoutScreen} 
+      {/* 🔹 Main Workout Screens */}
+      <Stack.Screen name="WorkoutMain" component={WorkoutScreen} />
+      <Stack.Screen name="WorkoutSection" component={WorkoutSection} />
+      <Stack.Screen name="SelectExercise" component={SelectExercise} />
+      <Stack.Screen name="FilterExercise" component={FilterExercise} />
+
+      {/* 🔹 Integration with Home + AI */}
+      <Stack.Screen name="HomeScreen" component={HomeScreen} />
+      <Stack.Screen name="AiCoach" component={AiCoachScreen} />
+
+      {/* 🔹 Suggested Workout Flow */}
+      <Stack.Screen
+        name="WorkoutOverview"
+        component={WorkoutOverviewScreen}
       />
-      
-      {/* Create Workout Flow */}
-      <WorkoutStack.Screen name="WorkoutSection" component={WorkoutSection} />
-      <WorkoutStack.Screen name="SelectExercise" component={SelectExercise} />
-      <WorkoutStack.Screen name="FilterExercise" component={FilterExercise} />
-      <WorkoutStack.Screen name="HomeScreen" component={HomeScreen} />
-       <WorkoutStack.Screen name="AiCoach" component={AiCoachScreen} />
-    </WorkoutStack.Navigator>
+      <Stack.Screen
+        name="ActiveWorkout"
+        component={ActiveWorkoutScreen}
+      />
+    </Stack.Navigator>
   );
 };
 

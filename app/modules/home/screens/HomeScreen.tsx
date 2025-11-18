@@ -1,3 +1,6 @@
+// FULL COMPLETED HOMESCREEN CODE
+// ---------------------------------------------------------
+
 import React, { useState, useEffect } from "react";
 import {
   View,
@@ -6,6 +9,7 @@ import {
   Image,
   TouchableOpacity,
   ScrollView,
+  ActivityIndicator,
 } from "react-native";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -32,49 +36,65 @@ import {
 } from "firebase/firestore";
 import moment from "moment";
 
+// Types ----------------------------------------------------
+
 type HomeScreenNavigationProp = CompositeNavigationProp<
   BottomTabNavigationProp<HomeTabParamList, "Home">,
   NativeStackNavigationProp<RootStackParamList>
 >;
 
-const workouts = [
-  {
-    title: "ABS BEGINNER",
-    duration: "78 min",
-    exercises: 28,
-    image: require("../../../assets/beginnerWorkout.jpeg"),
-  },
-  {
-    title: "Biceps BEGINNER",
-    duration: "78 min",
-    exercises: 28,
-    image: require("../../../assets/beginnerWorkout.jpeg"),
-  },
-  {
-    title: "Triceps BEGINNER",
-    duration: "78 min",
-    exercises: 28,
-    image: require("../../../assets/beginnerWorkout.jpeg"),
-  },
-];
+type Level = "Beginner" | "Intermediate" | "Advanced";
+
+interface Exercise {
+  id: string;
+  name?: string;
+  bodyPart: string;
+  duration?: string;
+  imageURL?: string;
+  level: Level;
+}
+
+interface Task {
+  id: string;
+  title: string;
+  type?: string;
+  duration?: string;
+  completed?: boolean;
+  scheduledAt: any;
+}
+
+// Component ------------------------------------------------
 
 const HomeScreen: React.FC = () => {
   const navigation = useNavigation<HomeScreenNavigationProp>();
   const [profileImage, setProfileImage] = useState<string | null>(null);
   const [showChat, setShowChat] = useState(false);
   const [userName, setUserName] = useState<string>("");
-  const [todayTasks, setTodayTasks] = useState<any[]>([]);
+  const [todayTasks, setTodayTasks] = useState<Task[]>([]);
   const [loadingTasks, setLoadingTasks] = useState(true);
+  const [loadingLevel, setLoadingLevel] = useState(true);
   const [bmi, setBmi] = useState<number | null>(null);
   const [bmiDesc, setBmiDesc] = useState<string>("");
+  const [userLevel, setUserLevel] = useState<Level>("Beginner");
+  const [suggestedWorkouts, setSuggestedWorkouts] = useState<any[]>([]);
 
+  useEffect(() => {
+    const loadLevel = async () => {
+      const level = await fetchUserLevel();
+      setUserLevel(level);
+      setLoadingLevel(false);
+    };
+
+    loadLevel();
+  }, []);
+
+  // Fetch Health Info -----------------------------------------
   useEffect(() => {
     const fetchHealthInfo = async () => {
       try {
         const currentUser = auth.currentUser;
         if (!currentUser) return;
 
-        // Get the healthinfo collection (assume only one doc)
         const healthInfoRef = collection(
           db,
           "users",
@@ -84,26 +104,26 @@ const HomeScreen: React.FC = () => {
         const snapshot = await getDocs(healthInfoRef);
 
         if (!snapshot.empty) {
-          const data = snapshot.docs[0].data();
+          const data = snapshot.docs[0].data() as any;
           setBmi(data.bmi ?? null);
 
-          // Set BMI description
           let desc = "";
           if (data.bmi === undefined || data.bmi === null) desc = "--";
           else if (data.bmi < 18.5) desc = "Underweight";
           else if (data.bmi < 25) desc = "You have a normal weight";
           else if (data.bmi < 30) desc = "Overweight";
           else desc = "Obese";
+
           setBmiDesc(desc);
         }
       } catch (error) {
         console.error("Error fetching health info:", error);
       }
     };
-
     fetchHealthInfo();
   }, []);
 
+  // Fetch User Info -----------------------------------------
   useEffect(() => {
     const currentUser = auth.currentUser;
     if (!currentUser) {
@@ -114,35 +134,53 @@ const HomeScreen: React.FC = () => {
     const userRef = doc(db, "users", currentUser.uid);
     const unsubscribe = onSnapshot(
       userRef,
-      async (snap) => {
-        try {
-          if (snap.exists()) {
-            const d = snap.data() as any;
-            setUserName(d?.name ?? auth.currentUser?.displayName ?? "");
+      (snap) => {
+        if (snap.exists()) {
+          const data = snap.data() as any;
+          setUserName(data?.name ?? auth.currentUser?.displayName ?? "");
+          setUserLevel(data?.level ?? "Beginner");
 
-            const photo = d?.photoURL;
-            // Use photoURL directly as profile image (cuz ady store in https://)
-            if (photo && typeof photo === "string") {
-              setProfileImage(photo);
-            } else {
-              setProfileImage(null);
-            }
-          } else {
-            setUserName(auth.currentUser?.displayName ?? "");
-            setProfileImage(null);
-          }
-        } catch (e) {
-          console.warn("Error handling user snapshot:", e);
+          const photo = data?.photoURL;
+          setProfileImage(photo && typeof photo === "string" ? photo : null);
         }
       },
-      (err) => {
-        console.warn("Failed to listen to user doc:", err);
-      }
+      (err) => console.warn("Failed to listen to user doc:", err)
     );
 
     return () => unsubscribe();
   }, [navigation]);
 
+  //fetch userlevel
+  const fetchUserLevel = async () => {
+    const uid = auth.currentUser?.uid;
+    if (!uid) return "Beginner";
+
+    // healthinfo is a SUBCOLLECTION
+    const healthInfoRef = collection(db, "users", uid, "healthinfo");
+    const snapshot = await getDocs(healthInfoRef);
+
+    if (snapshot.empty) return "Beginner";
+
+    // you only have 1 document inside
+    const data = snapshot.docs[0].data();
+    return data.level || "Beginner";
+  };
+
+  useEffect(() => {
+    const loadLevel = async () => {
+      try {
+        const result = await fetchUserLevel();
+        setUserLevel(result);
+        console.log("User Level:", result);
+      } catch (error) {
+        console.log("Error fetching level:", error);
+      }
+    };
+
+    loadLevel();
+  }, []);
+
+  // Fetch Today's Tasks -------------------------------------
   useEffect(() => {
     let unsubscribe: (() => void) | undefined;
 
@@ -155,50 +193,106 @@ const HomeScreen: React.FC = () => {
           setLoadingTasks(false);
           return;
         }
+
         const startOfDay = moment().startOf("day").toDate();
         const endOfDay = moment().endOf("day").toDate();
+
         const schedulesRef = collection(
           db,
           "users",
           currentUser.uid,
           "schedules"
         );
-        // Remove the completed filter to show all tasks
+
         const q = query(
           schedulesRef,
           where("scheduledAt", ">=", startOfDay),
           where("scheduledAt", "<=", endOfDay),
           orderBy("scheduledAt", "asc")
         );
-        unsubscribe = onSnapshot(q, (querySnapshot) => {
-          const tasks = querySnapshot.docs.map((doc) => ({
-            id: doc.id,
-            ...doc.data(),
+
+        unsubscribe = onSnapshot(q, (snapshot) => {
+          const list: Task[] = snapshot.docs.map((d) => ({
+            ...(d.data() as Task),
+            id: d.id,
           }));
-          setTodayTasks(tasks);
+          setTodayTasks(list);
           setLoadingTasks(false);
         });
       } catch (error) {
+        console.error("Error fetching today's tasks:", error);
         setTodayTasks([]);
         setLoadingTasks(false);
-        console.error("Error fetching today's tasks:", error);
       }
     };
 
     fetchTodayTasks();
-
-    return () => {
-      if (unsubscribe) unsubscribe();
-    };
+    return () => unsubscribe && unsubscribe();
   }, []);
 
-  // Tab navigation
-  const goToSchedule = () => {
-    navigation.navigate("Schedule", { screen: "ScheduleList" });
-  };
+  // Fetch Suggested Workouts --------------------------------
+  useEffect(() => {
+    const fetchSuggestedWorkouts = async () => {
+      try {
+        const exercisesRef = collection(db, "exercises");
+        const snapshot = await getDocs(exercisesRef);
 
-  // Stack navigation
+        const allExercises: Exercise[] = snapshot.docs.map((doc) => {
+          const data = doc.data();
+          return {
+            id: doc.id,
+            name: data.name,
+            bodyPart: data.bodyParts?.[0] || "General",
+            duration: "4",
+            imageURL: data.gifUrl,
+            level: userLevel,
+          };
+        });
+
+        const grouped: Record<string, Exercise[]> = {};
+        allExercises.forEach((ex) => {
+          if (!grouped[ex.bodyPart]) grouped[ex.bodyPart] = [];
+          grouped[ex.bodyPart].push(ex);
+        });
+
+        const getRandom = (arr: Exercise[], count = 5) => {
+          const shuffled = [...arr].sort(() => Math.random() - 0.5);
+          return shuffled.slice(0, Math.min(count, arr.length));
+        };
+
+        const workouts = Object.entries(grouped).map(
+          ([bodyPart, exercises]) => {
+            const set = getRandom(exercises, 4 + Math.floor(Math.random() * 2));
+            const total = set.reduce(
+              (sum, e) => sum + (e.duration ? parseInt(e.duration) : 10),
+              0
+            );
+
+            return {
+              title: `${bodyPart} ${userLevel}`,
+              exercises: set,
+              duration: `${total} min`,
+              image: set[0]?.imageURL ?? null,
+            };
+          }
+        );
+
+        setSuggestedWorkouts(workouts);
+      } catch (error) {
+        console.error("Error fetching exercises:", error);
+        setSuggestedWorkouts([]);
+      }
+    };
+
+    fetchSuggestedWorkouts();
+  }, [userLevel]);
+
+  // Navigation functions ------------------------------------
+  const goToSchedule = () =>
+    navigation.navigate("Schedule", { screen: "ScheduleList" });
+
   const goToProfile = () => navigation.navigate("Profile");
+
   const goToStatistic = () => navigation.navigate("Statistic");
 
   const getTaskIcon = (type: string) => {
@@ -212,28 +306,33 @@ const HomeScreen: React.FC = () => {
     }
   };
 
+  // Render ----------------------------------------------------
+  if (loadingLevel) {
+    return (
+      <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
+        <ActivityIndicator size="large" color="#4a90e2" />
+      </View>
+    );
+  }
+
   return (
     <SafeAreaView style={styles.container} edges={["top", "bottom"]}>
-      <ScrollView
-        contentContainerStyle={{
-          paddingLeft: 12,
-          paddingRight: 12,
-          paddingBottom: 20,
-        }}
-      >
+      <ScrollView contentContainerStyle={{ padding: 12, paddingBottom: 20 }}>
         {/* Header */}
         <View style={styles.header}>
           <View>
             <Text style={styles.hiText}>Hi!</Text>
             <Text style={styles.nameText}>{userName}</Text>
+
             <View style={styles.badgeRow}>
-              <Text style={styles.badge}>Beginner</Text>
+              <Text style={styles.badge}>{userLevel}</Text>
               <Text style={[styles.badge, styles.trainingBadge]}>Training</Text>
               <Text style={[styles.badge, styles.communityBadge]}>
                 Community
               </Text>
             </View>
           </View>
+
           <TouchableOpacity onPress={goToProfile}>
             <Image
               source={
@@ -245,10 +344,12 @@ const HomeScreen: React.FC = () => {
             />
           </TouchableOpacity>
         </View>
-        {/* Statistic Section */}
+
+        {/* Statistics */}
         <View>
           <View style={styles.statisticsHeader}>
             <Text style={styles.statisticsSectionTitle}>Statistics</Text>
+
             <TouchableOpacity style={styles.viewButton} onPress={goToStatistic}>
               <Text style={styles.viewButtonText}>View All</Text>
               <MaterialCommunityIcons
@@ -258,22 +359,26 @@ const HomeScreen: React.FC = () => {
               />
             </TouchableOpacity>
           </View>
+
           <View style={styles.statisticsContent}>
             <View style={styles.bmiBox}>
               <Text style={styles.statLabel}>BMI (Body Mass Index)</Text>
-              <Text style={styles.statValue}>{bmi !== null ? bmi : "--"}</Text>
-              <Text style={styles.statDesc}>{bmiDesc || "No health info"}</Text>
+              <Text style={styles.statValue}>{bmi ?? "--"}</Text>
+              <Text style={styles.statDesc}>{bmiDesc}</Text>
             </View>
+
             <View style={styles.calorieBox}>
               <Text style={styles.statLabel}>Calorie</Text>
               <Text style={styles.statValue}>349 kcal</Text>
             </View>
           </View>
         </View>
-        {/* Schedule Section */}
+
+        {/* Today's Schedule */}
         <View style={styles.scheduleSection}>
           <View style={styles.scheduleSectionHeader}>
             <Text style={styles.scheduleSectionTitle}>Today's Schedule</Text>
+
             <TouchableOpacity style={styles.viewButton} onPress={goToSchedule}>
               <Text style={styles.viewButtonText}>View All</Text>
               <MaterialCommunityIcons
@@ -300,9 +405,7 @@ const HomeScreen: React.FC = () => {
                 <TouchableOpacity
                   key={task.id}
                   style={styles.taskCard}
-                  onPress={() => {
-                    goToSchedule();
-                  }}
+                  onPress={goToSchedule}
                 >
                   <View style={styles.taskTimeColumn}>
                     <Text style={styles.taskTime}>
@@ -313,6 +416,7 @@ const HomeScreen: React.FC = () => {
                       ).format("hh:mm A")}
                     </Text>
                   </View>
+
                   <View style={styles.taskContent}>
                     <View style={styles.taskHeader}>
                       <View style={styles.taskTitleContainer}>
@@ -321,8 +425,10 @@ const HomeScreen: React.FC = () => {
                           size={20}
                           color="#4a90e2"
                         />
+
                         <Text style={styles.taskTitle}>{task.title}</Text>
                       </View>
+
                       <MaterialCommunityIcons
                         name={
                           task.completed ? "check-circle" : "circle-outline"
@@ -331,6 +437,7 @@ const HomeScreen: React.FC = () => {
                         color={task.completed ? "#4CAF50" : "#8a84a5"}
                       />
                     </View>
+
                     <Text style={styles.taskDuration}>
                       {task.duration || ""}
                     </Text>
@@ -354,39 +461,62 @@ const HomeScreen: React.FC = () => {
           <Text style={styles.createWorkoutText}>Create Workout</Text>
         </TouchableOpacity>
 
-        {/* Suggestion Workouts */}
-        <Text style={styles.sectionTitle}>Suggestion Workouts</Text>
-        {workouts.map((workout, i) => (
-          <View key={i} style={styles.workoutCard}>
-            <Image source={workout.image} style={styles.workoutImage} />
-            <View style={styles.workoutInfo}>
-              <Text style={styles.workoutTitle}>{workout.title}</Text>
-              <Text style={styles.workoutMeta}>
-                ⏱ {workout.duration} • 🔥 {workout.exercises} Exercises
-              </Text>
-              <TouchableOpacity style={styles.startBtn}>
-                <Text style={styles.startBtnText}>Start</Text>
-              </TouchableOpacity>
+        {/* Suggested Workouts */}
+        <Text style={styles.sectionTitle}>Suggested Workouts</Text>
+
+        {suggestedWorkouts.length === 0 ? (
+          <Text style={{ color: "#fff", padding: 20 }}>
+            Loading workouts...
+          </Text>
+        ) : (
+          suggestedWorkouts.map((workout, i) => (
+            <View key={i} style={styles.workoutCard}>
+              {workout.image && (
+                <Image
+                  source={{ uri: workout.image }}
+                  style={styles.workoutImage}
+                />
+              )}
+
+              <View style={styles.workoutInfo}>
+                <Text style={styles.workoutTitle}>{workout.title}</Text>
+
+                <Text style={styles.workoutMeta}>
+                  ⏱ {workout.duration} • 🔥 {workout.exercises.length}{" "}
+                  Exercises
+                </Text>
+
+                <TouchableOpacity
+                  style={styles.startBtn}
+                  onPress={() =>
+                    navigation.navigate("Workout", {
+                      screen: "WorkoutOverview",
+                      params: { workout, level: userLevel },
+                    })
+                  }
+                >
+                  <Text style={styles.startBtnText}>Start</Text>
+                </TouchableOpacity>
+              </View>
             </View>
-          </View>
-        ))}
+          ))
+        )}
       </ScrollView>
-      {/* Floating Chat Icon */}
+
+      {/* Floating Chat Bot Icon */}
       <TouchableOpacity
         style={styles.chatButton}
         onPress={() => setShowChat(true)}
       >
-        <MaterialCommunityIcons
-          name="robot"
-          size={30}
-          color="#4a90e2"
-          style={styles.chatIcon}
-        />
+        <MaterialCommunityIcons name="robot" size={30} color="#4a90e2" />
       </TouchableOpacity>
+
       <AIChatBox visible={showChat} onClose={() => setShowChat(false)} />
     </SafeAreaView>
   );
 };
+
+// Styles ----------------------------------------------------
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#262135" },
@@ -395,6 +525,7 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     alignItems: "center",
   },
+
   hiText: { color: "#fff", fontSize: 36, fontWeight: "bold", paddingLeft: 10 },
   nameText: {
     color: "#fff",
@@ -402,6 +533,7 @@ const styles = StyleSheet.create({
     fontWeight: "bold",
     paddingLeft: 10,
   },
+
   badgeRow: { flexDirection: "row", marginTop: 8, gap: 6, marginBottom: 20 },
   badge: {
     backgroundColor: "#fff",
@@ -412,7 +544,9 @@ const styles = StyleSheet.create({
   },
   trainingBadge: { backgroundColor: "#f55" },
   communityBadge: { backgroundColor: "#4a90e2", color: "#fff" },
+
   profilePic: { width: 100, height: 100, borderRadius: 50 },
+
   statisticsHeader: {
     flexDirection: "row",
     justifyContent: "space-between",
@@ -425,10 +559,8 @@ const styles = StyleSheet.create({
     fontWeight: "bold",
     marginBottom: 10,
   },
-  statisticsContent: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-  },
+  statisticsContent: { flexDirection: "row", justifyContent: "space-between" },
+
   viewButton: {
     flexDirection: "row",
     alignItems: "center",
@@ -437,11 +569,8 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
     borderRadius: 20,
   },
-  viewButtonText: {
-    color: "#fff",
-    fontSize: 14,
-    fontWeight: "500",
-  },
+  viewButtonText: { color: "#fff", fontSize: 14, fontWeight: "500" },
+
   bmiBox: {
     backgroundColor: "#5a6df0",
     flex: 1,
@@ -456,13 +585,12 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     marginLeft: 10,
   },
+
   statLabel: { color: "#fff", fontSize: 12 },
   statValue: { color: "#fff", fontSize: 22, fontWeight: "bold" },
   statDesc: { color: "#fff", fontSize: 12, marginTop: 4 },
-  scheduleSection: {
-    marginTop: 20,
-    marginBottom: 20,
-  },
+
+  scheduleSection: { marginTop: 20, marginBottom: 20 },
   scheduleSectionHeader: {
     flexDirection: "row",
     justifyContent: "space-between",
@@ -470,53 +598,34 @@ const styles = StyleSheet.create({
     marginBottom: 15,
     paddingHorizontal: 4,
   },
-  scheduleSectionTitle: {
-    color: "#fff",
-    fontSize: 16,
-    fontWeight: "bold",
-  },
-  tasksScrollContainer: {
-    paddingHorizontal: 4,
-  },
+  scheduleSectionTitle: { color: "#fff", fontSize: 16, fontWeight: "bold" },
+
+  tasksScrollContainer: { paddingHorizontal: 4 },
+
   taskCard: {
     flexDirection: "row",
     backgroundColor: "#3C3952",
     borderRadius: 12,
     padding: 12,
     marginRight: 12,
-    width: 280, // Fixed width for each card
+    width: 280,
   },
-  taskTimeColumn: {
-    marginRight: 12,
-  },
-  taskTime: {
-    color: "#8a84a5",
-    fontSize: 14,
-  },
-  taskContent: {
-    flex: 1,
-  },
+
+  taskTimeColumn: { marginRight: 12 },
+  taskTime: { color: "#8a84a5", fontSize: 14 },
+
+  taskContent: { flex: 1 },
   taskHeader: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
     marginBottom: 4,
   },
-  taskTitleContainer: {
-    flexDirection: "row",
-    alignItems: "center",
-  },
-  taskTitle: {
-    color: "#fff",
-    fontSize: 16,
-    fontWeight: "500",
-    marginLeft: 8,
-  },
-  taskDuration: {
-    color: "#8a84a5",
-    fontSize: 14,
-    marginTop: 4,
-  },
+
+  taskTitleContainer: { flexDirection: "row", alignItems: "center" },
+  taskTitle: { color: "#fff", fontSize: 16, fontWeight: "500", marginLeft: 8 },
+  taskDuration: { color: "#8a84a5", fontSize: 14, marginTop: 4 },
+
   createWorkoutBtn: {
     backgroundColor: "#fff",
     paddingVertical: 12,
@@ -525,6 +634,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   createWorkoutText: { fontWeight: "bold" },
+
   sectionTitle: {
     color: "#fff",
     fontSize: 16,
@@ -532,6 +642,7 @@ const styles = StyleSheet.create({
     marginTop: 30,
     marginBottom: 10,
   },
+
   workoutCard: {
     flexDirection: "row",
     backgroundColor: "#333",
@@ -539,17 +650,14 @@ const styles = StyleSheet.create({
     overflow: "hidden",
     marginBottom: 10,
   },
-  workoutImage: {
-    width: 100,
-    height: 100,
-  },
-  workoutInfo: {
-    flex: 1,
-    padding: 10,
-    justifyContent: "space-between",
-  },
+
+  workoutImage: { width: 100, height: 100 },
+
+  workoutInfo: { flex: 1, padding: 10, justifyContent: "space-between" },
+
   workoutTitle: { color: "#fff", fontSize: 16, fontWeight: "bold" },
   workoutMeta: { color: "#ccc", fontSize: 12 },
+
   startBtn: {
     backgroundColor: "#f57c00",
     paddingHorizontal: 10,
@@ -558,16 +666,16 @@ const styles = StyleSheet.create({
     alignSelf: "flex-start",
   },
   startBtnText: { color: "#fff", fontWeight: "bold" },
+
   chatButton: {
     position: "absolute",
     bottom: 10,
     right: 10,
     backgroundColor: "#fff",
-    borderRadius: 30,
     padding: 12,
-    elevation: 5,
+    borderRadius: 30,
+    elevation: 4,
   },
-  chatIcon: { width: 30, height: 30 },
 });
 
 export default HomeScreen;
