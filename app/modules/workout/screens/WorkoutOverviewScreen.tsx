@@ -8,6 +8,7 @@ import {
   Image,
   ScrollView,
 } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 import { NativeStackScreenProps } from "@react-navigation/native-stack";
 import { WorkoutStackParamList } from "../navigation/WorkoutNavigator";
 
@@ -50,9 +51,12 @@ const WorkoutOverviewScreen: React.FC<Props> = ({ route, navigation }) => {
   };
 
   return (
-    <View style={styles.container}>
+    <SafeAreaView style={styles.container} edges={["top"]}>
       <ScrollView
-        contentContainerStyle={{ paddingBottom: 100 }}
+        contentContainerStyle={{
+          padding: 12,
+          paddingBottom: 100,
+        }}
         showsVerticalScrollIndicator={false}
       >
         <Text style={styles.title}>{workout?.title || "Workout Overview"}</Text>
@@ -71,7 +75,10 @@ const WorkoutOverviewScreen: React.FC<Props> = ({ route, navigation }) => {
           workout.exercises.map((ex: any, index: number) => (
             <View key={index} style={styles.exerciseCard}>
               {ex.imageURL && (
-                <Image source={{ uri: ex.imageURL }} style={styles.exerciseImage} />
+                <Image
+                  source={{ uri: ex.imageURL }}
+                  style={styles.exerciseImage}
+                />
               )}
               <View style={styles.exerciseInfo}>
                 <Text style={styles.exerciseName}>{ex.name}</Text>
@@ -80,7 +87,8 @@ const WorkoutOverviewScreen: React.FC<Props> = ({ route, navigation }) => {
                 </Text>
                 {ex.targetMuscles && (
                   <Text style={styles.exerciseMeta}>
-                    Target: {Array.isArray(ex.targetMuscles)
+                    Target:{" "}
+                    {Array.isArray(ex.targetMuscles)
                       ? ex.targetMuscles.join(", ")
                       : ex.targetMuscles}
                   </Text>
@@ -98,7 +106,7 @@ const WorkoutOverviewScreen: React.FC<Props> = ({ route, navigation }) => {
       <TouchableOpacity style={styles.button} onPress={startWorkout}>
         <Text style={styles.buttonText}>Start Workout</Text>
       </TouchableOpacity>
-    </View>
+    </SafeAreaView>
   );
 };
 
@@ -106,7 +114,6 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: "#262135",
-    padding: 16,
   },
   title: {
     color: "#fff",
