@@ -1,6 +1,3 @@
-// FULL COMPLETED HOMESCREEN CODE
-// ---------------------------------------------------------
-
 import React, { useState, useEffect } from "react";
 import {
   View,
@@ -9,7 +6,6 @@ import {
   Image,
   TouchableOpacity,
   ScrollView,
-  ActivityIndicator,
 } from "react-native";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -35,8 +31,7 @@ import {
   getDocs,
 } from "firebase/firestore";
 import moment from "moment";
-
-// Types ----------------------------------------------------
+import LoadingIndicator from "../../../components/LoadingIndicator";
 
 type HomeScreenNavigationProp = CompositeNavigationProp<
   BottomTabNavigationProp<HomeTabParamList, "Home">,
@@ -63,8 +58,6 @@ interface Task {
   scheduledAt: any;
 }
 
-// Component ------------------------------------------------
-
 const HomeScreen: React.FC = () => {
   const navigation = useNavigation<HomeScreenNavigationProp>();
   const [profileImage, setProfileImage] = useState<string | null>(null);
@@ -72,58 +65,13 @@ const HomeScreen: React.FC = () => {
   const [userName, setUserName] = useState<string>("");
   const [todayTasks, setTodayTasks] = useState<Task[]>([]);
   const [loadingTasks, setLoadingTasks] = useState(true);
-  const [loadingLevel, setLoadingLevel] = useState(true);
   const [bmi, setBmi] = useState<number | null>(null);
   const [bmiDesc, setBmiDesc] = useState<string>("");
-  const [userLevel, setUserLevel] = useState<Level>("Beginner");
+  const [userLevel, setUserLevel] = useState<Level | null>(null);
   const [suggestedWorkouts, setSuggestedWorkouts] = useState<any[]>([]);
+  const [loadingWorkouts, setLoadingWorkouts] = useState(true);
 
-  useEffect(() => {
-    const loadLevel = async () => {
-      const level = await fetchUserLevel();
-      setUserLevel(level);
-      setLoadingLevel(false);
-    };
-
-    loadLevel();
-  }, []);
-
-  // Fetch Health Info -----------------------------------------
-  useEffect(() => {
-    const fetchHealthInfo = async () => {
-      try {
-        const currentUser = auth.currentUser;
-        if (!currentUser) return;
-
-        const healthInfoRef = collection(
-          db,
-          "users",
-          currentUser.uid,
-          "healthinfo"
-        );
-        const snapshot = await getDocs(healthInfoRef);
-
-        if (!snapshot.empty) {
-          const data = snapshot.docs[0].data() as any;
-          setBmi(data.bmi ?? null);
-
-          let desc = "";
-          if (data.bmi === undefined || data.bmi === null) desc = "--";
-          else if (data.bmi < 18.5) desc = "Underweight";
-          else if (data.bmi < 25) desc = "You have a normal weight";
-          else if (data.bmi < 30) desc = "Overweight";
-          else desc = "Obese";
-
-          setBmiDesc(desc);
-        }
-      } catch (error) {
-        console.error("Error fetching health info:", error);
-      }
-    };
-    fetchHealthInfo();
-  }, []);
-
-  // Fetch User Info -----------------------------------------
+  // Fetch User Info
   useEffect(() => {
     const currentUser = auth.currentUser;
     if (!currentUser) {
@@ -138,7 +86,6 @@ const HomeScreen: React.FC = () => {
         if (snap.exists()) {
           const data = snap.data() as any;
           setUserName(data?.name ?? auth.currentUser?.displayName ?? "");
-          setUserLevel(data?.level ?? "Beginner");
 
           const photo = data?.photoURL;
           setProfileImage(photo && typeof photo === "string" ? photo : null);
@@ -150,37 +97,41 @@ const HomeScreen: React.FC = () => {
     return () => unsubscribe();
   }, [navigation]);
 
-  //fetch userlevel
-  const fetchUserLevel = async () => {
-    const uid = auth.currentUser?.uid;
-    if (!uid) return "Beginner";
-
-    // healthinfo is a SUBCOLLECTION
-    const healthInfoRef = collection(db, "users", uid, "healthinfo");
-    const snapshot = await getDocs(healthInfoRef);
-
-    if (snapshot.empty) return "Beginner";
-
-    // you only have 1 document inside
-    const data = snapshot.docs[0].data();
-    return data.level || "Beginner";
-  };
-
+  // Fetch Health Info
   useEffect(() => {
-    const loadLevel = async () => {
-      try {
-        const result = await fetchUserLevel();
-        setUserLevel(result);
-        console.log("User Level:", result);
-      } catch (error) {
-        console.log("Error fetching level:", error);
-      }
-    };
+    const currentUser = auth.currentUser;
+    if (!currentUser) return;
+    const healthInfoRef = collection(
+      db,
+      "users",
+      currentUser.uid,
+      "healthinfo"
+    );
+    const unsub = onSnapshot(
+      healthInfoRef,
+      (snapshot) => {
+        if (snapshot.empty) return;
+        const data = snapshot.docs[0].data() as any;
 
-    loadLevel();
+        // Set BMI + description
+        const bmiVal = data.bmi ?? null;
+        setBmi(bmiVal);
+        let desc = "";
+        if (bmiVal === undefined || bmiVal === null) desc = "--";
+        else if (bmiVal < 18.5) desc = "Underweight";
+        else if (bmiVal < 25) desc = "You have a normal weight";
+        else if (bmiVal < 30) desc = "Overweight";
+        else desc = "Obese";
+        setBmiDesc(desc);
+
+        setUserLevel((data.level as Level) ?? "Beginner");
+      },
+      (err) => console.error("Healthinfo listener error:", err)
+    );
+    return () => unsub();
   }, []);
 
-  // Fetch Today's Tasks -------------------------------------
+  // Fetch Today's Tasks
   useEffect(() => {
     let unsubscribe: (() => void) | undefined;
 
@@ -230,9 +181,11 @@ const HomeScreen: React.FC = () => {
     return () => unsubscribe && unsubscribe();
   }, []);
 
-  // Fetch Suggested Workouts --------------------------------
+  // Fetch Suggested Workouts
   useEffect(() => {
     const fetchSuggestedWorkouts = async () => {
+      if (!userLevel) return; // wait until level is known to avoid Beginner→Intermediate flicker
+      setLoadingWorkouts(true);
       try {
         const exercisesRef = collection(db, "exercises");
         const snapshot = await getDocs(exercisesRef);
@@ -281,15 +234,23 @@ const HomeScreen: React.FC = () => {
       } catch (error) {
         console.error("Error fetching exercises:", error);
         setSuggestedWorkouts([]);
+      } finally {
+        setLoadingWorkouts(false);
       }
     };
-
     fetchSuggestedWorkouts();
   }, [userLevel]);
 
-  // Navigation functions ------------------------------------
+  // Navigation functions
   const goToSchedule = () =>
     navigation.navigate("Schedule", { screen: "ScheduleList" });
+
+  const goToScheduleDetail = (scheduleId: string) => {
+    navigation.navigate("Schedule", {
+      screen: "ScheduleDetail",
+      params: { scheduleId, fromHome: true },
+    });
+  };
 
   const goToProfile = () => navigation.navigate("Profile");
 
@@ -306,17 +267,8 @@ const HomeScreen: React.FC = () => {
     }
   };
 
-  // Render ----------------------------------------------------
-  if (loadingLevel) {
-    return (
-      <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
-        <ActivityIndicator size="large" color="#4a90e2" />
-      </View>
-    );
-  }
-
   return (
-    <SafeAreaView style={styles.container} edges={["top", "bottom"]}>
+    <SafeAreaView style={styles.container} edges={["top"]}>
       <ScrollView contentContainerStyle={{ padding: 12, paddingBottom: 20 }}>
         {/* Header */}
         <View style={styles.header}>
@@ -405,7 +357,9 @@ const HomeScreen: React.FC = () => {
                 <TouchableOpacity
                   key={task.id}
                   style={styles.taskCard}
-                  onPress={goToSchedule}
+                  onPress={() => {
+                    goToScheduleDetail(task.id);
+                  }}
                 >
                   <View style={styles.taskTimeColumn}>
                     <Text style={styles.taskTime}>
@@ -464,9 +418,13 @@ const HomeScreen: React.FC = () => {
         {/* Suggested Workouts */}
         <Text style={styles.sectionTitle}>Suggested Workouts</Text>
 
-        {suggestedWorkouts.length === 0 ? (
+        {loadingWorkouts || !userLevel ? (
+          <View style={{ height: 120, justifyContent: "center" }}>
+            <LoadingIndicator />
+          </View>
+        ) : suggestedWorkouts.length === 0 ? (
           <Text style={{ color: "#fff", padding: 20 }}>
-            Loading workouts...
+            No workouts available.
           </Text>
         ) : (
           suggestedWorkouts.map((workout, i) => (
@@ -515,8 +473,6 @@ const HomeScreen: React.FC = () => {
     </SafeAreaView>
   );
 };
-
-// Styles ----------------------------------------------------
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#262135" },

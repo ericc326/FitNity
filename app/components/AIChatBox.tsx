@@ -240,7 +240,6 @@ Never give medical diagnoses; recommend consulting a healthcare professional for
     const placeholder = "Generating recovery tips...";
 
     try {
-      // run analysis first so we know whether to tag RECOVERY_REQUEST_GEMINI or RECOVERY_REQUEST
       const analysis = await analyzeWorkoutsAndRecommend(currentUser.uid);
       const hasWorkouts = !!(
         analysis.meta &&
@@ -251,15 +250,20 @@ Never give medical diagnoses; recommend consulting a healthcare professional for
         ? "RECOVERY_REQUEST_GEMINI"
         : "RECOVERY_REQUEST";
 
-      // append user tag + ai placeholder so UI shows the user tag immediately
       setMessages((prev) => [
         ...prev,
         { sender: "user", text: docTag },
         { sender: "ai", text: placeholder },
       ]);
 
-      // prepare final text (call Gemini only if we have workouts)
+      // Build a header with the recent exercise names (always shown if available)
+      const workoutLine =
+        hasWorkouts && analysis.meta?.workoutNames?.length
+          ? `Recent exercises (latest first): ${analysis.meta.workoutNames.join(", ")}`
+          : "";
+
       let finalText = analysis.recommendation;
+
       if (hasWorkouts) {
         const prompt = `You are an expert fitness coach. Based on this workout summary produce a concise, actionable post-workout recovery plan. 
         Workout summary: ${analysis.summary} 
@@ -278,11 +282,11 @@ Never give medical diagnoses; recommend consulting a healthcare professional for
         }
       }
 
+      // Prepend the workout list line so names are always visible
       const combinedMessage = hasWorkouts
-        ? finalText
+        ? `${workoutLine}\n\n${finalText}`
         : `No Workout Found.\n\nGeneral recovery: ${finalText}`;
 
-      // replace the last placeholder with the final AI text
       setMessages((prev) => {
         const copy = [...prev];
         const idx = copy.map((m) => m.text).lastIndexOf(placeholder);
@@ -291,7 +295,6 @@ Never give medical diagnoses; recommend consulting a healthcare professional for
         return copy;
       });
 
-      // persist the doc
       await addDoc(collection(db, `users/${currentUser.uid}/aimessages`), {
         user: docTag,
         ai: combinedMessage,
