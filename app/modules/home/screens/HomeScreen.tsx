@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
+import { useFocusEffect } from "@react-navigation/native";
 import {
   View,
   Text,
@@ -60,6 +61,8 @@ interface Task {
 
 const HomeScreen: React.FC = () => {
   const navigation = useNavigation<HomeScreenNavigationProp>();
+  const scrollRef = useRef<ScrollView | null>(null);
+
   const [profileImage, setProfileImage] = useState<string | null>(null);
   const [showChat, setShowChat] = useState(false);
   const [userName, setUserName] = useState<string>("");
@@ -70,6 +73,14 @@ const HomeScreen: React.FC = () => {
   const [userLevel, setUserLevel] = useState<Level | null>(null);
   const [suggestedWorkouts, setSuggestedWorkouts] = useState<any[]>([]);
   const [loadingWorkouts, setLoadingWorkouts] = useState(true);
+
+  useFocusEffect(
+    React.useCallback(() => {
+      // On focus ensure top
+      scrollRef.current?.scrollTo({ y: 0, animated: false });
+      return undefined;
+    }, [])
+  );
 
   // Fetch User Info
   useEffect(() => {
@@ -269,7 +280,10 @@ const HomeScreen: React.FC = () => {
 
   return (
     <SafeAreaView style={styles.container} edges={["top"]}>
-      <ScrollView contentContainerStyle={{ padding: 12, paddingBottom: 20 }}>
+      <ScrollView
+        ref={scrollRef}
+        contentContainerStyle={{ padding: 12, paddingBottom: 20 }}
+      >
         {/* Header */}
         <View style={styles.header}>
           <View>

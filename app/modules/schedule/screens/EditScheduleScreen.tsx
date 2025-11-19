@@ -20,6 +20,11 @@ import { ScheduleStackParamList } from "../navigation/ScheduleNavigator";
 import { db, auth } from "../../../../firebaseConfig";
 import { doc, getDoc, updateDoc, Timestamp } from "firebase/firestore";
 import moment from "moment";
+import {
+  ensureNotificationPermissions,
+  scheduleWorkoutReminder,
+  cancelReminder,
+} from "../../../services/NotificationService";
 
 type Props = NativeStackScreenProps<ScheduleStackParamList, "EditSchedule">;
 
@@ -43,6 +48,12 @@ const EditScheduleScreen = ({ navigation, route }: Props) => {
   const [customRestSec, setCustomRestSec] = useState<number | null>(null);
   const [customLabel, setCustomLabel] = useState<string | null>(null);
 
+  //schedule time for notification
+  const [prevScheduledAt, setPrevScheduledAt] = useState<Date | null>(null);
+  const [prevNotificationId, setPrevNotificationId] = useState<string | null>(
+    null
+  );
+
   useEffect(() => {
     const fetchSchedule = async () => {
       const currentUser = auth.currentUser;
@@ -65,6 +76,12 @@ const EditScheduleScreen = ({ navigation, route }: Props) => {
           setTitle(data.title || "");
           setDate(
             data.scheduledAt?.toDate ? data.scheduledAt.toDate() : new Date()
+          );
+          setPrevScheduledAt(
+            data.scheduledAt?.toDate ? data.scheduledAt.toDate() : null
+          );
+          setPrevNotificationId(
+            typeof data.notificationId === "string" ? data.notificationId : null
           );
           setSelectedWorkout(data.selectedWorkoutName || "Front Square");
           setSelectedWorkoutId(
@@ -133,6 +150,25 @@ const EditScheduleScreen = ({ navigation, route }: Props) => {
         scheduleId
       );
 
+      // handle notification changes if time changed
+      let newNotificationId: string | null = prevNotificationId;
+      const didChangeTime =
+        (prevScheduledAt?.getTime() || 0) !== date.getTime();
+      if (didChangeTime) {
+        try {
+          await cancelReminder(prevNotificationId);
+          const ok = await ensureNotificationPermissions();
+          if (ok) {
+            const fiveMinBefore = new Date(date.getTime() - 5 * 60 * 1000);
+            const when = fiveMinBefore > new Date() ? fiveMinBefore : date;
+            newNotificationId = await scheduleWorkoutReminder(
+              when,
+              title.trim()
+            );
+          }
+        } catch {}
+      }
+
       await updateDoc(scheduleRef, {
         title: title.trim(),
         scheduledAt: Timestamp.fromDate(date),
@@ -142,8 +178,11 @@ const EditScheduleScreen = ({ navigation, route }: Props) => {
         customReps: customReps ?? undefined,
         customRestSeconds: customRestSec ?? undefined,
         customLabel: customLabel ?? undefined,
+        notificationId: newNotificationId ?? null,
       });
 
+      setPrevScheduledAt(date);
+      setPrevNotificationId(newNotificationId ?? null);
       Alert.alert("Success", "Schedule updated successfully!");
       navigation.goBack();
     } catch (error: any) {

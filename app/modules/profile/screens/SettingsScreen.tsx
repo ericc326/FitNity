@@ -1,10 +1,51 @@
-import React, { useState } from "react";
-import { View, Text, StyleSheet, TouchableOpacity, Switch } from "react-native";
+import React, { useEffect, useState } from "react";
+import {
+  View,
+  Text,
+  StyleSheet,
+  TouchableOpacity,
+  Switch,
+  Alert,
+} from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
+import {
+  ensureNotificationPermissions,
+  getNotificationPreference,
+  setNotificationPreference,
+  rescheduleUpcomingReminders,
+} from "../../../services/NotificationService";
 
 const SettingsScreen = () => {
+  //Pending: add reminder preference (how many minutes before workout)
   const [pushEnabled, setPushEnabled] = useState(true);
+
+  useEffect(() => {
+    const loadSettings = async () => {
+      const isEnabled = await getNotificationPreference();
+      setPushEnabled(isEnabled);
+    };
+    loadSettings();
+  }, []);
+
+  const handleToggleNotifications = async (value: boolean) => {
+    setPushEnabled(value);
+    if (value) {
+      const permissionGranted = await ensureNotificationPermissions();
+      await setNotificationPreference(true);
+      if (permissionGranted) {
+        // re-create all future reminders that were canceled while push was off
+        await rescheduleUpcomingReminders();
+      }
+    } else {
+      await setNotificationPreference(false); // this also cancels all pending
+      Alert.alert(
+        "Notifications Disabled",
+        "All pending workout reminders have been canceled."
+      );
+    }
+  };
+
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.content}>
@@ -12,7 +53,10 @@ const SettingsScreen = () => {
           <Text style={styles.sectionTitle}>Notifications</Text>
           <View style={styles.settingItem}>
             <Text style={styles.settingLabel}>Push Notifications</Text>
-            <Switch value={pushEnabled} onValueChange={setPushEnabled} />
+            <Switch
+              value={pushEnabled}
+              onValueChange={handleToggleNotifications}
+            />
           </View>
         </View>
 

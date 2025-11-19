@@ -19,6 +19,10 @@ import { ScheduleStackParamList } from "../navigation/ScheduleNavigator";
 import { db, auth } from "../../../../firebaseConfig";
 import { collection, addDoc } from "firebase/firestore";
 import moment from "moment";
+import {
+  ensureNotificationPermissions,
+  scheduleWorkoutReminder,
+} from "../../../services/NotificationService";
 
 type Props = NativeStackScreenProps<ScheduleStackParamList, "CreateSchedule">;
 type CreateScheduleParams = {
@@ -130,6 +134,19 @@ const CreateScheduleScreen = ({ navigation, route }: Props) => {
         "schedules"
       );
 
+      // Schedule a local reminder (5 minutes before if possible)
+      let notificationId: string | null = null;
+      try {
+        const permissionGranted = await ensureNotificationPermissions();
+        if (permissionGranted) {
+          const fiveMinBefore = new Date(date.getTime() - 5 * 60 * 1000);
+          const when = fiveMinBefore > new Date() ? fiveMinBefore : date;
+          notificationId = await scheduleWorkoutReminder(when, title.trim());
+        }
+      } catch (e) {
+        console.warn("Failed to schedule reminder:", e);
+      }
+
       const newScheduleData = {
         title: title.trim(),
         scheduledAt: date,
@@ -142,6 +159,7 @@ const CreateScheduleScreen = ({ navigation, route }: Props) => {
         customReps: customReps ?? undefined,
         customRestSeconds: customRestSec ?? undefined,
         customLabel: customLabel ?? undefined,
+        notificationId: notificationId ?? null, // store so you can cancel/update later
       };
 
       await addDoc(userSchedulesRef, newScheduleData);

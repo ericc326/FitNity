@@ -29,6 +29,7 @@ import {
   where,
 } from "firebase/firestore";
 import LoadingIndicator from "../../../../app/components/LoadingIndicator";
+import { cancelReminder } from "../../../services/NotificationService";
 
 type ScheduleScreenNavigationProp = NativeStackNavigationProp<
   ScheduleStackParamList,
@@ -47,6 +48,7 @@ interface ScheduleItem {
   icon?: keyof typeof MaterialCommunityIcons.glyphMap;
   completed?: boolean;
   color?: string;
+  notificationId?: string | null; // stored when created
 }
 
 const ScheduleScreen = () => {
@@ -199,6 +201,8 @@ const ScheduleScreen = () => {
                       "schedules",
                       schedule.id
                     );
+                    // cancel local notification if any
+                    await cancelReminder(schedule.notificationId);
                     await deleteDoc(scheduleRef);
                     Alert.alert("Success", "Schedule deleted successfully!");
                     fetchSchedules();
