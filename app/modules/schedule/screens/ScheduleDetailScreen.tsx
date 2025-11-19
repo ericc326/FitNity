@@ -24,6 +24,7 @@ import {
 import moment from "moment";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import LoadingIndicator from "../../../components/LoadingIndicator";
+import { cancelReminder } from "../../../services/NotificationService";
 
 type Props = NativeStackScreenProps<ScheduleStackParamList, "ScheduleDetail">;
 
@@ -191,6 +192,7 @@ export default function ScheduleDetailScreen({ route, navigation }: Props) {
                   }
                   try {
                     setBusy(true);
+                    await cancelReminder((data as any)?.notificationId);
                     await deleteDoc(
                       doc(db, "users", currentUser.uid, "schedules", data.id)
                     );
