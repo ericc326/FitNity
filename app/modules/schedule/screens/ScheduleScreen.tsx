@@ -161,6 +161,7 @@ const ScheduleScreen = () => {
               "schedules",
               schedule.id
             );
+            await cancelReminder(schedule.notificationId); // cancel completed schedule notification
             await updateDoc(scheduleRef, { completed: true });
             fetchSchedules();
           } catch (error: any) {

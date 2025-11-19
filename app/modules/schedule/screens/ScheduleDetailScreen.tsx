@@ -153,6 +153,10 @@ export default function ScheduleDetailScreen({ route, navigation }: Props) {
                 }
                 try {
                   setBusy(true);
+                  const nid = (data as any)?.notificationId as
+                    | string
+                    | undefined;
+                  await cancelReminder(nid); //cancel notification for completed schedule
                   await updateDoc(
                     doc(db, "users", currentUser.uid, "schedules", data.id),
                     { completed: true }
