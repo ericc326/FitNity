@@ -159,10 +159,8 @@ const EditScheduleScreen = ({ navigation, route }: Props) => {
           await cancelReminder(prevNotificationId);
           const ok = await ensureNotificationPermissions();
           if (ok) {
-            const fiveMinBefore = new Date(date.getTime() - 5 * 60 * 1000);
-            const when = fiveMinBefore > new Date() ? fiveMinBefore : date;
             newNotificationId = await scheduleWorkoutReminder(
-              when,
+              date,
               title.trim()
             );
           }

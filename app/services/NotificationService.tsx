@@ -15,6 +15,7 @@ import {
 } from "firebase/firestore";
 
 const PUSH_ENABLED_KEY = "fitnity_push_enabled";
+const REMINDER_OFFSET_MIN_KEY = "fitnity_reminder_offset_min"; // default 5 min
 
 // SETUP GLOBAL HANDLER
 // Without this, notifications won't appear if the user has the app OPEN.
@@ -28,6 +29,23 @@ Notifications.setNotificationHandler({
     shouldSetBadge: false,
   }),
 });
+
+export async function getReminderOffsetMinutes(): Promise<number> {
+  try {
+    const value = await AsyncStorage.getItem(REMINDER_OFFSET_MIN_KEY);
+    const n = value != null ? Number(value) : 5;
+    return Number.isFinite(n) && n >= 0 ? n : 5;
+  } catch {
+    return 5;
+  }
+}
+
+export async function setReminderOffsetMinutes(min: number) {
+  try {
+    const n = Number.isFinite(min) && min >= 0 ? Math.round(min) : 5;
+    await AsyncStorage.setItem(REMINDER_OFFSET_MIN_KEY, String(n));
+  } catch {}
+}
 
 export async function getNotificationPreference(): Promise<boolean> {
   try {
@@ -80,24 +98,62 @@ export async function ensureNotificationPermissions(): Promise<boolean> {
 
 export async function scheduleWorkoutReminder(
   date: Date,
-  title: string
+  title: string,
+  options?: { skipIfPassed?: boolean }
 ): Promise<string | null> {
   const isEnabled = await getNotificationPreference();
   if (!isEnabled) {
     console.log("Notification skipped: User has disabled notifications.");
     return null;
   }
-  if (!(date instanceof Date) || isNaN(date.getTime()) || date <= new Date()) {
-    console.warn("Cannot schedule notification in the past");
-    return null;
-  }
+  if (!(date instanceof Date) || isNaN(date.getTime())) return null;
+
   const hasPermission = await ensureNotificationPermissions();
   if (!hasPermission) return null;
 
   try {
+    const offsetMin = await getReminderOffsetMinutes();
+    const offsetMs = offsetMin * 60 * 1000;
+    const reminderAt = new Date(date.getTime() - offsetMs);
+    const now = new Date();
+
+    // 1. Grace period check:
+    // If workout passed more than 60 seconds ago, skip it.
+    // (Using strictly "now" might fail if user takes 1 second to click save)
+    if (date.getTime() <= now.getTime() - 60 * 1000) {
+      console.log("Skip scheduling: workout time already passed.");
+      return null;
+    }
+
+    let target: Date;
+
+    if (reminderAt.getTime() > now.getTime()) {
+      // Normal case: Reminder is in the future
+      target = reminderAt;
+    } else {
+      // Offset passed.
+      // If we are strictly rescheduling (e.g. settings change), do NOT fire a late notification.
+      if (options?.skipIfPassed) {
+        console.log("Skipping past reminder during reschedule.");
+        return null;
+      }
+
+      // Catch-up mode (only for new/edited schedules created "now")
+      // We set this slightly in the future so iOS creates the ID successfully.
+      target = new Date(now.getTime() + 2000);
+    }
+
+    // 2. CRITICAL SAFETY CHECK for iOS
+    // Ensure the final target is strictly in the future relative to the *exact* moment of scheduling.
+    const strictNow = new Date().getTime();
+    if (target.getTime() <= strictNow + 1000) {
+      // If it's too close or passed, push it forward
+      target = new Date(strictNow + 2000);
+    }
+
     const trigger: Notifications.DateTriggerInput = {
       type: Notifications.SchedulableTriggerInputTypes.DATE,
-      date: date.getTime(),
+      date: target.getTime(),
       channelId: Platform.OS === "android" ? "reminders" : undefined,
     };
 
@@ -141,20 +197,28 @@ export async function rescheduleUpcomingReminders() {
     orderBy("scheduledAt", "asc")
   );
   const snap = await getDocs(qRef);
+
   for (const docSnap of snap.docs) {
     const data = docSnap.data() as any;
+
+    // Cancel the old pending reminder
+    const oldId =
+      typeof data.notificationId === "string" ? data.notificationId : null;
+    await cancelReminder(oldId);
+
+    // Always schedule from the original schedule time; service applies latest offset
     const when: Date = data.scheduledAt?.toDate
       ? data.scheduledAt.toDate()
       : new Date(data.scheduledAt);
-    const fiveMinBefore = new Date(when.getTime() - 5 * 60 * 1000);
-    const fireAt = fiveMinBefore > new Date() ? fiveMinBefore : when;
     const title =
       (data.title as string) ||
       (data.selectedWorkoutName as string) ||
       "Workout";
-    const id = await scheduleWorkoutReminder(fireAt, title);
+    const newId = await scheduleWorkoutReminder(when, title, {
+      skipIfPassed: true,
+    });
     await updateDoc(doc(db, "users", uid, "schedules", docSnap.id), {
-      notificationId: id ?? null,
+      notificationId: newId ?? null,
     });
   }
 }

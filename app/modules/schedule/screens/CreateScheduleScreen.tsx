@@ -139,9 +139,7 @@ const CreateScheduleScreen = ({ navigation, route }: Props) => {
       try {
         const permissionGranted = await ensureNotificationPermissions();
         if (permissionGranted) {
-          const fiveMinBefore = new Date(date.getTime() - 5 * 60 * 1000);
-          const when = fiveMinBefore > new Date() ? fiveMinBefore : date;
-          notificationId = await scheduleWorkoutReminder(when, title.trim());
+          notificationId = await scheduleWorkoutReminder(date, title.trim());
         }
       } catch (e) {
         console.warn("Failed to schedule reminder:", e);
