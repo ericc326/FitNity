@@ -1,79 +1,189 @@
-import React from "react";
-import { View, Text, StyleSheet, TouchableOpacity } from "react-native";
-import { useNavigation } from "@react-navigation/native";
-import { MaterialCommunityIcons } from "@expo/vector-icons";
+import React, { useEffect, useState } from "react";
+import {
+  View,
+  Text,
+  StyleSheet,
+  Dimensions,
+  PermissionsAndroid,
+  Platform,
+} from "react-native";
+import { WebView } from "react-native-webview";
+import { Camera, useCameraPermissions } from "expo-camera";
 
-const AiCoachScreen = () => {
-  const navigation = useNavigation();
+const API_KEY = "d2b81624-30bb-4207-92c6-9f879a365eec";
+const POSETRACKER_API = "https://app.posetracker.com/pose_tracker/tracking";
+const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get("window");
+
+type PoseKeypoint = {
+  name: string;
+  x: number;
+  y: number;
+  score: number;
+};
+
+type PoseTrackerInitialization = {
+  type: "initialization";
+  message: string;
+  ready: boolean;
+};
+
+type PoseTrackerKeypoints = {
+  type: "keypoints";
+  data: PoseKeypoint[];
+};
+
+type PoseTrackerCounter = {
+  type: "counter";
+  current_count: number;
+};
+
+type PoseTrackerData =
+  | PoseTrackerInitialization
+  | PoseTrackerKeypoints
+  | PoseTrackerCounter;
+
+export default function AiCoachScreen() {
+  const [permission, requestPermission] = useCameraPermissions();
+  const [poseReady, setPoseReady] = useState(false);
+  const [keypoints, setKeypoints] = useState<PoseKeypoint[]>([]);
+  const [reps, setReps] = useState(0);
+
+  // Request camera permission on mount
+  useEffect(() => {
+    if (!permission?.granted) {
+      requestPermission();
+    }
+  }, []);
+
+  const exercise = "squat";
+
+  const posetrackerUrl = `${POSETRACKER_API}?token=${API_KEY}&exercise=${exercise}&difficulty=easy&width=${SCREEN_WIDTH}&height=${SCREEN_HEIGHT}&isMobile=true&keypoints=true`;
+
+  // JS bridge for communication between WebView and React Native
+  const jsBridge = `
+    window.addEventListener('message', function(event) {
+      window.ReactNativeWebView.postMessage(JSON.stringify(event.data));
+    });
+
+    window.webViewCallback = function(data) {
+      window.ReactNativeWebView.postMessage(JSON.stringify(data));
+    };
+
+    const originalPostMessage = window.postMessage;
+    window.postMessage = function(data) {
+      window.ReactNativeWebView.postMessage(typeof data === 'string' ? data : JSON.stringify(data));
+    };
+
+    true;
+  `;
+
+  // Handle WebView messages
+  const handleWebViewMessage = (event: any) => {
+    try {
+      const data: PoseTrackerData = JSON.parse(event.nativeEvent.data);
+
+      switch (data.type) {
+        case "initialization":
+          setPoseReady(data.ready);
+          console.log(
+            "PoseTracker status:",
+            data.message,
+            "Ready:",
+            data.ready
+          );
+          break;
+
+        case "keypoints":
+          setKeypoints(data.data);
+          break;
+
+        case "counter":
+          setReps(data.current_count);
+          break;
+
+        default:
+          break;
+      }
+    } catch (e) {
+      console.error("Failed to parse message:", event.nativeEvent.data);
+    }
+  };
 
   return (
     <View style={styles.container}>
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => navigation.goBack()}>
-          <MaterialCommunityIcons name="arrow-left" size={24} color="white" />
-        </TouchableOpacity>
-        <Text style={styles.title}>Scan Exercise</Text>
-        <View style={{ width: 24 }} />
+      <WebView
+        source={{ uri: posetrackerUrl }}
+        style={styles.webView}
+        javaScriptEnabled
+        domStorageEnabled
+        allowsInlineMediaPlayback
+        mediaPlaybackRequiresUserAction={false}
+        injectedJavaScript={jsBridge}
+        onMessage={handleWebViewMessage}
+        originWhitelist={["*"]}
+        mixedContentMode="compatibility"
+        onError={(e) => console.warn("WebView error:", e.nativeEvent)}
+      />
+
+      {/* Overlay Info */}
+      <View style={styles.infoContainer}>
+        {!poseReady ? (
+          <Text style={styles.infoText}>Loading AI & Camera...</Text>
+        ) : (
+          <>
+            <Text style={styles.infoText}>AI Ready ✅</Text>
+            <Text style={styles.infoText}>Reps: {reps}</Text>
+            <Text style={styles.infoText}>
+              Keypoints detected: {keypoints.length}
+            </Text>
+          </>
+        )}
       </View>
 
-      <View style={styles.scannerPlaceholder}>
-        <MaterialCommunityIcons name="dumbbell" size={100} color="#5A3BFF" />
-        <Text style={styles.placeholderText}>Exercise Scanner</Text>
-      </View>
-
-      <TouchableOpacity
-        style={styles.button}
-        onPress={() => navigation.goBack()}
-      >
-        <Text style={styles.buttonText}>Cancel Scan</Text>
-      </TouchableOpacity>
+      {/* Render keypoints as circles */}
+      {poseReady &&
+        keypoints.map((kp) => (
+          <View
+            key={kp.name}
+            style={{
+              position: "absolute",
+              top: kp.y,
+              left: kp.x,
+              width: 12,
+              height: 12,
+              borderRadius: 6,
+              backgroundColor: "rgba(255,0,0,0.7)",
+            }}
+          />
+        ))}
     </View>
   );
-};
+}
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#1c1c2e",
-    paddingTop: 60,
-    paddingHorizontal: 20,
+    backgroundColor: "#000",
   },
-  header: {
-    flexDirection: "row",
-    justifyContent: "space-between",
+  webView: {
+    width: "100%",
+    height: "100%",
+    zIndex: 1,
+  },
+  infoContainer: {
+    position: "absolute",
+    top: 50,
+    left: 0,
+    right: 0,
     alignItems: "center",
-    marginBottom: 30,
-  },
-  title: {
-    color: "white",
-    fontSize: 20,
-    fontWeight: "bold",
-  },
-  scannerPlaceholder: {
-    flex: 1,
-    backgroundColor: "#2a2a3a",
-    borderRadius: 15,
-    justifyContent: "center",
-    alignItems: "center",
-    marginBottom: 30,
-  },
-  placeholderText: {
-    color: "white",
-    fontSize: 18,
-    marginTop: 20,
-  },
-  button: {
-    backgroundColor: "#5A3BFF",
-    padding: 15,
+    zIndex: 2,
+    backgroundColor: "rgba(0,0,0,0.5)",
+    padding: 10,
     borderRadius: 10,
-    alignItems: "center",
-    marginBottom: 30,
   },
-  buttonText: {
-    color: "white",
-    fontWeight: "bold",
+  infoText: {
+    color: "#fff",
     fontSize: 16,
+    marginVertical: 2,
   },
 });
-
-export default AiCoachScreen;

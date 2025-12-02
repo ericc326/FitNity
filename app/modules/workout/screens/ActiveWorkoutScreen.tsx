@@ -6,12 +6,13 @@ import {
   TouchableOpacity,
   Modal,
   Animated,
-  Alert,
 } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
 import Svg, { Circle } from "react-native-svg";
 import { NativeStackScreenProps } from "@react-navigation/native-stack";
 import { WorkoutStackParamList } from "../navigation/WorkoutNavigator";
+import { addDoc, collection, Timestamp } from "firebase/firestore";
+import { getAuth } from "firebase/auth";
+import { db } from "../../../../firebaseConfig";
 
 type Props = NativeStackScreenProps<WorkoutStackParamList, "ActiveWorkout">;
 
@@ -27,6 +28,7 @@ const ActiveWorkoutScreen: React.FC<Props> = ({ route, navigation }) => {
   const [isRunning, setIsRunning] = useState(true);
   const [isRest, setIsRest] = useState(false);
   const [completedModal, setCompletedModal] = useState(false);
+  const [workoutStartTime] = useState(Date.now());
 
   const radius = 90;
   const circumference = 2 * Math.PI * radius;
@@ -35,6 +37,50 @@ const ActiveWorkoutScreen: React.FC<Props> = ({ route, navigation }) => {
 
   const totalSets = exerciseList.length * sets;
   const progress = (currentExercise * sets + currentSet - 1) / totalSets;
+
+  const calculateCalories = () => {
+    const durationSec = Math.floor((Date.now() - workoutStartTime) / 1000);
+    const durationMin = durationSec / 60;
+
+    let MET = 4; // beginner default
+
+    if (workout.level === "Intermediate") MET = 6;
+    if (workout.level === "Advanced") MET = 8;
+
+    // Estimated calorie burn formula:
+    // Calories = MET × weight(kg) × duration(hr)
+    // But user weight unknown → use standard 70kg estimate
+    const calories = MET * 70 * (durationMin / 60);
+
+    return Math.round(calories);
+  };
+
+  const saveCompletedWorkout = async () => {
+    try {
+      const user = getAuth().currentUser;
+      if (!user) return;
+
+      const durationSec = Math.floor((Date.now() - workoutStartTime) / 1000);
+      const totalReps = reps * sets * exerciseList.length;
+      const totalCalories = calculateCalories();
+
+      await addDoc(collection(db, "users", user.uid, "completedWorkouts"), {
+        WorkoutId: workout.id || workout.title,
+        WorkoutTitle: workout.title,
+        totalExercises: exerciseList.length,
+        totalReps,
+        totalSets: sets * exerciseList.length,
+        level: workout.level || "Beginner",
+        durationSec,
+        totalCalories,
+        completedAt: Timestamp.now(),
+      });
+
+      console.log("Workout saved!");
+    } catch (error) {
+      console.log("Failed to save:", error);
+    }
+  };
 
   // Animate the circle based on progress
   useEffect(() => {
@@ -87,28 +133,9 @@ const ActiveWorkoutScreen: React.FC<Props> = ({ route, navigation }) => {
     }
 
     // Workout completed
+    saveCompletedWorkout();
     setCompletedModal(true);
   };
-
-  const handleExit = () => {
-    Alert.alert("End workout", "Do you want to end this workout now?", [
-      { text: "Cancel", style: "cancel" },
-      {
-        text: "End",
-        style: "destructive",
-        onPress: () => navigation.goBack(),
-      },
-    ]);
-  };
-
-  const handleFinishNow = () => {
-    Alert.alert("Finish workout", "Mark this workout as completed?", [
-      { text: "Cancel", style: "cancel" },
-      { text: "Finish", onPress: () => setCompletedModal(true) },
-    ]);
-  };
-
-  const resetTimer = () => setTimer(0);
 
   const dashOffset = progressAnim.interpolate({
     inputRange: [0, 1],
@@ -118,120 +145,90 @@ const ActiveWorkoutScreen: React.FC<Props> = ({ route, navigation }) => {
   const current = exerciseList[currentExercise];
 
   return (
-    <SafeAreaView style={styles.container} edges={["top"]}>
-      {/* HEADER ROW: back + title + finish */}
-      <View style={styles.contentWrap}>
-        {/* HEADER: absolute left/right, title perfectly centered */}
-        <View style={styles.headerRow}>
-          <TouchableOpacity onPress={handleExit} style={styles.hLeft}>
-            <Text style={styles.headerBtnText}>Back</Text>
-          </TouchableOpacity>
-          <Text style={styles.headerTitle}>{current?.name || "Workout"}</Text>
-          <TouchableOpacity onPress={handleFinishNow} style={styles.hRight}>
-            <Text style={styles.headerBtnText}>End</Text>
-          </TouchableOpacity>
+    <View style={styles.container}>
+      {/* TOP HEADER */}
+      <View style={styles.headerBox}>
+        <Text style={styles.workoutName}>{current?.name || "Workout"}</Text>
+        <Text style={styles.detailsText}>
+          {sets} Sets • {reps} Reps • {rest}s Rest
+        </Text>
+      </View>
+
+      {/* TIMER */}
+      <View style={styles.timerWrapper}>
+        <Svg width={230} height={230} viewBox="0 0 230 230">
+          <Circle
+            cx="115"
+            cy="115"
+            r={radius}
+            stroke="#3a3550"
+            strokeWidth="14"
+            fill="none"
+          />
+          <AnimatedCircle
+            cx="115"
+            cy="115"
+            r={radius}
+            stroke="#b9f7e4"
+            strokeWidth="14"
+            fill="none"
+            strokeDasharray={circumference}
+            strokeDashoffset={dashOffset}
+            strokeLinecap="round"
+          />
+        </Svg>
+
+        <Text style={styles.timerText}>
+          {isRest ? `${rest - timer}s` : `${timer}s`}
+        </Text>
+      </View>
+
+      {/* PAUSE / START */}
+      <TouchableOpacity
+        style={styles.bigButton}
+        onPress={() => setIsRunning(!isRunning)}
+      >
+        <Text style={styles.bigButtonText}>
+          {isRunning ? "Pause" : "Start"}
+        </Text>
+      </TouchableOpacity>
+
+      {/* BOTTOM CARD */}
+      <View style={styles.bottomCard}>
+        <View style={styles.stepRow}>
+          <Text style={styles.stepLabel}>{isRest ? "Rest" : "Work"}</Text>
+          <Text style={styles.stepValue}>
+            {isRest ? rest + " sec" : reps + " reps"}
+          </Text>
         </View>
 
-        {/* TOP HEADER */}
-        <View style={styles.headerBox}>
-          {/* moved title to header row; keep details + progress here */}
-          <Text style={styles.detailsText}>
-            {sets} Sets • {reps} Reps • {rest}s Rest
-          </Text>
-          <Text style={[styles.detailsText, { marginTop: 2 }]}>
-            Exercise {currentExercise + 1}/{Math.max(exerciseList.length, 1)} •
-            Set {currentSet}/{sets}
-          </Text>
-        </View>
-
-        {/* TIMER */}
-        <View style={styles.timerWrapper}>
-          <Svg width={230} height={230} viewBox="0 0 230 230">
-            <Circle
-              cx="115"
-              cy="115"
-              r={radius}
-              stroke="#3a3550"
-              strokeWidth="14"
-              fill="none"
-            />
-            <AnimatedCircle
-              cx="115"
-              cy="115"
-              r={radius}
-              stroke="#b9f7e4"
-              strokeWidth="14"
-              fill="none"
-              strokeDasharray={circumference}
-              strokeDashoffset={dashOffset}
-              strokeLinecap="round"
-            />
-          </Svg>
-
-          <Text style={styles.timerText}>
-            {isRest ? `${Math.max(rest - timer, 0)}s` : `${timer}s`}
-          </Text>
-        </View>
-
-        {/* PAUSE / START */}
-        <TouchableOpacity
-          style={styles.bigButton}
-          onPress={() => setIsRunning(!isRunning)}
-        >
-          <Text style={styles.bigButtonText}>
-            {isRunning ? "Pause" : "Start"}
+        <TouchableOpacity style={styles.nextButton} onPress={handleNext}>
+          <Text style={styles.nextButtonText}>
+            {isRest ? "Next Exercise" : "Finish Set"}
           </Text>
         </TouchableOpacity>
-
-        {/* REST CONTROLS */}
-        <View style={styles.restControls}>
-          <TouchableOpacity onPress={resetTimer} style={styles.linkButton}>
-            <Text style={styles.linkText}>Reset Timer</Text>
-          </TouchableOpacity>
-          {isRest && (
-            <TouchableOpacity onPress={handleNext} style={styles.linkButton}>
-              <Text style={styles.linkText}>Skip Rest</Text>
-            </TouchableOpacity>
-          )}
-        </View>
-
-        {/* BOTTOM CARD */}
-        <View style={styles.bottomCard}>
-          <View style={styles.stepRow}>
-            <Text style={styles.stepLabel}>{isRest ? "Rest" : "Work"}</Text>
-            <Text style={styles.stepValue}>
-              {isRest ? rest + " sec" : reps + " reps"}
-            </Text>
-          </View>
-
-          <TouchableOpacity style={styles.nextButton} onPress={handleNext}>
-            <Text style={styles.nextButtonText}>
-              {isRest ? "Next Exercise" : "Finish Set"}
-            </Text>
-          </TouchableOpacity>
-        </View>
-
-        {/* COMPLETED MODAL */}
-        <Modal transparent visible={completedModal} animationType="fade">
-          <View style={styles.modalOverlay}>
-            <View style={styles.modalBox}>
-              <Text style={styles.modalTitle}>Workout Completed!</Text>
-              <Text style={styles.modalSubtitle}>Great job today 🎉</Text>
-
-              <TouchableOpacity
-                style={styles.modalButton}
-                onPress={() => {
-                  setCompletedModal(false);
-                  navigation.navigate("HomeScreen");
-                }}
-              >
-                <Text style={styles.modalButtonText}>Continue</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        </Modal>
       </View>
-    </SafeAreaView>
+
+      {/* COMPLETED MODAL */}
+      <Modal transparent visible={completedModal} animationType="fade">
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalBox}>
+            <Text style={styles.modalTitle}>Workout Completed!</Text>
+            <Text style={styles.modalSubtitle}>Great job today 🎉</Text>
+
+            <TouchableOpacity
+              style={styles.modalButton}
+              onPress={() => {
+                setCompletedModal(false);
+                navigation.navigate("HomeScreen");
+              }}
+            >
+              <Text style={styles.modalButtonText}>Continue</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+    </View>
   );
 };
 
@@ -241,45 +238,10 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: "#1d1a2b",
-    alignItems: "stretch",
-  },
-  contentWrap: {
-    flex: 1,
-    paddingHorizontal: 12,
-  },
-  headerRow: {
-    height: 44,
-    justifyContent: "center",
+    paddingTop: 60,
     alignItems: "center",
-    marginBottom: 8,
   },
-  hLeft: {
-    position: "absolute",
-    left: 8,
-    top: 0,
-    bottom: 0,
-    justifyContent: "center",
-    paddingHorizontal: 8,
-  },
-  hRight: {
-    position: "absolute",
-    right: 8,
-    top: 0,
-    bottom: 0,
-    justifyContent: "center",
-    paddingHorizontal: 8,
-  },
-  headerBtnText: {
-    color: "#fff",
-    fontSize: 16,
-    fontWeight: "600",
-  },
-  headerTitle: {
-    color: "#fff",
-    fontSize: 22,
-    fontWeight: "700",
-    textAlign: "center",
-  },
+
   headerBox: {
     alignItems: "center",
     marginBottom: 15,
@@ -298,8 +260,7 @@ const styles = StyleSheet.create({
   timerWrapper: {
     justifyContent: "center",
     alignItems: "center",
-    marginTop: 6,
-    marginBottom: 18,
+    marginBottom: 25,
   },
   timerText: {
     position: "absolute",
@@ -315,7 +276,6 @@ const styles = StyleSheet.create({
     borderRadius: 50,
     justifyContent: "center",
     alignItems: "center",
-    alignSelf: "center",
     elevation: 5,
     marginBottom: 20,
   },
@@ -325,27 +285,14 @@ const styles = StyleSheet.create({
     color: "#000",
   },
 
-  restControls: {
-    flexDirection: "row",
-    justifyContent: "center",
-    alignItems: "center",
-    gap: 16,
-    marginBottom: 8,
-  },
-  linkButton: {
-    paddingVertical: 8,
-    paddingHorizontal: 14,
-  },
-  linkText: {
-    color: "#b9f7e4",
-    fontWeight: "600",
-  },
-
   bottomCard: {
     width: "100%",
     backgroundColor: "#fff",
-    paddingVertical: 30,
-    borderRadius: 22,
+    paddingVertical: 25,
+    borderTopLeftRadius: 22,
+    borderTopRightRadius: 22,
+    position: "absolute",
+    bottom: 0,
   },
 
   stepRow: {
