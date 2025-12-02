@@ -1,3 +1,4 @@
+// WorkoutScreen.tsx
 import React, { useState, useEffect } from "react";
 import {
   View,
@@ -10,12 +11,12 @@ import {
   FlatList,
   Dimensions,
   ActivityIndicator,
+  SafeAreaView,
 } from "react-native";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { useNavigation } from "@react-navigation/native";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { WorkoutStackParamList } from "../navigation/WorkoutNavigator";
-import { SafeAreaView } from "react-native-safe-area-context";
 import { collection, getDocs, query, where } from "firebase/firestore";
 import { db } from "../../../../firebaseConfig";
 
@@ -74,16 +75,6 @@ const WorkoutScreen = () => {
     null
   );
   const [selectedBodyPart, setSelectedBodyPart] = useState<string>("All");
-  const allBodyPartsList = [
-    "All",
-    "Chest",
-    "Back",
-    "Legs",
-    "Shoulders",
-    "Arms",
-    "Core",
-    "Cardio",
-  ];
   const [bodyParts, setBodyParts] = useState<string[]>([]);
 
   const fetchExercisesFromFirestore = async (bodyPart: string = "All") => {
@@ -93,17 +84,17 @@ const WorkoutScreen = () => {
       let q;
 
       if (bodyPart && bodyPart !== "All") {
-        // Filter exercises by body part
         q = query(exercisesRef, where("bodyParts", "array-contains", bodyPart));
       } else {
-        // Get all exercises
         q = query(exercisesRef);
       }
 
       const snapshot = await getDocs(q);
-      const allExercises: any[] = snapshot.docs.map((doc) => doc.data());
+      const allExercises: any[] = snapshot.docs.map((doc) => ({
+        ...(doc.data() as any),
+        exerciseId: doc.id,
+      }));
 
-      console.log("Fetched exercises from Firestore:", allExercises.length);
       setExercises(allExercises);
     } catch (error) {
       console.error("Error fetching exercises from Firestore:", error);
@@ -128,7 +119,6 @@ const WorkoutScreen = () => {
       });
 
       setBodyParts(["All", ...Array.from(partsSet)]);
-      console.log("Fetched body parts:", Array.from(partsSet));
     } catch (error) {
       console.error("Error fetching body parts:", error);
     }
@@ -156,6 +146,7 @@ const WorkoutScreen = () => {
   });
 
   const calculateGrowth = (start: number, current: number) => {
+    if (start === 0) return "N/A";
     const growth = ((current - start) / start) * 100;
     return `${growth >= 0 ? "+" : ""}${Math.round(growth)}%`;
   };
@@ -185,7 +176,7 @@ const WorkoutScreen = () => {
       <View style={styles.textContainer}>
         <Text style={styles.exerciseName}>{item.name}</Text>
         <Text style={styles.exerciseMeta}>
-          {item.bodyParts || "Unknown part"}
+          {(item.bodyParts || []).join(", ") || "Unknown part"}
         </Text>
       </View>
     </TouchableOpacity>
@@ -203,7 +194,7 @@ const WorkoutScreen = () => {
     </View>
   );
 
-  // ✅ Exercise Detail View
+  // Exercise Detail View
   if (selectedExercise) {
     return (
       <SafeAreaView style={{ flex: 1, backgroundColor: "#262135" }}>
@@ -227,7 +218,6 @@ const WorkoutScreen = () => {
             </View>
           )}
 
-          {/* ✅ Exercise Details Section */}
           <View style={{ marginHorizontal: 20, marginTop: 10 }}>
             <Text style={styles.sectionTitle}>🎯 Target Muscles</Text>
             <Text style={styles.descriptionText}>
@@ -263,11 +253,7 @@ const WorkoutScreen = () => {
                 No instructions available.
               </Text>
             )}
-
-            <TouchableOpacity style={styles.aiCoachButton}>
-              <MaterialCommunityIcons name="robot" size={24} color="white" />
-              <Text style={styles.aiCoachText}>Analyze with AI Coach</Text>
-            </TouchableOpacity>
+            {/* Removed per-exercise AI button — AI Coach is global from main screen */}
           </View>
         </ScrollView>
       </SafeAreaView>
@@ -301,22 +287,33 @@ const WorkoutScreen = () => {
       {/* Exercise Tab */}
       {activeTab === "exercise" ? (
         <>
-          {/* Search + Body Part Filter */}
+          {/* Search + Body Part Filter + Global AI Coach button */}
           <View style={{ marginHorizontal: 20, marginBottom: 10 }}>
-            <View style={styles.searchContainer}>
-              <MaterialCommunityIcons
-                name="magnify"
-                size={24}
-                color="#888"
-                style={styles.searchIcon}
-              />
-              <TextInput
-                style={styles.searchInput}
-                placeholder="Search exercises..."
-                placeholderTextColor="#888"
-                value={searchQuery}
-                onChangeText={setSearchQuery}
-              />
+            <View style={styles.searchRow}>
+              <View style={styles.searchContainer}>
+                <MaterialCommunityIcons
+                  name="magnify"
+                  size={24}
+                  color="#888"
+                  style={styles.searchIcon}
+                />
+                <TextInput
+                  style={styles.searchInput}
+                  placeholder="Search exercises..."
+                  placeholderTextColor="#888"
+                  value={searchQuery}
+                  onChangeText={setSearchQuery}
+                />
+              </View>
+
+              {/* Global AI Coach button */}
+              <TouchableOpacity
+                style={styles.aiCoachMainButton}
+                onPress={() => navigation.navigate("AiCoach")}
+              >
+                <MaterialCommunityIcons name="robot" size={18} color="white" />
+                <Text style={styles.aiCoachMainText}>AI Coach</Text>
+              </TouchableOpacity>
             </View>
 
             {/* Body Part Filter */}
@@ -389,7 +386,6 @@ const WorkoutScreen = () => {
   );
 };
 
-// --- styles (same as before) ---
 const styles = StyleSheet.create({
   container: {
     flex: 1,
@@ -417,30 +413,41 @@ const styles = StyleSheet.create({
     fontWeight: "bold",
     fontSize: 16,
   },
+  searchRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
   searchContainer: {
+    flex: 1,
     flexDirection: "row",
     alignItems: "center",
     backgroundColor: "#2a2a3a",
     borderRadius: 10,
-    marginHorizontal: 20,
-    marginBottom: 15,
-    paddingHorizontal: 15,
+    paddingHorizontal: 12,
+    marginRight: 10,
+    height: 48,
   },
   searchIcon: {
     marginRight: 10,
   },
-  videoContainer: {
-    marginHorizontal: 20,
-    marginBottom: 20,
-    borderRadius: 10,
-    overflow: "hidden",
-    height: 250, // same height used above
-  },
-
   searchInput: {
     flex: 1,
     color: "white",
-    height: 50,
+  },
+  aiCoachMainButton: {
+    flexDirection: "row",
+    backgroundColor: "#5A3BFF",
+    paddingVertical: 10,
+    paddingHorizontal: 14,
+    borderRadius: 10,
+    alignItems: "center",
+  },
+  aiCoachMainText: {
+    color: "white",
+    marginLeft: 8,
+    fontSize: 14,
+    fontWeight: "bold",
   },
   filterContainer: {
     flexDirection: "row",
@@ -499,6 +506,13 @@ const styles = StyleSheet.create({
     marginLeft: 10,
     fontSize: 16,
   },
+  videoContainer: {
+    marginHorizontal: 20,
+    marginBottom: 20,
+    borderRadius: 10,
+    overflow: "hidden",
+    height: 250,
+  },
   exerciseTitle: {
     color: "white",
     fontSize: 24,
@@ -519,22 +533,6 @@ const styles = StyleSheet.create({
     marginHorizontal: 20,
     lineHeight: 22,
   },
-  aiCoachButton: {
-    flexDirection: "row",
-    backgroundColor: "#5A556B",
-    padding: 15,
-    borderRadius: 10,
-    alignItems: "center",
-    justifyContent: "center",
-    margin: 20,
-    marginTop: 30,
-  },
-  aiCoachText: {
-    color: "white",
-    marginLeft: 10,
-    fontWeight: "bold",
-    fontSize: 16,
-  },
   emptyStateText: {
     color: "#888",
     textAlign: "center",
@@ -551,7 +549,7 @@ const styles = StyleSheet.create({
     marginBottom: 15,
   },
   progressTable: {
-    minWidth: Dimensions.get("window").width - 30,
+    minWidth: width - 30,
   },
   progressHeaderRow: {
     flexDirection: "row",
