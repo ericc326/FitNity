@@ -9,6 +9,7 @@ import {
 } from "react-native";
 import { WebView } from "react-native-webview";
 import { Camera, useCameraPermissions } from "expo-camera";
+import { SafeAreaView } from "react-native-safe-area-context";
 
 const API_KEY = "d2b81624-30bb-4207-92c6-9f879a365eec";
 const POSETRACKER_API = "https://app.posetracker.com/pose_tracker/tracking";
@@ -103,7 +104,7 @@ export default function AiCoachScreen() {
   };
 
   return (
-    <View style={styles.container}>
+    <SafeAreaView style={styles.container}>
       {/* Exercise selection row */}
       <ScrollView
         horizontal
@@ -186,7 +187,7 @@ export default function AiCoachScreen() {
       <TouchableOpacity style={styles.cancelButton} onPress={handleCancel}>
         <Text style={styles.cancelText}>Cancel Scan</Text>
       </TouchableOpacity>
-    </View>
+    </SafeAreaView>
   );
 }
 
