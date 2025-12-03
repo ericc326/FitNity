@@ -170,6 +170,7 @@ const HomeScreen: React.FC = () => {
           schedulesRef,
           where("scheduledAt", ">=", startOfDay),
           where("scheduledAt", "<=", endOfDay),
+          where("completed", "==", false), // show only incomplete tasks
           orderBy("scheduledAt", "asc")
         );
 
@@ -364,7 +365,7 @@ const HomeScreen: React.FC = () => {
               <Text style={{ color: "#fff", padding: 20 }}>Loading...</Text>
             ) : todayTasks.length === 0 ? (
               <Text style={{ color: "#fff", padding: 20 }}>
-                No schedule for today.
+                No pending schedules for today.
               </Text>
             ) : (
               todayTasks.map((task) => (
