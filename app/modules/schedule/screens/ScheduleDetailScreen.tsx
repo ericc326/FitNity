@@ -350,7 +350,17 @@ export default function ScheduleDetailScreen({ route, navigation }: Props) {
             {data.customLabel && (
               <>
                 <Text style={styles.label}>Note</Text>
-                <Text style={styles.noteValue}>{data.customLabel}</Text>
+                <Text style={styles.noteValue}>
+                  {(() => {
+                    const d =
+                      typeof data.duration === "number"
+                        ? Math.round(data.duration)
+                        : null;
+                    const durLine = d && d > 0 ? `Duration: ${d} min` : null;
+                    const note = String(data.customLabel || "");
+                    return durLine ? `${durLine}\n${note}` : note;
+                  })()}
+                </Text>
               </>
             )}
           </>

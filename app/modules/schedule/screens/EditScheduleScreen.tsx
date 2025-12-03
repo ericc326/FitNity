@@ -11,6 +11,7 @@ import {
   ActivityIndicator,
   Modal,
   Pressable,
+  AlertButton,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
@@ -20,11 +21,16 @@ import { ScheduleStackParamList } from "../navigation/ScheduleNavigator";
 import { db, auth } from "../../../../firebaseConfig";
 import { doc, getDoc, updateDoc, Timestamp } from "firebase/firestore";
 import moment from "moment";
+import LoadingIndicator from "../../../components/LoadingIndicator";
 import {
   ensureNotificationPermissions,
   scheduleWorkoutReminder,
   cancelReminder,
 } from "../../../services/NotificationService";
+import {
+  checkTimeAvailability,
+  suggestOptimalTime,
+} from "../../../services/ScheduleSuggestionService";
 
 type Props = NativeStackScreenProps<ScheduleStackParamList, "EditSchedule">;
 
@@ -36,6 +42,7 @@ const EditScheduleScreen = ({ navigation, route }: Props) => {
   const [fetching, setFetching] = useState(true);
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [showTimePicker, setShowTimePicker] = useState(false);
+  const [duration, setDuration] = useState(60); // Default 60 minutes
   const [selectedWorkout, setSelectedWorkout] = useState("Front Square");
   const [selectedWorkoutId, setSelectedWorkoutId] = useState<string | null>(
     null
@@ -53,6 +60,9 @@ const EditScheduleScreen = ({ navigation, route }: Props) => {
   const [prevNotificationId, setPrevNotificationId] = useState<string | null>(
     null
   );
+
+  //For suggesting optimal time loading indicator
+  const [isSuggesting, setIsSuggesting] = useState(false);
 
   useEffect(() => {
     const fetchSchedule = async () => {
@@ -80,6 +90,7 @@ const EditScheduleScreen = ({ navigation, route }: Props) => {
           setPrevScheduledAt(
             data.scheduledAt?.toDate ? data.scheduledAt.toDate() : null
           );
+          setDuration(data.duration ?? 60);
           setPrevNotificationId(
             typeof data.notificationId === "string" ? data.notificationId : null
           );
@@ -127,6 +138,47 @@ const EditScheduleScreen = ({ navigation, route }: Props) => {
     if (selectedTime) setDate(selectedTime);
   };
 
+  const handleSmartSuggestion = async () => {
+    const currentUser = auth.currentUser;
+    if (!currentUser) return;
+
+    setIsSuggesting(true); // Shows the LoadingIndicator
+    try {
+      const suggestion = await suggestOptimalTime(
+        currentUser.uid,
+        date,
+        duration,
+        scheduleId
+      );
+
+      if (suggestion) {
+        Alert.alert(
+          "✨ Smart Suggestion",
+          `Based on your '${suggestion.fitnessLevel}' level, we found a optimal time slot:\n\n` +
+            `⏰ ${moment(suggestion.time).format("h:mm A")}\n` +
+            `📝 Reason: ${suggestion.reason}`,
+          [
+            { text: "Cancel", style: "cancel" },
+            {
+              text: "Use This Time",
+              onPress: () => setDate(suggestion.time),
+            },
+          ]
+        );
+      } else {
+        Alert.alert(
+          "No Perfect Match",
+          "We couldn't find an optimal time slot in your preferred windows for this specific date."
+        );
+      }
+    } catch (error) {
+      console.error("Suggestion Error:", error);
+      Alert.alert("Error", "Could not analyze schedule availability.");
+    } finally {
+      setIsSuggesting(false); // Hides the LoadingIndicator
+    }
+  };
+
   const handleSave = async () => {
     const currentUser = auth.currentUser;
     if (!currentUser) {
@@ -142,6 +194,41 @@ const EditScheduleScreen = ({ navigation, route }: Props) => {
     setLoading(true);
 
     try {
+      // Check if the selected time slot is available
+      const availability = await checkTimeAvailability(
+        currentUser.uid,
+        date,
+        duration,
+        scheduleId
+      );
+
+      if (!availability.available) {
+        const alertButtons: AlertButton[] = [
+          { text: "Cancel", style: "cancel" },
+        ];
+
+        // Only add "Switch" button if a valid next time exists
+        // This prevents "Switch to Invalid date" button for past time errors
+        if (availability.nextAvailable) {
+          alertButtons.push({
+            text: `Switch to ${moment(availability.nextAvailable).format("h:mm A")}`,
+            onPress: () => setDate(availability.nextAvailable!),
+          });
+        }
+
+        // Check if the conflict is specifically "Past Time" to show a cleaner message
+        const conflictTitle =
+          availability.conflicts?.[0]?.title || "a conflict";
+        const errorMessage =
+          conflictTitle === "Past Time"
+            ? "Cannot schedule in the past."
+            : `You already have "${conflictTitle}" at this time.`;
+
+        Alert.alert("Time Conflict", errorMessage, alertButtons);
+        setLoading(false);
+        return; // STOP saving
+      }
+
       const scheduleRef = doc(
         db,
         "users",
@@ -170,6 +257,7 @@ const EditScheduleScreen = ({ navigation, route }: Props) => {
       await updateDoc(scheduleRef, {
         title: title.trim(),
         scheduledAt: Timestamp.fromDate(date),
+        duration: duration,
         selectedWorkoutName: selectedWorkout,
         selectedWorkoutId: selectedWorkoutId ?? null,
         customSets: customSets ?? undefined,
@@ -297,6 +385,48 @@ const EditScheduleScreen = ({ navigation, route }: Props) => {
               )}
             </>
           )}
+
+          {/* DURATION SELECTOR */}
+          <Text style={styles.label}>Duration (minutes)</Text>
+          <View style={styles.durationContainer}>
+            {[30, 45, 60, 75, 90].map((mins) => (
+              <TouchableOpacity
+                key={mins}
+                style={[
+                  styles.durationButton,
+                  duration === mins && styles.durationButtonActive,
+                ]}
+                onPress={() => setDuration(mins)}
+                disabled={loading}
+              >
+                <Text
+                  style={[
+                    styles.durationText,
+                    duration === mins && styles.durationTextActive,
+                  ]}
+                >
+                  {mins}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+
+          {/* Smart Suggestion Button */}
+          <TouchableOpacity
+            style={styles.suggestionButton}
+            onPress={handleSmartSuggestion}
+            disabled={isSuggesting || loading}
+          >
+            <MaterialCommunityIcons
+              name="magic-staff"
+              size={20}
+              color="#fff"
+              style={{ marginRight: 8 }}
+            />
+            <Text style={styles.suggestionButtonText}>
+              {isSuggesting ? "Finding Best Time..." : "Suggest Optimal Time"}
+            </Text>
+          </TouchableOpacity>
 
           {/* Details Workout Section */}
           <Text style={styles.detailsWorkoutHeader}>Details Workout</Text>
@@ -446,6 +576,8 @@ const EditScheduleScreen = ({ navigation, route }: Props) => {
             </Text>
           </TouchableOpacity>
         </ScrollView>
+        {/* Overlay Loading Indicator when suggesting */}
+        {isSuggesting && <LoadingIndicator />}
       </View>
     </SafeAreaView>
   );
@@ -526,6 +658,54 @@ const styles = StyleSheet.create({
   },
   timeInputText: {
     color: "#fff",
+    fontSize: 16,
+  },
+  durationContainer: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    marginBottom: 20,
+  },
+  durationButton: {
+    flex: 1,
+    backgroundColor: "rgba(255,255,255,0.1)",
+    paddingVertical: 12,
+    marginHorizontal: 4,
+    borderRadius: 10,
+    alignItems: "center",
+    borderWidth: 1,
+    borderColor: "transparent",
+  },
+  durationButtonActive: {
+    backgroundColor: "rgba(74, 144, 226, 0.2)",
+    borderColor: "#4a90e2",
+  },
+  durationText: {
+    color: "#bdbdbd",
+    fontWeight: "600",
+    fontSize: 14,
+  },
+  durationTextActive: {
+    color: "#4a90e2",
+    fontWeight: "bold",
+  },
+  suggestionButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#4a90e2",
+    borderRadius: 12,
+    paddingVertical: 14,
+    marginBottom: 10,
+    marginTop: 10,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 3,
+    elevation: 3,
+  },
+  suggestionButtonText: {
+    color: "#fff",
+    fontWeight: "bold",
     fontSize: 16,
   },
   detailsWorkoutHeader: {
