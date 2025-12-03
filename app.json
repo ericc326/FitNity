@@ -2,6 +2,7 @@
   "expo": {
     "name": "FitNity",
     "slug": "FitNity",
+    "owner": "yuhenggoh",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/iconFitNity.png",
@@ -20,10 +21,13 @@
         "foregroundImage": "./assets/iconFitNity.png",
         "backgroundColor": "#ffffff"
       },
-      "edgeToEdgeEnabled": true
+      "edgeToEdgeEnabled": true,
+      "package": "com.fyp.FitNity"
     },
     "web": {
       "favicon": "./assets/favicon.png"
-    }
+    },
+    "scheme": "fitnity",
+    "plugins": ["expo-web-browser", "expo-notifications"]
   }
 }
