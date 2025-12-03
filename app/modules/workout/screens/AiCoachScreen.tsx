@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useMemo } from "react";
 import {
   View,
   Text,
@@ -8,12 +8,16 @@ import {
   ScrollView,
 } from "react-native";
 import { WebView } from "react-native-webview";
-import { Camera, useCameraPermissions } from "expo-camera";
+import { useCameraPermissions } from "expo-camera";
 import { SafeAreaView } from "react-native-safe-area-context";
+import LoadingIndicator from "../../../components/LoadingIndicator";
+import { useNavigation } from "@react-navigation/native";
+import { NativeStackNavigationProp } from "@react-navigation/native-stack";
+import { WorkoutStackParamList } from "../navigation/WorkoutNavigator";
 
 const API_KEY = "d2b81624-30bb-4207-92c6-9f879a365eec";
 const POSETRACKER_API = "https://app.posetracker.com/pose_tracker/tracking";
-const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get("window");
+// const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get("window");
 
 type PoseKeypoint = {
   name: string;
@@ -44,24 +48,30 @@ type PoseTrackerData =
   | PoseTrackerCounter;
 
 export default function AiCoachScreen() {
+  const navigation =
+    useNavigation<NativeStackNavigationProp<WorkoutStackParamList>>();
   const [permission, requestPermission] = useCameraPermissions();
   const [poseReady, setPoseReady] = useState(false);
   const [keypoints, setKeypoints] = useState<PoseKeypoint[]>([]);
   const [reps, setReps] = useState(0);
   const [exercise, setExercise] = useState("squat");
+  const [webLoading, setWebLoading] = useState(true);
 
-  const exercises = ["Squat", "Push-Up", "Bicep Curl", "Lunge", "Plank"];
+  const exercises = ["Squat", "Push-up", "Bicep Curl", "Lunge", "Plank"];
 
-  // Request camera permission on mount
+  // Request camera permission when not granted
   useEffect(() => {
     if (!permission?.granted) {
       requestPermission();
     }
-  }, []);
+  }, [permission]);
 
-  const posetrackerUrl = `${POSETRACKER_API}?token=${API_KEY}&exercise=${exercise.toLowerCase()}&difficulty=easy&width=${SCREEN_WIDTH}&height=${SCREEN_HEIGHT}&isMobile=true&keypoints=true`;
+  const permissionPending = permission == null || permission.granted === false;
 
-  // JS bridge for WebView
+  const posetrackerUrl = useMemo(() => {
+    return `${POSETRACKER_API}?token=${API_KEY}&exercise=${exercise.toLowerCase()}&difficulty=easy&width=0&height=0&isMobile=true&keypoints=true&t=${Date.now()}`;
+  }, [exercise]);
+
   const jsBridge = `
     window.addEventListener('message', function(event) {
       window.ReactNativeWebView.postMessage(JSON.stringify(event.data));
@@ -82,9 +92,11 @@ export default function AiCoachScreen() {
       switch (data.type) {
         case "initialization":
           setPoseReady(data.ready);
+          setWebLoading(false);
           break;
         case "keypoints":
           setKeypoints(data.data);
+          if (webLoading) setWebLoading(false);
           break;
         case "counter":
           setReps(data.current_count);
@@ -93,7 +105,7 @@ export default function AiCoachScreen() {
           break;
       }
     } catch (e) {
-      console.error("Failed to parse message:", event.nativeEvent.data);
+      // console.error("Failed to parse message:", event.nativeEvent.data);
     }
   };
 
@@ -101,92 +113,98 @@ export default function AiCoachScreen() {
     setPoseReady(false);
     setKeypoints([]);
     setReps(0);
+    navigation.goBack(); // navigate back to WorkoutScreen
   };
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={styles.container} edges={["top", "left", "right"]}>
       {/* Exercise selection row */}
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        style={styles.exerciseRow}
-        contentContainerStyle={{ paddingHorizontal: 10 }}
-      >
-        {exercises.map((ex) => (
-          <TouchableOpacity
-            key={ex}
-            style={[
-              styles.exerciseButton,
-              exercise === ex.toLowerCase() && styles.activeExerciseButton,
-            ]}
-            onPress={() => {
-              setExercise(ex.toLowerCase());
-              setReps(0); // reset reps when exercise changes
-              setKeypoints([]);
-            }}
-          >
-            <Text
+      <View style={styles.headerContainer}>
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={{ paddingHorizontal: 10 }}
+        >
+          {exercises.map((ex) => (
+            <TouchableOpacity
+              key={ex}
               style={[
-                styles.exerciseText,
-                exercise === ex.toLowerCase() && styles.activeExerciseText,
+                styles.exerciseButton,
+                exercise === ex.toLowerCase() && styles.activeExerciseButton,
               ]}
+              onPress={() => {
+                setExercise(ex.toLowerCase());
+                setReps(0);
+                setKeypoints([]);
+                setPoseReady(false);
+                setWebLoading(true);
+              }}
             >
-              {ex}
-            </Text>
-          </TouchableOpacity>
-        ))}
-      </ScrollView>
+              <Text
+                style={[
+                  styles.exerciseText,
+                  exercise === ex.toLowerCase() && styles.activeExerciseText,
+                ]}
+              >
+                {ex}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </ScrollView>
+      </View>
 
-      {/* WebView */}
-      <WebView
-        source={{ uri: posetrackerUrl }}
-        style={styles.webView}
-        javaScriptEnabled
-        domStorageEnabled
-        allowsInlineMediaPlayback
-        mediaPlaybackRequiresUserAction={false}
-        injectedJavaScript={jsBridge}
-        onMessage={handleWebViewMessage}
-        originWhitelist={["*"]}
-        mixedContentMode="compatibility"
-      />
-
-      {/* Overlay Info */}
       <View style={styles.infoContainer}>
         {!poseReady ? (
-          <Text style={styles.infoText}>Loading AI & Camera...</Text>
+          <Text style={styles.infoText}>
+            {permissionPending
+              ? "Requesting camera permission..."
+              : webLoading
+                ? "Loading camera..."
+                : "Initializing AI..."}
+          </Text>
         ) : (
           <>
             <Text style={styles.infoText}>AI Ready ✅</Text>
             <Text style={styles.infoText}>Reps: {reps}</Text>
-            <Text style={styles.infoText}>
-              Keypoints detected: {keypoints.length}
-            </Text>
           </>
         )}
       </View>
 
-      {/* Keypoints */}
-      {poseReady &&
-        keypoints.map((kp) => (
-          <View
-            key={kp.name}
-            style={{
-              position: "absolute",
-              top: kp.y,
-              left: kp.x,
-              width: 12,
-              height: 12,
-              borderRadius: 6,
-              backgroundColor: "rgba(255,0,0,0.7)",
-            }}
-          />
-        ))}
+      {/* WebView */}
+      <View style={styles.webviewContainer}>
+        <WebView
+          key={exercise}
+          source={{ uri: posetrackerUrl }}
+          style={styles.webView}
+          containerStyle={{ backgroundColor: "transparent" }}
+          javaScriptEnabled
+          domStorageEnabled
+          allowsInlineMediaPlayback={true}
+          mediaPlaybackRequiresUserAction={false}
+          allowsAirPlayForMediaPlayback={false}
+          allowsPictureInPictureMediaPlayback={false}
+          userAgent="Mozilla/5.0 (iPhone; CPU iPhone OS 16_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.0 Mobile/15E148 Safari/604.1"
+          injectedJavaScript={jsBridge}
+          onMessage={handleWebViewMessage}
+          originWhitelist={["*"]}
+          mixedContentMode="always"
+          mediaCapturePermissionGrantType="grant"
+        />
 
-      {/* Cancel button */}
-      <TouchableOpacity style={styles.cancelButton} onPress={handleCancel}>
-        <Text style={styles.cancelText}>Cancel Scan</Text>
-      </TouchableOpacity>
+        {/* Loading Indicator centered over WebView */}
+        {(permissionPending || webLoading || !poseReady) && (
+          <View style={styles.loadingOverlay}>
+            <LoadingIndicator color="#ffffff" />
+          </View>
+        )}
+      </View>
+
+      {/* 4. Footer (Cancel Button) */}
+      <View style={styles.footerContainer}>
+        <TouchableOpacity style={styles.cancelButton} onPress={handleCancel}>
+          <Text style={styles.cancelText}>Cancel Scan</Text>
+        </TouchableOpacity>
+      </View>
     </SafeAreaView>
   );
 }
@@ -194,64 +212,92 @@ export default function AiCoachScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#000",
+    backgroundColor: "#262135",
   },
-  webView: {
-    width: "100%",
-    height: "100%",
-    zIndex: 1,
+  headerContainer: {
+    height: 60, // Fixed height for header
+    justifyContent: "center",
+    backgroundColor: "rgba(0,0,0,0.2)",
+    zIndex: 10,
   },
   infoContainer: {
-    position: "absolute",
-    top: 100,
-    left: 0,
-    right: 0,
+    // No absolute positioning needed!
     alignItems: "center",
-    zIndex: 2,
+    backgroundColor: "rgba(0,0,0,0.4)",
+    paddingVertical: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: "rgba(255,255,255,0.1)",
+    zIndex: 10,
+  },
+  webviewContainer: {
+    flex: 1,
+    position: "relative",
+  },
+  webView: {
+    flex: 1,
+    width: "100%",
+    height: "100%",
+    backgroundColor: "transparent",
+    zIndex: 1,
+  },
+  footerContainer: {
+    padding: 20,
+    backgroundColor: "transparent",
+    position: "absolute", // Floating button is okay
+    bottom: 0,
+    width: "100%",
+    alignItems: "center",
+  },
+  loadingOverlay: {
+    ...StyleSheet.absoluteFillObject, // Covers the webviewContainer
     backgroundColor: "rgba(0,0,0,0.5)",
-    padding: 10,
-    borderRadius: 10,
+    justifyContent: "center",
+    alignItems: "center",
+    zIndex: 20,
   },
   infoText: {
     color: "#fff",
     fontSize: 16,
+    fontWeight: "600",
     marginVertical: 2,
   },
-  exerciseRow: {
-    position: "absolute",
-    top: 40,
-    left: 0,
-    right: 0,
-    zIndex: 3,
-    maxHeight: 50,
-  },
   exerciseButton: {
-    backgroundColor: "#222",
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 20,
+    backgroundColor: "#333",
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    borderRadius: 25,
     marginHorizontal: 5,
+    marginVertical: 10,
+    borderWidth: 1,
+    borderColor: "#444",
   },
   activeExerciseButton: {
     backgroundColor: "#4CAF50",
+    borderColor: "#4CAF50",
   },
   exerciseText: {
-    color: "#fff",
+    color: "#aaa",
     fontWeight: "600",
   },
   activeExerciseText: {
     color: "#fff",
+    fontWeight: "bold",
   },
   cancelButton: {
     position: "absolute",
     bottom: 40,
-    left: SCREEN_WIDTH / 4,
-    right: SCREEN_WIDTH / 4,
-    backgroundColor: "rgba(255,0,0,0.8)",
-    paddingVertical: 12,
-    borderRadius: 25,
+    alignSelf: "center",
+    backgroundColor: "#FF4444",
+    paddingVertical: 14,
+    paddingHorizontal: 30,
+    borderRadius: 30,
     alignItems: "center",
-    zIndex: 3,
+    zIndex: 30,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    elevation: 5,
   },
   cancelText: {
     color: "#fff",
