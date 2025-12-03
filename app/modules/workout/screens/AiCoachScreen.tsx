@@ -4,11 +4,12 @@ import {
   Text,
   StyleSheet,
   Dimensions,
-  PermissionsAndroid,
-  Platform,
+  TouchableOpacity,
+  ScrollView,
 } from "react-native";
 import { WebView } from "react-native-webview";
 import { Camera, useCameraPermissions } from "expo-camera";
+import { SafeAreaView } from "react-native-safe-area-context";
 
 const API_KEY = "d2b81624-30bb-4207-92c6-9f879a365eec";
 const POSETRACKER_API = "https://app.posetracker.com/pose_tracker/tracking";
@@ -47,6 +48,9 @@ export default function AiCoachScreen() {
   const [poseReady, setPoseReady] = useState(false);
   const [keypoints, setKeypoints] = useState<PoseKeypoint[]>([]);
   const [reps, setReps] = useState(0);
+  const [exercise, setExercise] = useState("squat");
+
+  const exercises = ["Squat", "Push-Up", "Bicep Curl", "Lunge", "Plank"];
 
   // Request camera permission on mount
   useEffect(() => {
@@ -55,52 +59,36 @@ export default function AiCoachScreen() {
     }
   }, []);
 
-  const exercise = "squat";
+  const posetrackerUrl = `${POSETRACKER_API}?token=${API_KEY}&exercise=${exercise.toLowerCase()}&difficulty=easy&width=${SCREEN_WIDTH}&height=${SCREEN_HEIGHT}&isMobile=true&keypoints=true`;
 
-  const posetrackerUrl = `${POSETRACKER_API}?token=${API_KEY}&exercise=${exercise}&difficulty=easy&width=${SCREEN_WIDTH}&height=${SCREEN_HEIGHT}&isMobile=true&keypoints=true`;
-
-  // JS bridge for communication between WebView and React Native
+  // JS bridge for WebView
   const jsBridge = `
     window.addEventListener('message', function(event) {
       window.ReactNativeWebView.postMessage(JSON.stringify(event.data));
     });
-
     window.webViewCallback = function(data) {
       window.ReactNativeWebView.postMessage(JSON.stringify(data));
     };
-
     const originalPostMessage = window.postMessage;
     window.postMessage = function(data) {
       window.ReactNativeWebView.postMessage(typeof data === 'string' ? data : JSON.stringify(data));
     };
-
     true;
   `;
 
-  // Handle WebView messages
   const handleWebViewMessage = (event: any) => {
     try {
       const data: PoseTrackerData = JSON.parse(event.nativeEvent.data);
-
       switch (data.type) {
         case "initialization":
           setPoseReady(data.ready);
-          console.log(
-            "PoseTracker status:",
-            data.message,
-            "Ready:",
-            data.ready
-          );
           break;
-
         case "keypoints":
           setKeypoints(data.data);
           break;
-
         case "counter":
           setReps(data.current_count);
           break;
-
         default:
           break;
       }
@@ -109,8 +97,47 @@ export default function AiCoachScreen() {
     }
   };
 
+  const handleCancel = () => {
+    setPoseReady(false);
+    setKeypoints([]);
+    setReps(0);
+  };
+
   return (
-    <View style={styles.container}>
+    <SafeAreaView style={styles.container}>
+      {/* Exercise selection row */}
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        style={styles.exerciseRow}
+        contentContainerStyle={{ paddingHorizontal: 10 }}
+      >
+        {exercises.map((ex) => (
+          <TouchableOpacity
+            key={ex}
+            style={[
+              styles.exerciseButton,
+              exercise === ex.toLowerCase() && styles.activeExerciseButton,
+            ]}
+            onPress={() => {
+              setExercise(ex.toLowerCase());
+              setReps(0); // reset reps when exercise changes
+              setKeypoints([]);
+            }}
+          >
+            <Text
+              style={[
+                styles.exerciseText,
+                exercise === ex.toLowerCase() && styles.activeExerciseText,
+              ]}
+            >
+              {ex}
+            </Text>
+          </TouchableOpacity>
+        ))}
+      </ScrollView>
+
+      {/* WebView */}
       <WebView
         source={{ uri: posetrackerUrl }}
         style={styles.webView}
@@ -122,7 +149,6 @@ export default function AiCoachScreen() {
         onMessage={handleWebViewMessage}
         originWhitelist={["*"]}
         mixedContentMode="compatibility"
-        onError={(e) => console.warn("WebView error:", e.nativeEvent)}
       />
 
       {/* Overlay Info */}
@@ -140,7 +166,7 @@ export default function AiCoachScreen() {
         )}
       </View>
 
-      {/* Render keypoints as circles */}
+      {/* Keypoints */}
       {poseReady &&
         keypoints.map((kp) => (
           <View
@@ -156,7 +182,12 @@ export default function AiCoachScreen() {
             }}
           />
         ))}
-    </View>
+
+      {/* Cancel button */}
+      <TouchableOpacity style={styles.cancelButton} onPress={handleCancel}>
+        <Text style={styles.cancelText}>Cancel Scan</Text>
+      </TouchableOpacity>
+    </SafeAreaView>
   );
 }
 
@@ -172,7 +203,7 @@ const styles = StyleSheet.create({
   },
   infoContainer: {
     position: "absolute",
-    top: 50,
+    top: 100,
     left: 0,
     right: 0,
     alignItems: "center",
@@ -185,5 +216,46 @@ const styles = StyleSheet.create({
     color: "#fff",
     fontSize: 16,
     marginVertical: 2,
+  },
+  exerciseRow: {
+    position: "absolute",
+    top: 40,
+    left: 0,
+    right: 0,
+    zIndex: 3,
+    maxHeight: 50,
+  },
+  exerciseButton: {
+    backgroundColor: "#222",
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 20,
+    marginHorizontal: 5,
+  },
+  activeExerciseButton: {
+    backgroundColor: "#4CAF50",
+  },
+  exerciseText: {
+    color: "#fff",
+    fontWeight: "600",
+  },
+  activeExerciseText: {
+    color: "#fff",
+  },
+  cancelButton: {
+    position: "absolute",
+    bottom: 40,
+    left: SCREEN_WIDTH / 4,
+    right: SCREEN_WIDTH / 4,
+    backgroundColor: "rgba(255,0,0,0.8)",
+    paddingVertical: 12,
+    borderRadius: 25,
+    alignItems: "center",
+    zIndex: 3,
+  },
+  cancelText: {
+    color: "#fff",
+    fontWeight: "bold",
+    fontSize: 16,
   },
 });
