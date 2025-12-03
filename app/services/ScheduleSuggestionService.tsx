@@ -73,9 +73,13 @@ export const suggestOptimalTime = async (
 
     const snapshot = await getDocs(q);
 
-    // Map existing schedules and filter out the one being edited
+    // Map existing schedules and filter out the one being edited and already completed
     const busySlots = snapshot.docs
       .filter((doc) => !excludeScheduleId || doc.id !== excludeScheduleId)
+      .filter((doc) => {
+         const data = doc.data();
+         return data.completed !== true;
+      })
       .map((doc) => {
         const data = doc.data();
         const rawDate =
@@ -354,6 +358,11 @@ export const checkTimeAvailability = async (
         return;
       }
       const data = doc.data();
+
+      if (data.completed === true) {
+        return; 
+      }
+
       const rawDate =
         data.scheduledAt instanceof Timestamp
           ? data.scheduledAt.toDate()
