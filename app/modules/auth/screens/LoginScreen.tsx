@@ -78,7 +78,14 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ navigation }) => {
         })
       );
     } catch (error: any) {
-      Alert.alert("Login Failed", error.message);
+      if (
+        error.code === "auth/wrong-password" ||
+        error.code === "auth/invalid-credential"
+      ) {
+        Alert.alert("Login Failed", "Current password is incorrect.");
+      } else {
+        Alert.alert("Login Failed", error.message);
+      }
     }
   };
 

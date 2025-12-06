@@ -13,7 +13,7 @@ import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { ProfileStackParamList } from "../navigation/ProfileNavigator";
 import { app, auth, db } from "../../../../firebaseConfig";
-import { doc, onSnapshot } from "firebase/firestore";
+import { doc, onSnapshot, collection } from "firebase/firestore";
 
 type ProfileScreenNavigationProp =
   NativeStackNavigationProp<ProfileStackParamList>;
@@ -26,6 +26,7 @@ const ProfileScreen = () => {
     profileImage: string | null;
     // Add other user fields as needed
   } | null>(null);
+  const [workoutCount, setWorkoutCount] = useState(0);
   const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
@@ -40,9 +41,9 @@ const ProfileScreen = () => {
       return;
     }
 
+    // Load user data
     const userRef = doc(db, "users", currentUser.uid);
-
-    const unsubscribe = onSnapshot(
+    const unsubscribeUser = onSnapshot(
       userRef,
       async (snap) => {
         try {
@@ -71,11 +72,30 @@ const ProfileScreen = () => {
       }
     );
 
-    return () => unsubscribe();
+    // Load schedules count
+    const schedulesRef = collection(db, "users", currentUser.uid, "schedules");
+    const unsubscribeSchedules = onSnapshot(
+      schedulesRef,
+      (snap) => {
+        setWorkoutCount(snap.size); // count all schedules
+      },
+      (err) => {
+        console.warn("schedules onSnapshot error", err);
+      }
+    );
+
+    return () => {
+      unsubscribeUser();
+      unsubscribeSchedules();
+    };
   }, [navigation]);
 
   const navigateToEditProfile = () => {
     navigation.navigate("EditProfile");
+  };
+
+  const navigateToPersoanalInfo = () => {
+    navigation.navigate("PersonalInformation");
   };
 
   const navigateToSettings = () => {
@@ -206,7 +226,7 @@ const ProfileScreen = () => {
         {/* Stats Section */}
         <View style={styles.statsContainer}>
           <View style={styles.statBox}>
-            <Text style={styles.statValue}>24</Text>
+            <Text style={styles.statValue}>{workoutCount}</Text>
             <Text style={styles.statLabel}>Workouts</Text>
           </View>
           <View style={styles.statBox}>
@@ -221,7 +241,10 @@ const ProfileScreen = () => {
 
         {/* Menu Items */}
         <View style={styles.menuContainer}>
-          <TouchableOpacity style={styles.menuItem}>
+          <TouchableOpacity
+            style={styles.menuItem}
+            onPress={navigateToPersoanalInfo}
+          >
             <View style={styles.menuItemLeft}>
               <MaterialCommunityIcons
                 name="account"
