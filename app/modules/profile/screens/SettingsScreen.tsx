@@ -8,6 +8,7 @@ import {
   Alert,
   Modal,
   Pressable,
+  TextInput,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
@@ -20,6 +21,13 @@ import {
   getReminderOffsetMinutes,
   setReminderOffsetMinutes,
 } from "../../../services/NotificationService";
+import {
+  updatePassword,
+  reauthenticateWithCredential,
+  EmailAuthProvider,
+} from "firebase/auth";
+import { auth } from "../../../../firebaseConfig";
+import LoadingIndicator from "../../../components/LoadingIndicator";
 
 const SettingsScreen = () => {
   const [pushEnabled, setPushEnabled] = useState(true);
@@ -27,6 +35,13 @@ const SettingsScreen = () => {
   const [pickerValue, setPickerValue] = useState(5);
   const [showTimeModal, setShowTimeModal] = useState(false);
   const [loading, setLoading] = useState(false);
+
+  // state for change password modal
+  const [showPasswordModal, setShowPasswordModal] = useState(false);
+  const [currentPassword, setCurrentPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [passwordLoading, setPasswordLoading] = useState(false);
 
   useEffect(() => {
     const loadSettings = async () => {
@@ -83,6 +98,83 @@ const SettingsScreen = () => {
     }
   };
 
+  const handleClosePasswordModal = () => {
+    setShowPasswordModal(false);
+    // Clear all inputs
+    setCurrentPassword("");
+    setNewPassword("");
+    setConfirmPassword("");
+  };
+
+  const handleUpdatePassword = async () => {
+    // Check for empty fields
+    if (!currentPassword || !newPassword || !confirmPassword) {
+      Alert.alert("Error", "All fields are required.");
+      return;
+    }
+
+    // Check if Old and New are the same
+    if (currentPassword === newPassword) {
+      Alert.alert(
+        "Error",
+        "New password cannot be the same as the current password."
+      );
+      return;
+    }
+
+    // Check if New and Confirm match
+    if (newPassword !== confirmPassword) {
+      Alert.alert("Error", "New passwords do not match.");
+      return;
+    }
+
+    // Check password length
+    if (newPassword.length < 6) {
+      Alert.alert("Error", "New password must be at least 6 characters.");
+      return;
+    }
+
+    try {
+      setPasswordLoading(true);
+      const user = auth.currentUser;
+
+      if (!user || !user.email) {
+        Alert.alert("Error", "User not found. Please sign in again.");
+        return;
+      }
+
+      // Reauthenticate with current password
+      const credential = EmailAuthProvider.credential(
+        user.email,
+        currentPassword
+      );
+      await reauthenticateWithCredential(user, credential);
+
+      // Update password
+      await updatePassword(user, newPassword);
+
+      Alert.alert("Success", "Your password has been updated.");
+      setShowPasswordModal(false);
+      //clear fields
+      setCurrentPassword("");
+      setNewPassword("");
+      setConfirmPassword("");
+    } catch (error: any) {
+      if (
+        error.code === "auth/wrong-password" ||
+        error.code === "auth/invalid-credential"
+      ) {
+        Alert.alert("Error", "Current password is incorrect.");
+      } else if (error.code === "auth/weak-password") {
+        Alert.alert("Error", "New password is too weak.");
+      } else {
+        Alert.alert("Error", "Failed to update password. Try again.");
+      }
+    } finally {
+      setPasswordLoading(false);
+    }
+  };
+
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.content}>
@@ -118,6 +210,21 @@ const SettingsScreen = () => {
         </View>
 
         <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Account</Text>
+          <TouchableOpacity
+            style={styles.settingItem}
+            onPress={() => setShowPasswordModal(true)}
+          >
+            <Text style={styles.settingLabel}>Change Password</Text>
+            <MaterialCommunityIcons
+              name="chevron-right"
+              size={24}
+              color="#8a84a5"
+            />
+          </TouchableOpacity>
+        </View>
+
+        <View style={styles.section}>
           <Text style={styles.sectionTitle}>Privacy</Text>
           <TouchableOpacity style={styles.settingItem}>
             <Text style={styles.settingLabel}>Privacy Policy</Text>
@@ -150,9 +257,9 @@ const SettingsScreen = () => {
               <Picker
                 selectedValue={pickerValue}
                 onValueChange={(itemValue) => setPickerValue(itemValue)}
-                style={{ width: "100%", height: 200 }} // Height required for iOS wheel
-                itemStyle={{ color: "#fff", fontSize: 20 }} // iOS item style
-                dropdownIconColor="#fff" // Android dropdown icon
+                style={{ width: "100%", height: 200 }}
+                itemStyle={{ color: "#fff", fontSize: 20 }}
+                dropdownIconColor="#fff"
                 mode="dialog" // Android dialog mode
               >
                 {/* Generate 1 to 60 minutes */}
@@ -161,8 +268,8 @@ const SettingsScreen = () => {
                     key={val}
                     label={`${val} min`}
                     value={val}
-                    color="#fff" // Android text color (sometimes overridden by theme)
-                    style={{ backgroundColor: "#2b2435", color: "#fff" }} // Extra safety for Android
+                    color="#fff"
+                    style={{ backgroundColor: "#2b2435", color: "#fff" }}
                   />
                 ))}
               </Picker>
@@ -181,6 +288,81 @@ const SettingsScreen = () => {
                 onPress={handleSaveTime}
               >
                 <Text style={styles.saveText}>Save</Text>
+              </TouchableOpacity>
+            </View>
+          </Pressable>
+        </Pressable>
+      </Modal>
+      {/* Change Password Modal */}
+      <Modal visible={showPasswordModal} transparent animationType="fade">
+        <Pressable
+          style={styles.modalOverlay}
+          onPress={() => setShowPasswordModal(false)}
+        >
+          <Pressable style={styles.modalContent} onPress={() => {}}>
+            <Text style={styles.modalTitle}>Update Password</Text>
+
+            <View style={{ width: "100%", marginBottom: 20, gap: 15 }}>
+              <View>
+                <Text style={styles.inputLabel}>Current Password</Text>
+                <TextInput
+                  style={styles.input}
+                  value={currentPassword}
+                  onChangeText={setCurrentPassword}
+                  secureTextEntry
+                  placeholder="Required for verification"
+                  placeholderTextColor="#666"
+                />
+              </View>
+
+              <View>
+                <Text style={styles.inputLabel}>New Password</Text>
+                <TextInput
+                  style={styles.input}
+                  value={newPassword}
+                  onChangeText={setNewPassword}
+                  secureTextEntry
+                  placeholder="Min 6 chars"
+                  placeholderTextColor="#666"
+                />
+              </View>
+
+              <View>
+                <Text style={styles.inputLabel}>Confirm New Password</Text>
+                <TextInput
+                  style={styles.input}
+                  value={confirmPassword}
+                  onChangeText={setConfirmPassword}
+                  secureTextEntry
+                  placeholder="Re-enter new password"
+                  placeholderTextColor="#666"
+                />
+              </View>
+            </View>
+
+            <View style={styles.modalButtonsRow}>
+              <TouchableOpacity
+                style={[styles.modalButton, styles.cancelButton]}
+                onPress={handleClosePasswordModal}
+                disabled={passwordLoading}
+              >
+                <Text style={styles.cancelText}>Cancel</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[styles.modalButton, styles.saveButton]}
+                onPress={handleUpdatePassword}
+                disabled={passwordLoading}
+              >
+                {passwordLoading ? (
+                  <LoadingIndicator
+                    size="small"
+                    color="#fff"
+                    style={{ position: "relative", flex: 0 }}
+                  />
+                ) : (
+                  <Text style={styles.saveText}>Update</Text>
+                )}
               </TouchableOpacity>
             </View>
           </Pressable>
@@ -284,6 +466,21 @@ const styles = StyleSheet.create({
     color: "#fff",
     fontWeight: "bold",
     fontSize: 16,
+  },
+  inputLabel: {
+    color: "#aaa",
+    fontSize: 12,
+    marginBottom: 6,
+    marginLeft: 4,
+  },
+  input: {
+    backgroundColor: "#1b1630",
+    borderRadius: 8,
+    padding: 12,
+    color: "#fff",
+    borderWidth: 1,
+    borderColor: "#3C3952",
+    width: "100%",
   },
 });
 

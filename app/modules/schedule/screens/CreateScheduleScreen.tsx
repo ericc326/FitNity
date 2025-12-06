@@ -11,6 +11,8 @@ import {
   Modal,
   Pressable,
   AlertButton,
+  Keyboard,
+  TouchableWithoutFeedback,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
@@ -473,74 +475,81 @@ const CreateScheduleScreen = ({ navigation, route }: Props) => {
 
           {/* Custom modal */}
           <Modal visible={showCustomModal} transparent animationType="fade">
-            <View style={styles.modalContainer}>
-              <View style={styles.modalContent}>
-                <Text style={styles.modalTitle}>Custom Reps & Rest</Text>
+            <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
+              <View style={styles.modalContainer}>
+                <View style={styles.modalContent}>
+                  <Text style={styles.modalTitle}>Custom Reps & Rest</Text>
 
-                <View style={styles.modalRow}>
-                  <Text style={{ color: "#fff", marginBottom: 6 }}>Sets</Text>
-                  <TextInput
-                    style={styles.numberInput}
-                    value={customSets?.toString() ?? ""}
-                    onChangeText={(t) => setCustomSets(t ? Number(t) : null)}
-                    keyboardType="numeric"
-                    placeholder="e.g. 3"
-                    placeholderTextColor="#777"
-                  />
-                </View>
+                  <View style={styles.modalRow}>
+                    <Text style={{ color: "#fff", marginBottom: 6 }}>Sets</Text>
+                    <TextInput
+                      style={styles.numberInput}
+                      value={customSets?.toString() ?? ""}
+                      onChangeText={(t) => setCustomSets(t ? Number(t) : null)}
+                      keyboardType="numeric"
+                      placeholder="e.g. 3"
+                      placeholderTextColor="#777"
+                    />
+                  </View>
 
-                <View style={styles.modalRow}>
-                  <Text style={{ color: "#fff", marginBottom: 6 }}>
-                    Reps / Set
-                  </Text>
-                  <TextInput
-                    style={styles.numberInput}
-                    value={customReps?.toString() ?? ""}
-                    onChangeText={(t) => setCustomReps(t ? Number(t) : null)}
-                    keyboardType="numeric"
-                    placeholder="e.g. 10"
-                    placeholderTextColor="#777"
-                  />
-                </View>
+                  <View style={styles.modalRow}>
+                    <Text style={{ color: "#fff", marginBottom: 6 }}>
+                      Reps / Set
+                    </Text>
+                    <TextInput
+                      style={styles.numberInput}
+                      value={customReps?.toString() ?? ""}
+                      onChangeText={(t) => setCustomReps(t ? Number(t) : null)}
+                      keyboardType="numeric"
+                      placeholder="e.g. 10"
+                      placeholderTextColor="#777"
+                    />
+                  </View>
 
-                <View style={styles.modalRow}>
-                  <Text style={{ color: "#fff", marginBottom: 6 }}>
-                    Rest (sec)
-                  </Text>
-                  <TextInput
-                    style={styles.numberInput}
-                    value={customRestSec?.toString() ?? ""}
-                    onChangeText={(t) => setCustomRestSec(t ? Number(t) : null)}
-                    keyboardType="numeric"
-                    placeholder="e.g. 60"
-                    placeholderTextColor="#777"
-                  />
-                </View>
+                  <View style={styles.modalRow}>
+                    <Text style={{ color: "#fff", marginBottom: 6 }}>
+                      Rest (sec)
+                    </Text>
+                    <TextInput
+                      style={styles.numberInput}
+                      value={customRestSec?.toString() ?? ""}
+                      onChangeText={(t) =>
+                        setCustomRestSec(t ? Number(t) : null)
+                      }
+                      keyboardType="numeric"
+                      placeholder="e.g. 60"
+                      placeholderTextColor="#777"
+                    />
+                  </View>
 
-                <View style={styles.modalButtons}>
-                  <Pressable
-                    style={[styles.modalButton, { backgroundColor: "#444" }]}
-                    onPress={() => setShowCustomModal(false)}
-                  >
-                    <Text style={styles.modalButtonText}>Cancel</Text>
-                  </Pressable>
-                  <Pressable
-                    style={[styles.modalButton, { backgroundColor: "#7b68ee" }]}
-                    onPress={() => {
-                      // apply and close
-                      const sets = customSets ?? 0;
-                      const reps = customReps ?? 0;
-                      const rest = customRestSec ?? 0;
-                      const label = `${sets}×${reps} • rest ${rest}s`;
-                      setCustomLabel(label);
-                      setShowCustomModal(false);
-                    }}
-                  >
-                    <Text style={styles.modalButtonText}>Apply</Text>
-                  </Pressable>
+                  <View style={styles.modalButtons}>
+                    <Pressable
+                      style={[styles.modalButton, { backgroundColor: "#444" }]}
+                      onPress={() => setShowCustomModal(false)}
+                    >
+                      <Text style={styles.modalButtonText}>Cancel</Text>
+                    </Pressable>
+                    <Pressable
+                      style={[
+                        styles.modalButton,
+                        { backgroundColor: "#7b68ee" },
+                      ]}
+                      onPress={() => {
+                        // apply and close
+                        const sets = customSets ?? 0;
+                        const reps = customReps ?? 0;
+                        const rest = customRestSec ?? 0;
+                        const label = `${sets}×${reps} • rest ${rest}s`;
+                        setCustomLabel(label);
+                        setShowCustomModal(false);
+                      }}
+                    >
+                      <Text style={styles.modalButtonText}>Apply</Text>
+                    </Pressable>
+                  </View>
                 </View>
               </View>
-            </View>
+            </TouchableWithoutFeedback>
           </Modal>
 
           {/* Save Button */}

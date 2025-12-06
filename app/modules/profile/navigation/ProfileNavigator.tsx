@@ -3,10 +3,12 @@ import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import ProfileScreen from "../screens/ProfileScreen";
 import EditProfileScreen from "../screens/EditProfileScreen";
 import SettingsScreen from "../screens/SettingsScreen";
+import PersonalInformationScreen from "../screens/PersonalInformationScreen";
 
 export type ProfileStackParamList = {
   ProfileMain: undefined;
   EditProfile: undefined;
+  PersonalInformation: undefined;
   Settings: undefined;
 };
 
@@ -15,27 +17,13 @@ const ProfileStack = createNativeStackNavigator<ProfileStackParamList>();
 const ProfileNavigator = () => {
   return (
     <ProfileStack.Navigator screenOptions={{ headerShown: false }}>
+      <ProfileStack.Screen name="ProfileMain" component={ProfileScreen} />
+      <ProfileStack.Screen name="EditProfile" component={EditProfileScreen} />
       <ProfileStack.Screen
-        name="ProfileMain"
-        component={ProfileScreen}
-        options={{
-          headerShown: false,
-        }}
+        name="PersonalInformation"
+        component={PersonalInformationScreen}
       />
-      <ProfileStack.Screen
-        name="EditProfile"
-        component={EditProfileScreen}
-        options={{
-          headerShown: false,
-        }}
-      />
-      <ProfileStack.Screen
-        name="Settings"
-        component={SettingsScreen}
-        options={{
-          headerShown: false,
-        }}
-      />
+      <ProfileStack.Screen name="Settings" component={SettingsScreen} />
     </ProfileStack.Navigator>
   );
 };
