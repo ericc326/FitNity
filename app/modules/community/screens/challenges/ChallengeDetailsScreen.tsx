@@ -532,19 +532,39 @@ const ChallengeDetailsScreen = ({ route, navigation }: Props) => {
 
           <View style={styles.buttonContainer}>
             {isParticipant ? (
-              <TouchableOpacity
-                style={styles.updateProgressButton}
-                onPress={() => setShowProgressModal(true)}
-              >
-                <MaterialCommunityIcons
-                  name="chart-line"
-                  size={24}
-                  color="#fff"
-                />
-                <Text style={styles.updateProgressButtonText}>
-                  Update Progress
-                </Text>
-              </TouchableOpacity>
+              userProgress === 100 ? (
+                // If completed, show Disabled Button
+                <View
+                  style={[
+                    styles.updateProgressButton,
+                    { backgroundColor: "#4CAF50", opacity: 0.8 },
+                  ]}
+                >
+                  <MaterialCommunityIcons
+                    name="check-circle"
+                    size={24}
+                    color="#fff"
+                  />
+                  <Text style={styles.updateProgressButtonText}>
+                    Challenge Completed
+                  </Text>
+                </View>
+              ) : (
+                // If incomplete show clickable Update Button
+                <TouchableOpacity
+                  style={styles.updateProgressButton}
+                  onPress={() => setShowProgressModal(true)}
+                >
+                  <MaterialCommunityIcons
+                    name="chart-line"
+                    size={24}
+                    color="#fff"
+                  />
+                  <Text style={styles.updateProgressButtonText}>
+                    Update Progress
+                  </Text>
+                </TouchableOpacity>
+              )
             ) : (
               <TouchableOpacity
                 style={[styles.joinButton, loading && styles.disabledButton]}
