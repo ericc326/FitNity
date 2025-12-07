@@ -27,14 +27,19 @@ import LoadingIndicator from "../../../components/LoadingIndicator";
 type HealthInfo = {
   weight?: string | number;
   height?: string | number;
-  bmi?: number;
+  age?: string | number;
+  bmi?: number | null;
   level?: string;
+  gender?: string;
+  bmr?: number | null;
+  tdee?: number | null;
   healthInfo?: string;
   createdAt?: any;
   updatedAt?: any;
 };
 
 const LEVELS = ["Beginner", "Intermediate", "Advanced"];
+const GENDERS = ["Male", "Female"];
 
 const PersonalInformationScreen: React.FC = () => {
   const [loading, setLoading] = useState(true);
@@ -42,11 +47,14 @@ const PersonalInformationScreen: React.FC = () => {
   const [uid, setUid] = useState<string | null>(null);
   const [healthInfoDocId, setHealthInfoDocId] = useState<string | null>(null);
 
+  const [gender, setGender] = useState<string>("");
+  const [age, setAge] = useState<string>("");
   const [weightKg, setWeightKg] = useState<string>("");
   const [heightCm, setHeightCm] = useState<string>("");
   const [fitnessLevel, setFitnessLevel] = useState<string>("");
   const [healthInfoNote, setHealthInfoNote] = useState<string>("");
   const [showLevelPicker, setShowLevelPicker] = useState(false);
+  const [showGenderPicker, setShowGenderPicker] = useState(false);
 
   const bmi = useMemo(() => {
     const w = parseFloat(weightKg);
@@ -79,7 +87,9 @@ const PersonalInformationScreen: React.FC = () => {
         const data = docSnap.data() as HealthInfo;
         if (data.weight != null) setWeightKg(String(data.weight));
         if (data.height != null) setHeightCm(String(data.height));
+        if (data.age != null) setAge(String(data.age));
         if (data.level) setFitnessLevel(String(data.level));
+        if (data.gender) setGender(String(data.gender));
         if (data.healthInfo) setHealthInfoNote(String(data.healthInfo));
       }
     } catch (error) {
@@ -106,17 +116,45 @@ const PersonalInformationScreen: React.FC = () => {
     }
     const w = parseFloat(weightKg);
     const h = parseFloat(heightCm);
+    const a = parseFloat(age);
+
     if (!w || w <= 0 || !h || h <= 0) {
       Alert.alert("Invalid Input", "Enter valid weight and height.");
       return;
     }
 
+    let calculatedBmr = null;
+    let calculatedTdee = null;
+
+    // Only calculate if have ALL required fields (Weight, Height, Age, Gender, Level)
+    if (w && h && a && gender && fitnessLevel) {
+      // A. Calculate BMR (Mifflin-St Jeor)
+      let bmr = 10 * w + 6.25 * h - 5 * a;
+      if (gender === "Male") {
+        bmr += 5;
+      } else {
+        bmr -= 161;
+      }
+      calculatedBmr = Math.round(bmr);
+
+      // B. Calculate TDEE (Multiplier)
+      let multiplier = 1.2;
+      if (fitnessLevel === "Intermediate") multiplier = 1.55;
+      if (fitnessLevel === "Advanced") multiplier = 1.725;
+
+      calculatedTdee = Math.round(bmr * multiplier);
+    }
+
     const payload: HealthInfo = {
       weight: weightKg,
       height: heightCm,
-      bmi: bmi ? Number(bmi) : undefined,
-      level: fitnessLevel || undefined,
+      age: age || "",
+      bmi: bmi ? Number(bmi) : null,
+      level: fitnessLevel,
+      gender: gender || "",
       healthInfo: healthInfoNote || "",
+      bmr: calculatedBmr,
+      tdee: calculatedTdee,
       updatedAt: serverTimestamp(),
     };
 
@@ -155,6 +193,39 @@ const PersonalInformationScreen: React.FC = () => {
           contentContainerStyle={styles.content}
           keyboardShouldPersistTaps="handled"
         >
+          {/* --- PERSONAL DETAILS SECTION --- */}
+          <Text style={styles.title}>Personal Details</Text>
+
+          <Field
+            label="Age"
+            value={age}
+            onChangeText={setAge}
+            keyboardType="numeric"
+            placeholder="e.g. 24"
+          />
+
+          <TouchableOpacity
+            style={styles.pickerField}
+            onPress={() => setShowGenderPicker(true)}
+          >
+            <Text style={styles.label}>Gender</Text>
+            <View
+              style={[
+                styles.input,
+                {
+                  flexDirection: "row",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                },
+              ]}
+            >
+              <Text style={{ color: gender ? "#fff" : "#666" }}>
+                {gender || "Select Gender"}
+              </Text>
+              <Text style={{ color: "#aaa" }}>▼</Text>
+            </View>
+          </TouchableOpacity>
+
           <Text style={styles.title}>Body Metrics</Text>
 
           <Field
@@ -224,6 +295,42 @@ const PersonalInformationScreen: React.FC = () => {
           </TouchableOpacity>
         </ScrollView>
       </KeyboardAvoidingView>
+      {/* Gender Picker Modal */}
+      <Modal visible={showGenderPicker} transparent animationType="fade">
+        <View style={styles.modalBackdrop}>
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>Select Gender</Text>
+            {GENDERS.map((opt) => (
+              <TouchableOpacity
+                key={opt}
+                style={[
+                  styles.levelOption,
+                  gender === opt && styles.levelOptionActive,
+                ]}
+                onPress={() => {
+                  setGender(opt);
+                  setShowGenderPicker(false);
+                }}
+              >
+                <Text
+                  style={[
+                    styles.levelOptionText,
+                    gender === opt && styles.levelOptionTextActive,
+                  ]}
+                >
+                  {opt}
+                </Text>
+              </TouchableOpacity>
+            ))}
+            <TouchableOpacity
+              style={styles.modalCancelButton}
+              onPress={() => setShowGenderPicker(false)}
+            >
+              <Text style={styles.modalCancelText}>Cancel</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
       {/* Level Picker Modal */}
       <Modal visible={showLevelPicker} transparent animationType="fade">
         <View style={styles.modalBackdrop}>

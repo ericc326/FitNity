@@ -68,9 +68,12 @@ const HomeScreen: React.FC = () => {
   const [userName, setUserName] = useState<string>("");
   const [todayTasks, setTodayTasks] = useState<Task[]>([]);
   const [loadingTasks, setLoadingTasks] = useState(true);
+  // Health Info State
   const [bmi, setBmi] = useState<number | null>(null);
   const [bmiDesc, setBmiDesc] = useState<string>("");
+  const [tdee, setTdee] = useState<string>("--");
   const [userLevel, setUserLevel] = useState<Level | null>(null);
+
   const [suggestedWorkouts, setSuggestedWorkouts] = useState<any[]>([]);
   const [loadingWorkouts, setLoadingWorkouts] = useState(true);
 
@@ -121,7 +124,10 @@ const HomeScreen: React.FC = () => {
     const unsub = onSnapshot(
       healthInfoRef,
       (snapshot) => {
-        if (snapshot.empty) return;
+        if (snapshot.empty) {
+          setTdee("--");
+          return;
+        }
         const data = snapshot.docs[0].data() as any;
 
         // Set BMI + description
@@ -134,6 +140,12 @@ const HomeScreen: React.FC = () => {
         else if (bmiVal < 30) desc = "Overweight";
         else desc = "Obese";
         setBmiDesc(desc);
+
+        if (data.tdee) {
+          setTdee(`${data.tdee} kcal`);
+        } else {
+          setTdee("--");
+        }
 
         setUserLevel((data.level as Level) ?? "Beginner");
       },
@@ -335,8 +347,8 @@ const HomeScreen: React.FC = () => {
             </View>
 
             <View style={styles.calorieBox}>
-              <Text style={styles.statLabel}>Calorie</Text>
-              <Text style={styles.statValue}>349 kcal</Text>
+              <Text style={styles.statLabel}>Est. Daily Cal. Burn</Text>
+              <Text style={styles.statValue}>{tdee}</Text>
             </View>
           </View>
         </View>

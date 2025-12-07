@@ -26,7 +26,10 @@ const ProfileScreen = () => {
     profileImage: string | null;
     // Add other user fields as needed
   } | null>(null);
+
+  //Statistic state
   const [workoutCount, setWorkoutCount] = useState(0);
+  const [dailyCalories, setDailyCalories] = useState<string>("--");
   const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
@@ -84,9 +87,28 @@ const ProfileScreen = () => {
       }
     );
 
+    // Load Health Info
+    const healthRef = collection(db, "users", currentUser.uid, "healthinfo");
+    const unsubscribeHealth = onSnapshot(healthRef, (snap) => {
+      if (!snap.empty) {
+        const data = snap.docs[0].data();
+
+        // Check if the calculated TDEE exists in the database
+        if (data.tdee) {
+          setDailyCalories(`${data.tdee} kcal`);
+        } else {
+          setDailyCalories("--");
+        }
+      } else {
+        // No profile data found
+        setDailyCalories("--");
+      }
+    });
+
     return () => {
       unsubscribeUser();
       unsubscribeSchedules();
+      unsubscribeHealth();
     };
   }, [navigation]);
 
@@ -230,8 +252,8 @@ const ProfileScreen = () => {
             <Text style={styles.statLabel}>Workouts</Text>
           </View>
           <View style={styles.statBox}>
-            <Text style={styles.statValue}>12.5k</Text>
-            <Text style={styles.statLabel}>Calories</Text>
+            <Text style={styles.statValue}>{dailyCalories}</Text>
+            <Text style={styles.statLabel}>Est. Daily Cal. Burn</Text>
           </View>
           <View style={styles.statBox}>
             <Text style={styles.statValue}>48</Text>
@@ -260,7 +282,10 @@ const ProfileScreen = () => {
             />
           </TouchableOpacity>
 
-          <TouchableOpacity style={styles.menuItem}>
+          <TouchableOpacity
+            style={styles.menuItem}
+            onPress={() => navigation.navigate("Achievements")}
+          >
             <View style={styles.menuItemLeft}>
               <MaterialCommunityIcons name="trophy" size={24} color="#4a90e2" />
               <Text style={styles.menuItemText}>Achievements</Text>
