@@ -77,8 +77,8 @@ export const suggestOptimalTime = async (
     const busySlots = snapshot.docs
       .filter((doc) => !excludeScheduleId || doc.id !== excludeScheduleId)
       .filter((doc) => {
-         const data = doc.data();
-         return data.completed !== true;
+        const data = doc.data();
+        return data.completed !== true;
       })
       .map((doc) => {
         const data = doc.data();
@@ -360,7 +360,7 @@ export const checkTimeAvailability = async (
       const data = doc.data();
 
       if (data.completed === true) {
-        return; 
+        return;
       }
 
       const rawDate =

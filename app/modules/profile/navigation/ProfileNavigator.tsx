@@ -4,11 +4,13 @@ import ProfileScreen from "../screens/ProfileScreen";
 import EditProfileScreen from "../screens/EditProfileScreen";
 import SettingsScreen from "../screens/SettingsScreen";
 import PersonalInformationScreen from "../screens/PersonalInformationScreen";
+import AchievementsScreen from "../screens/AchievementsScreen";
 
 export type ProfileStackParamList = {
   ProfileMain: undefined;
   EditProfile: undefined;
   PersonalInformation: undefined;
+  Achievements: undefined;
   Settings: undefined;
 };
 
@@ -23,6 +25,7 @@ const ProfileNavigator = () => {
         name="PersonalInformation"
         component={PersonalInformationScreen}
       />
+      <ProfileStack.Screen name="Achievements" component={AchievementsScreen} />
       <ProfileStack.Screen name="Settings" component={SettingsScreen} />
     </ProfileStack.Navigator>
   );

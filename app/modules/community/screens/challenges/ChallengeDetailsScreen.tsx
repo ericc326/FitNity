@@ -22,6 +22,11 @@ import {
   getDoc,
   setDoc,
   serverTimestamp,
+  collection,
+  addDoc,
+  query,
+  where,
+  getDocs,
 } from "firebase/firestore";
 import LoadingIndicator from "../../../../components/LoadingIndicator";
 import Slider from "@react-native-community/slider";
@@ -265,6 +270,87 @@ const ChallengeDetailsScreen = ({ route, navigation }: Props) => {
     }
   };
 
+  const getBadgeIcon = (challenge: any): string => {
+    const text = (
+      challenge.title +
+      " " +
+      (challenge.description || "")
+    ).toLowerCase();
+
+    // Check Duration (Long term challenges get a Trophy)
+    if (challenge.duration >= 30) {
+      return "trophy";
+    }
+
+    // Check Activity Type keywords
+    if (
+      text.includes("run") ||
+      text.includes("jog") ||
+      text.includes("marathon")
+    ) {
+      return "run";
+    }
+    if (
+      text.includes("yoga") ||
+      text.includes("meditate") ||
+      text.includes("stretch")
+    ) {
+      return "yoga";
+    }
+    if (
+      text.includes("muscle") ||
+      text.includes("strength") ||
+      text.includes("lift") ||
+      text.includes("gym") ||
+      text.includes("dumbbell")
+    ) {
+      return "dumbbell";
+    }
+    if (text.includes("cycle") || text.includes("bike")) {
+      return "bike";
+    }
+    if (text.includes("walk") || text.includes("step")) {
+      return "shoe-print";
+    }
+
+    // Default fallback
+    return "medal";
+  };
+
+  const checkAndAwardBadge = async (userId: string) => {
+    try {
+      const achievementsRef = collection(db, "users", userId, "achievements");
+
+      // Check if user already has a badge for this challenge
+      const q = query(
+        achievementsRef,
+        where("challengeId", "==", challenge.id)
+      );
+      const existingDocs = await getDocs(q);
+
+      if (existingDocs.empty) {
+        const badgeIcon = getBadgeIcon(challenge);
+
+        // Create the badge
+        await addDoc(achievementsRef, {
+          title: `Completed: ${challenge.title}`,
+          description: `Successfully completed the ${challenge.duration}-day ${challenge.title} challenge.`,
+          challengeId: challenge.id,
+          earnedAt: serverTimestamp(),
+          icon: badgeIcon,
+          type: "challenge_completion",
+        });
+
+        Alert.alert(
+          "🎉 Challenge Complete!",
+          "Congratulations! You have earned a new badge. Check it out in your Achievements."
+        );
+      }
+    } catch (error) {
+      console.error("Error awarding badge:", error);
+    }
+  };
+
   const handleUpdateProgress = async (progress: number) => {
     setLoading(true);
     try {
@@ -286,6 +372,11 @@ const ChallengeDetailsScreen = ({ route, navigation }: Props) => {
       await updateDoc(statsRef, {
         progress: progress,
       });
+
+      // Check for Completion
+      if (progress === 100) {
+        await checkAndAwardBadge(currentUser.uid);
+      }
 
       setShowProgressModal(false);
       fetchParticipants(currentChallenge);

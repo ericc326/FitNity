@@ -8,6 +8,7 @@ import {
   Image,
   Alert,
   Platform,
+  AlertButton,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
@@ -20,7 +21,7 @@ import {
   getDownloadURL,
   deleteObject,
 } from "firebase/storage";
-import { doc, setDoc } from "firebase/firestore";
+import { doc, setDoc, getDoc } from "firebase/firestore";
 import { updateProfile, updateEmail } from "firebase/auth";
 import { useNavigation } from "@react-navigation/native";
 import LoadingIndicator from "../../../components/LoadingIndicator";
@@ -38,11 +39,45 @@ const EditProfileScreen = () => {
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
-    // ensure fields reflect current auth user
-    const u = auth.currentUser;
-    setUserName(u?.displayName || "");
-    setEmail(u?.email || "");
-    setPhotoUri(u?.photoURL || null);
+    const loadUserData = async () => {
+      const u = auth.currentUser;
+      if (u) {
+        // Try to refresh Auth cache
+        try {
+          await u.reload();
+        } catch (e) {
+          console.log("Failed to reload user auth", e);
+        }
+
+        // Fetch the latest data from Firestore (The Source of Truth)
+        try {
+          const userDocRef = doc(db, "users", u.uid);
+          const userDoc = await getDoc(userDocRef);
+
+          if (userDoc.exists()) {
+            const data = userDoc.data();
+
+            // Use Firestore data first, fallback to Auth
+            setUserName(data.name || u.displayName || "");
+
+            // Checking strictly for null to handle removal correctly
+            if (data.photoURL === null) {
+              setPhotoUri(null);
+            } else {
+              setPhotoUri(data.photoURL || u.photoURL || null);
+            }
+          } else {
+            // Fallback if no Firestore doc exists yet
+            setUserName(u.displayName || "");
+            setPhotoUri(u.photoURL || null);
+          }
+        } catch (e) {
+          console.error("Failed to load user from Firestore", e);
+        }
+      }
+    };
+
+    loadUserData();
   }, []);
 
   const parseStoragePathFromUrl = (url?: string | null) => {
@@ -118,12 +153,28 @@ const EditProfileScreen = () => {
     }
   };
 
+  const handleRemovePhoto = () => {
+    setPhotoUri(null);
+  };
+
   const onChangeImagePress = () => {
-    Alert.alert("Change Profile Photo", undefined, [
+    const options: AlertButton[] = [
       { text: "Choose from Library", onPress: () => handleImage(false) },
       { text: "Take Photo", onPress: () => handleImage(true) },
-      { text: "Cancel", style: "cancel" },
-    ]);
+    ];
+
+    // Only show "Remove Photo" if there is currently a photo
+    if (photoUri) {
+      options.push({
+        text: "Remove Photo",
+        style: "destructive",
+        onPress: handleRemovePhoto,
+      });
+    }
+
+    options.push({ text: "Cancel", style: "cancel" });
+
+    Alert.alert("Change Profile Photo", undefined, options);
   };
 
   const uploadImageAsync = async (uri: string, uid: string) => {
@@ -157,9 +208,14 @@ const EditProfileScreen = () => {
     try {
       const previousPhotoUrl = currentUser.photoURL ?? null;
       let photoURL = previousPhotoUrl;
+      // User selected a NEW photo
       if (photoUri && photoUri !== currentUser.photoURL) {
         const uploadedUrl = await uploadImageAsync(photoUri, currentUser.uid);
         if (uploadedUrl) photoURL = uploadedUrl;
+      }
+      // User removed the photo
+      else if (!photoUri && previousPhotoUrl) {
+        photoURL = null;
       }
 
       // update auth profile (name and photoURL)
@@ -168,6 +224,8 @@ const EditProfileScreen = () => {
           displayName: userName || null, // set auth.displayName from `userName`
           photoURL: photoURL || null,
         });
+
+        await currentUser.reload();
       } catch (err) {
         console.warn("updateProfile failed", err);
       }
