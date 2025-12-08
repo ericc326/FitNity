@@ -9,6 +9,7 @@ import {
   Alert,
   Platform,
   AlertButton,
+  Modal,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
@@ -22,12 +23,144 @@ import {
   deleteObject,
 } from "firebase/storage";
 import { doc, setDoc, getDoc } from "firebase/firestore";
-import { updateProfile, updateEmail } from "firebase/auth";
-import { useNavigation } from "@react-navigation/native";
+import {
+  updateProfile,
+  verifyBeforeUpdateEmail,
+  EmailAuthProvider,
+  reauthenticateWithCredential,
+} from "firebase/auth";
+import { useNavigation, CommonActions } from "@react-navigation/native";
 import LoadingIndicator from "../../../components/LoadingIndicator";
 
+interface PasswordPromptProps {
+  isVisible: boolean;
+  onConfirm: (password: string) => void;
+  onCancel: () => void;
+  isLoading: boolean;
+}
+
+const PasswordPromptModal: React.FC<PasswordPromptProps> = ({
+  isVisible,
+  onConfirm,
+  onCancel,
+  isLoading,
+}) => {
+  const [password, setPassword] = useState("");
+
+  const handleConfirm = () => {
+    if (password) {
+      onConfirm(password);
+      setPassword(""); // Clear field after attempt
+    }
+  };
+
+  return (
+    <Modal
+      visible={isVisible}
+      animationType="fade"
+      transparent={true}
+      onRequestClose={onCancel}
+    >
+      <View style={modalStyles.overlay}>
+        <View style={modalStyles.container}>
+          <Text style={modalStyles.title}>Security Check</Text>
+          <Text style={modalStyles.message}>
+            Please enter your password to confirm the email change:
+          </Text>
+          <TextInput
+            style={modalStyles.input}
+            placeholder="Password"
+            placeholderTextColor="#8a84a5"
+            secureTextEntry={true}
+            value={password}
+            onChangeText={setPassword}
+            autoFocus={true}
+            editable={!isLoading}
+          />
+          <View style={modalStyles.buttonContainer}>
+            <TouchableOpacity
+              style={[modalStyles.button, modalStyles.cancelButton]}
+              onPress={onCancel}
+              disabled={isLoading}
+            >
+              <Text style={modalStyles.cancelButtonText}>Cancel</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[modalStyles.button, modalStyles.confirmButton]}
+              onPress={handleConfirm}
+              disabled={isLoading || !password}
+            >
+              <Text style={modalStyles.confirmButtonText}>
+                {isLoading ? "Confirming..." : "Confirm"}
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </View>
+    </Modal>
+  );
+};
+
+const modalStyles = StyleSheet.create({
+  overlay: {
+    flex: 1,
+    backgroundColor: "rgba(0, 0, 0, 0.6)",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  container: {
+    width: "85%",
+    backgroundColor: "#3C3952",
+    borderRadius: 12,
+    padding: 20,
+  },
+  title: {
+    fontSize: 18,
+    fontWeight: "bold",
+    color: "#fff",
+    marginBottom: 10,
+  },
+  message: {
+    fontSize: 14,
+    color: "#ccc",
+    marginBottom: 15,
+  },
+  input: {
+    backgroundColor: "#262135",
+    borderRadius: 8,
+    padding: 12,
+    color: "#fff",
+    fontSize: 16,
+    marginBottom: 20,
+  },
+  buttonContainer: {
+    flexDirection: "row",
+    justifyContent: "flex-end",
+    gap: 10,
+  },
+  button: {
+    paddingHorizontal: 15,
+    paddingVertical: 10,
+    borderRadius: 8,
+    minWidth: 80,
+    alignItems: "center",
+  },
+  confirmButton: {
+    backgroundColor: "#4a90e2",
+  },
+  confirmButtonText: {
+    color: "#fff",
+    fontWeight: "bold",
+  },
+  cancelButton: {
+    backgroundColor: "transparent",
+  },
+  cancelButtonText: {
+    color: "#ccc",
+  },
+});
+
 const EditProfileScreen = () => {
-  //not completed yet
   const navigation = useNavigation();
   const user = auth.currentUser;
   const [userName, setUserName] = useState(user?.displayName || "");
@@ -37,6 +170,51 @@ const EditProfileScreen = () => {
   );
   const [uploading, setUploading] = useState(false);
   const [saving, setSaving] = useState(false);
+
+  const [showReAuthModal, setShowReAuthModal] = useState(false);
+  const [reAuthPayload, setReAuthPayload] = useState<any>(null);
+
+  const finalizeSave = async (
+    currentUser: any,
+    userName: string,
+    email: string,
+    photoURL: string | null,
+    previousPhotoUrl: string | null,
+    parsePath: (url?: string | null) => string | null
+  ) => {
+    // Persist to Firestore users collection (merge)
+    try {
+      const userRef = doc(db, "users", currentUser.uid);
+      await setDoc(
+        userRef,
+        {
+          name: userName || null,
+          email: email || null,
+          photoURL: photoURL || null,
+          updatedAt: new Date(),
+        },
+        { merge: true }
+      );
+    } catch (err) {
+      console.warn("Firestore save failed", err);
+    }
+
+    // Try to delete previous image (best-effort)
+    try {
+      if (previousPhotoUrl && previousPhotoUrl !== photoURL) {
+        const prevPath = parsePath(previousPhotoUrl);
+        if (prevPath) {
+          await deleteObject(ref(storage, prevPath));
+          console.log("Deleted previous profile image:", prevPath);
+        }
+      }
+    } catch (delErr) {
+      console.warn(
+        "Failed to delete previous profile image (non fatal):",
+        delErr
+      );
+    }
+  };
 
   useEffect(() => {
     const loadUserData = async () => {
@@ -198,6 +376,72 @@ const EditProfileScreen = () => {
     }
   };
 
+  const handleReAuth = async (password: string) => {
+    setShowReAuthModal(false);
+    setSaving(true);
+
+    if (!reAuthPayload) {
+      setSaving(false);
+      return;
+    }
+
+    const { currentUser, email, photoURL, userName, previousPhotoUrl } =
+      reAuthPayload;
+
+    try {
+      // Re-authentication
+      const credential = EmailAuthProvider.credential(
+        currentUser.email!,
+        password
+      );
+      await reauthenticateWithCredential(currentUser, credential);
+
+      // Send verification email
+      await verifyBeforeUpdateEmail(currentUser, email);
+
+      // Update Firestore/Delete Old Image
+      await finalizeSave(
+        currentUser,
+        userName,
+        email,
+        photoURL,
+        previousPhotoUrl,
+        parseStoragePathFromUrl
+      );
+
+      // Show success and force full logout/reset
+      Alert.alert(
+        "Success",
+        `Verification email sent to ${email}. Please verify it, then sign in again.`,
+        [
+          {
+            text: "OK",
+            onPress: async () => {
+              await auth.signOut().catch(() => null);
+              navigation.dispatch(
+                CommonActions.reset({
+                  index: 0,
+                  routes: [{ name: "Auth" as const }],
+                })
+              );
+            },
+          },
+        ]
+      );
+    } catch (reAuthErr: any) {
+      console.error("Re-authentication or email update failed:", reAuthErr);
+      Alert.alert(
+        "Error",
+        "Incorrect password or re-authentication failed. Please try again."
+      );
+      // If it fails, allow retry
+      setShowReAuthModal(true);
+    } finally {
+      setSaving(false);
+      setReAuthPayload(null);
+    }
+  };
+
   const handleSave = async () => {
     const currentUser = auth.currentUser;
     if (!currentUser) {
@@ -205,6 +449,10 @@ const EditProfileScreen = () => {
       return;
     }
     setSaving(true);
+
+    // Flag to track if the email change flow was handled by the prompt
+    let emailChangeHandled = false;
+
     try {
       const previousPhotoUrl = currentUser.photoURL ?? null;
       let photoURL = previousPhotoUrl;
@@ -230,76 +478,94 @@ const EditProfileScreen = () => {
         console.warn("updateProfile failed", err);
       }
 
-      // update email if changed (need change to used the firebase function) (not completed)
+      // update email if changed (With Re-authentication handling)
       if (email && email !== currentUser.email) {
         try {
-          await updateEmail(currentUser, email);
-        } catch (err: any) {
-          console.warn("updateEmail failed", err);
-          Alert.alert(
-            "Email update failed",
-            err?.message ||
-              "Could not update email. You may need to re-authenticate."
+          await verifyBeforeUpdateEmail(currentUser, email);
+
+          // Force the token to refresh NOW, ensuring the next screen has a fresh session.
+          await currentUser.getIdToken(true);
+
+          // If successful here (no re-auth needed), finalize and exit
+          await finalizeSave(
+            currentUser,
+            userName,
+            email,
+            photoURL,
+            previousPhotoUrl,
+            parseStoragePathFromUrl
           );
-          if (err?.code === "auth/requires-recent-login") {
-            Alert.alert(
-              "Re-authentication required",
-              "Please login again to confirm your identity before changing email."
-            );
+
+          Alert.alert(
+            "Verification Sent",
+            `We sent a verification email to ${email}. Please verify it, then sign in again.`,
+            [
+              {
+                text: "OK",
+                onPress: async () => {
+                  await auth.signOut().catch(() => null);
+                  navigation.dispatch(
+                    CommonActions.reset({
+                      index: 0,
+                      routes: [{ name: "Auth" as const }],
+                    })
+                  );
+                },
+              },
+            ],
+            { cancelable: false }
+          );
+          return;
+        } catch (err: any) {
+          // Check for re-authentication requirement
+          if (err.code === "auth/requires-recent-login") {
+            emailChangeHandled = true; // Mark as handled by prompt
+            setSaving(false); // Hide initial loader
+
+            // Set payload and SHOW MODAL (Cross-Platform)
+            setReAuthPayload({
+              currentUser,
+              email,
+              photoURL,
+              userName,
+              previousPhotoUrl,
+            });
+            setShowReAuthModal(true);
+
+            return; // Stop execution here, waiting for modal confirmation
           } else {
+            // Handle other errors (e.g., invalid email format)
             Alert.alert(
-              "Email update failed",
+              "Update Failed",
               err?.message || "Could not update email."
             );
+            setSaving(false);
+            return;
           }
         }
       }
 
-      // persist to Firestore users collection (merge)
-      try {
-        const userRef = doc(db, "users", currentUser.uid);
-        await setDoc(
-          userRef,
-          {
-            name: userName || null,
-            email: email || null,
-            photoURL: photoURL || null,
-            updatedAt: new Date(),
-          },
-          { merge: true }
+      //When email was not changed
+      if (!emailChangeHandled) {
+        await finalizeSave(
+          currentUser,
+          userName,
+          email,
+          photoURL,
+          previousPhotoUrl,
+          parseStoragePathFromUrl
         );
-      } catch (err) {
-        console.warn("Firestore save failed", err);
-      }
 
-      // try to delete previous image (best-effort)
-      try {
-        if (previousPhotoUrl && previousPhotoUrl !== photoURL) {
-          const prevPath = parseStoragePathFromUrl(previousPhotoUrl);
-          if (prevPath) {
-            // delete via client SDK
-            await deleteObject(ref(storage, prevPath));
-            console.log("Deleted previous profile image:", prevPath);
-          } else {
-            console.log(
-              "Could not derive storage path for previous photoURL, skip delete"
-            );
-          }
-        }
-      } catch (delErr) {
-        console.warn(
-          "Failed to delete previous profile image (non fatal):",
-          delErr
-        );
+        Alert.alert("Success", "Profile updated successfully.");
+        navigation.goBack();
       }
-
-      Alert.alert("Success", "Profile updated successfully.");
-      navigation.goBack();
     } catch (err) {
       console.error(err);
       Alert.alert("Error", "Failed to save profile.");
     } finally {
-      setSaving(false);
+      if (!emailChangeHandled) {
+        setSaving(false);
+      }
     }
   };
 
@@ -358,6 +624,16 @@ const EditProfileScreen = () => {
         </TouchableOpacity>
 
         {(uploading || saving) && <LoadingIndicator style={styles.overlay} />}
+
+        <PasswordPromptModal
+          isVisible={showReAuthModal}
+          onConfirm={handleReAuth}
+          onCancel={() => {
+            setShowReAuthModal(false);
+            setSaving(false);
+          }}
+          isLoading={saving}
+        />
       </View>
     </SafeAreaView>
   );
