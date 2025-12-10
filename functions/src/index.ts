@@ -151,9 +151,23 @@ export const deleteUserAndData = functions.https.onRequest(async (req, res) => {
     const uid = decoded.uid;
     console.log("deleteUserAndData: verified uid =", uid);
 
-    // --- BEGIN existing deletion logic (use uid) ---
     try {
-      // 1) Delete user's Firestore doc and its nested subcollections (recursive)
+      // 1) Profile image on users/{uid}
+      try {
+        const userDoc = await db.collection("users").doc(uid).get();
+        if (userDoc.exists) {
+          const u = userDoc.data() as any;
+          const profileImg =
+            u?.photoURL || u?.avatar || u?.image || u?.profileImage || u?.photo;
+          if (profileImg) {
+            console.log("Deleting profile image for user:", uid, profileImg);
+            await deleteStorageFileByUrlOrPath(String(profileImg));
+          }
+        }
+      } catch (e) {
+        console.warn("Failed to delete profile image for user", uid, e);
+      }
+      // 2) Delete user's Firestore doc and its nested subcollections (recursive)
       try {
         await admin
           .firestore()
@@ -172,29 +186,9 @@ export const deleteUserAndData = functions.https.onRequest(async (req, res) => {
         }
       }
 
-      // 2) Delete images referenced in profile, posts and challenges (run before Firestore deletion) ---
+      // 3) Delete images referenced in profile, posts and challenges (run before Firestore deletion) ---
       try {
-        // 1) Profile image on users/{uid}
-        // try {
-        //   const userDoc = await db.collection("users").doc(uid).get();
-        //   if (userDoc.exists) {
-        //     const u = userDoc.data() as any;
-        //     const profileImg =
-        //       u?.photoURL ||
-        //       u?.avatar ||
-        //       u?.image ||
-        //       u?.profileImage ||
-        //       u?.photo;
-        //     if (profileImg) {
-        //       console.log("Deleting profile image for user:", uid, profileImg);
-        //       await deleteStorageFileByUrlOrPath(String(profileImg));
-        //     }
-        //   }
-        // } catch (e) {
-        //   console.warn("Failed to delete profile image for user", uid, e);
-        // }
-
-        // 2) Top-level collections to scan
+        // 3a) Top-level collections to scan
         const collectionsToScan: {
           name: string;
           field: string;
@@ -248,7 +242,7 @@ export const deleteUserAndData = functions.https.onRequest(async (req, res) => {
         console.warn("Error deleting user images:", e);
       }
 
-      // 3) Delete related top-level collections documents created by this user
+      // 4) Delete related top-level collections documents created by this user
       const collectionsToTry = [
         "workouts",
         "activities",
@@ -360,7 +354,6 @@ export const deleteUserAndData = functions.https.onRequest(async (req, res) => {
       });
       return;
     }
-    // --- END existing deletion logic ---
 
     res.status(200).json({ success: true });
     return;
