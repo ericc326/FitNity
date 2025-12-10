@@ -316,7 +316,12 @@ const FeedTab = () => {
       {/* Content Section */}
       <TouchableOpacity
         activeOpacity={0.7}
-        onPress={() => navigation.navigate("PostDetails", { post })}
+        onPress={() =>
+          navigation.navigate("PostDetails", {
+            post,
+            likeState: likesState[post.id],
+          })
+        }
       >
         <Text style={styles.postContent}>{post.text}</Text>
         {post.imageUrl && <PostImage imageUrl={post.imageUrl} />}
@@ -345,7 +350,12 @@ const FeedTab = () => {
 
           <TouchableOpacity
             style={styles.commentSection}
-            onPress={() => navigation.navigate("PostDetails", { post })}
+            onPress={() =>
+              navigation.navigate("PostDetails", {
+                post,
+                likeState: likesState[post.id],
+              })
+            }
             activeOpacity={0.6}
           >
             <MaterialCommunityIcons

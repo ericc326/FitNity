@@ -421,7 +421,7 @@ const EditProfileScreen = () => {
               navigation.dispatch(
                 CommonActions.reset({
                   index: 0,
-                  routes: [{ name: "Auth" as const }],
+                  routes: [{ name: "Auth" }],
                 })
               );
             },
@@ -507,7 +507,7 @@ const EditProfileScreen = () => {
                   navigation.dispatch(
                     CommonActions.reset({
                       index: 0,
-                      routes: [{ name: "Auth" as const }],
+                      routes: [{ name: "Auth" }],
                     })
                   );
                 },

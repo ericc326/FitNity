@@ -18,7 +18,13 @@ export type CommunityTabParamList = {
 
 export type FeedStackParamList = {
   FeedList: undefined;
-  PostDetails: { post: any };
+  PostDetails: {
+    post: any;
+    likeState?: {
+      isLiked: boolean;
+      count: number;
+    };
+  };
   CreatePost: undefined;
   EditPost: { post: any };
 };

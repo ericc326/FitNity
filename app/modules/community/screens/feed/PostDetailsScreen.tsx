@@ -45,12 +45,12 @@ type LikeState = {
 };
 
 const PostDetailsScreen = ({ route, navigation }: Props) => {
-  const { post } = route.params;
+  const { post, likeState: initialLikeState } = route.params;
   const [comment, setComment] = useState("");
   const [comments, setComments] = useState<CommentType[]>([]);
   const [likeState, setLikeState] = useState<LikeState>({
-    isLiked: false,
-    count: post.likes || 0,
+    isLiked: initialLikeState?.isLiked || false,
+    count: initialLikeState?.count || post.likes || 0,
   });
   const [loading, setLoading] = useState(true); //for comments loading
   const [imageLoading, setImageLoading] = useState(true); // for post image loading
@@ -58,7 +58,9 @@ const PostDetailsScreen = ({ route, navigation }: Props) => {
 
   useEffect(() => {
     fetchComments();
-    checkIfLiked();
+    if (!initialLikeState) {
+      checkIfLiked();
+    }
   }, [post.id]);
 
   const onRefresh = async () => {
