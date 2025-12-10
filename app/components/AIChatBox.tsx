@@ -131,7 +131,7 @@ Never give medical diagnoses; recommend consulting a healthcare professional for
     }
   }
 
-  // analyze recent workouts and return a brief summary  deterministic recommendations (modify this cuz now store the exercise in schedule instead of workout collections)
+  // analyze recent workouts and return a brief summary  deterministic recommendations
   async function analyzeWorkoutsAndRecommend(uid: string) {
     try {
       // Read latest 10 schedules created by this user (created via CreateSchedule)
