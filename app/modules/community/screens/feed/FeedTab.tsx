@@ -350,7 +350,12 @@ const FeedTab = () => {
 
           <TouchableOpacity
             style={styles.commentSection}
-            onPress={() => navigation.navigate("PostDetails", { post })}
+            onPress={() =>
+              navigation.navigate("PostDetails", {
+                post,
+                likeState: likesState[post.id],
+              })
+            }
             activeOpacity={0.6}
           >
             <MaterialCommunityIcons
