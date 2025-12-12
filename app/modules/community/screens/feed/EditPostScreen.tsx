@@ -130,6 +130,7 @@ const EditPostScreen: React.FC<Props> = ({ route, navigation }) => {
       await updateDoc(doc(db, "posts", post.id), {
         text: postText,
         imageUrl,
+        editedAt: new Date().toISOString(),
       });
       Alert.alert("Success", "Post updated successfully!", [
         { text: "OK", onPress: () => navigation.goBack() },

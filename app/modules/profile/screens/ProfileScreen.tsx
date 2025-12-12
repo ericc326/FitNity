@@ -14,6 +14,7 @@ import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { ProfileStackParamList } from "../navigation/ProfileNavigator";
 import { app, auth, db } from "../../../../firebaseConfig";
 import { doc, onSnapshot, collection } from "firebase/firestore";
+import UserAvatar from "../../../components/UserAvatar";
 
 type ProfileScreenNavigationProp =
   NativeStackNavigationProp<ProfileStackParamList>;
@@ -225,13 +226,10 @@ const ProfileScreen = () => {
       <View>
         {/* Profile Header */}
         <View style={styles.header}>
-          <Image
-            source={
-              userData?.profileImage
-                ? { uri: userData.profileImage }
-                : require("../../../assets/profile.png")
-            }
-            style={styles.profileImage}
+          <UserAvatar
+            uri={userData?.profileImage}
+            size={100}
+            style={{ marginBottom: 15 }}
           />
           <Text style={styles.userName}>{userData?.name || "Loading..."}</Text>
           <Text style={styles.userEmail}>
@@ -350,12 +348,6 @@ const styles = StyleSheet.create({
   header: {
     alignItems: "center",
     padding: 10,
-  },
-  profileImage: {
-    width: 100,
-    height: 100,
-    borderRadius: 50,
-    marginBottom: 15,
   },
   userName: {
     color: "#fff",
