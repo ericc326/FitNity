@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useRoute, useFocusEffect } from "@react-navigation/native";
 import {
   View,
@@ -23,9 +23,12 @@ type Props = NativeStackScreenProps<WorkoutStackParamList, "SelectExercise">;
 
 const SelectExercise = ({ navigation }: Props) => {
   const route = useRoute() as any;
-  const returnToCreate = !!route?.params?.returnToCreateSchedule;
-  const returnToEdit = !!route?.params?.returnToEditSchedule;
+  const returnToCreateSchedule = !!route?.params?.returnToCreateSchedule;
+  const returnToEditSchedule = !!route?.params?.returnToEditSchedule;
+  const returnToCreateChallenge = !!route?.params?.returnToCreateChallenge;
+  const returnToEditChallenge = !!route?.params?.returnToEditChallenge;
   const scheduleId: string | undefined = route?.params?.scheduleId;
+  const challengeId: string | undefined = route?.params?.challengeId;
   const fromHome = !!route?.params?.fromHome;
 
   const [searchText, setSearchText] = useState("");
@@ -87,7 +90,7 @@ const SelectExercise = ({ navigation }: Props) => {
   );
 
   // Filter exercises by body part + search
-  React.useEffect(() => {
+  useEffect(() => {
     let filtered = exerciseData;
 
     if (selectedBodyPart && selectedBodyPart !== "All") {
@@ -129,15 +132,34 @@ const SelectExercise = ({ navigation }: Props) => {
       Alert.alert("No Selection", "Please select one exercise");
       return;
     }
-    if (returnToCreate) {
+    // Handle Schedule Returns
+    if (returnToCreateSchedule) {
       navigation.getParent()?.navigate("Schedule", {
         screen: "CreateSchedule",
         params: { selectedExercise, selectedExerciseId, fromHome },
       } as any);
-    } else if (returnToEdit && scheduleId) {
+    } else if (returnToEditSchedule && scheduleId) {
       navigation.getParent()?.navigate("Schedule", {
         screen: "EditSchedule",
         params: { scheduleId, selectedExercise, selectedExerciseId },
+      } as any);
+    }
+    // Handle Challenge Returns
+    else if (returnToCreateChallenge) {
+      navigation.getParent()?.navigate("Community", {
+        screen: "ChallengesTab",
+        params: {
+          screen: "CreateChallenge",
+          params: { selectedExercise, selectedExerciseId },
+        },
+      } as any);
+    } else if (returnToEditChallenge && challengeId) {
+      navigation.getParent()?.navigate("Community", {
+        screen: "ChallengesTab",
+        params: {
+          screen: "EditChallenge",
+          params: { challengeId, selectedExercise, selectedExerciseId },
+        },
       } as any);
     } else {
       navigation.goBack();
@@ -145,15 +167,30 @@ const SelectExercise = ({ navigation }: Props) => {
   };
 
   const handleBack = () => {
-    if (returnToCreate) {
+    if (returnToCreateSchedule) {
       navigation.getParent()?.navigate("Schedule", {
         screen: "CreateSchedule",
         params: { fromHome },
       } as any);
-    } else if (returnToEdit && scheduleId) {
+    } else if (returnToEditSchedule && scheduleId) {
       navigation.getParent()?.navigate("Schedule", {
         screen: "EditSchedule",
         params: { scheduleId },
+      } as any);
+    } else if (returnToCreateChallenge) {
+      navigation.getParent()?.navigate("Community", {
+        screen: "ChallengesTab",
+        params: {
+          screen: "CreateChallenge",
+        },
+      } as any);
+    } else if (returnToEditChallenge && challengeId) {
+      navigation.getParent()?.navigate("Community", {
+        screen: "ChallengesTab",
+        params: {
+          screen: "EditChallenge",
+          params: { challengeId },
+        },
       } as any);
     } else {
       navigation.goBack();

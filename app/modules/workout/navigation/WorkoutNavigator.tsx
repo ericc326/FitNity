@@ -8,12 +8,8 @@ import FilterExercise from "../screens/FilterExercise";
 import HomeScreen from "../../home/screens/HomeScreen";
 import AiCoachScreen from "../screens/AiCoachScreen";
 import WorkoutOverviewScreen from "../screens/WorkoutOverviewScreen";
-import ActiveWorkoutScreen from "../screens/ActiveWorkoutScreen";
+import RecommendationWorkoutScreen from "../screens/RecommendationWorkoutScreen";
 
-/**
- * 🧭 Workout Stack Route Types
- * These define all parameters passed between screens.
- */
 export type WorkoutStackParamList = {
   WorkoutMain: undefined;
   WorkoutSection:
@@ -30,11 +26,9 @@ export type WorkoutStackParamList = {
     workout: any;
     level?: "Beginner" | "Intermediate" | "Advanced"; // optional for flexibility
   };
-  ActiveWorkout: {
+  RecommendationWorkout: {
     workout: any;
-    sets: number;
-    reps: number;
-    rest: number;
+    level: string;
   };
 };
 
@@ -42,12 +36,11 @@ const Stack = createNativeStackNavigator<WorkoutStackParamList>();
 
 const WorkoutNavigator: React.FC = () => {
   const navigation = useNavigation();
-  const route = useRoute<
-    RouteProp<Record<string, { resetToMain?: boolean }>, string>
-  >();
+  const route =
+    useRoute<RouteProp<Record<string, { resetToMain?: boolean }>, string>>();
 
   /**
-   * ✅ Automatically reset navigation to WorkoutMain if resetToMain param is passed
+   * Automatically reset navigation to WorkoutMain if resetToMain param is passed
    */
   useEffect(() => {
     if (route.params?.resetToMain) {
@@ -66,24 +59,21 @@ const WorkoutNavigator: React.FC = () => {
       }}
       initialRouteName="WorkoutMain"
     >
-      {/* 🔹 Main Workout Screens */}
+      {/* Main Workout Screens */}
       <Stack.Screen name="WorkoutMain" component={WorkoutScreen} />
       <Stack.Screen name="WorkoutSection" component={WorkoutSection} />
       <Stack.Screen name="SelectExercise" component={SelectExercise} />
       <Stack.Screen name="FilterExercise" component={FilterExercise} />
 
-      {/* 🔹 Integration with Home + AI */}
+      {/* Integration with Home + AI */}
       <Stack.Screen name="HomeScreen" component={HomeScreen} />
       <Stack.Screen name="AiCoach" component={AiCoachScreen} />
 
-      {/* 🔹 Suggested Workout Flow */}
+      {/* Suggested Workout Flow */}
+      <Stack.Screen name="WorkoutOverview" component={WorkoutOverviewScreen} />
       <Stack.Screen
-        name="WorkoutOverview"
-        component={WorkoutOverviewScreen}
-      />
-      <Stack.Screen
-        name="ActiveWorkout"
-        component={ActiveWorkoutScreen}
+        name="RecommendationWorkout"
+        component={RecommendationWorkoutScreen}
       />
     </Stack.Navigator>
   );

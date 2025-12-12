@@ -466,15 +466,15 @@ const HomeScreen: React.FC = () => {
                 </Text>
 
                 <TouchableOpacity
-                  style={styles.startBtn}
+                  style={styles.viewBtn}
                   onPress={() =>
                     navigation.navigate("Workout", {
-                      screen: "WorkoutOverview",
-                      params: { workout, level: userLevel },
+                      screen: "RecommendationWorkout",
+                      params: { workout, level: userLevel ?? "Beginner" },
                     })
                   }
                 >
-                  <Text style={styles.startBtnText}>Start</Text>
+                  <Text style={styles.viewBtnText}>View</Text>
                 </TouchableOpacity>
               </View>
             </View>
@@ -693,14 +693,14 @@ const styles = StyleSheet.create({
     color: "#ccc",
     fontSize: 12,
   },
-  startBtn: {
+  viewBtn: {
     backgroundColor: "#f57c00",
     paddingHorizontal: 10,
     paddingVertical: 6,
     borderRadius: 6,
     alignSelf: "flex-start",
   },
-  startBtnText: {
+  viewBtnText: {
     color: "#fff",
     fontWeight: "bold",
   },

@@ -9,6 +9,7 @@ import {
   Alert,
   Modal,
   RefreshControl,
+  Vibration,
 } from "react-native";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { NativeStackScreenProps } from "@react-navigation/native-stack";
@@ -42,6 +43,131 @@ interface Participant {
   progress: number;
   joinedAt: any;
 }
+
+const WorkoutSessionModal = ({
+  visible,
+  onClose,
+  onComplete,
+  sets,
+  reps,
+  restSeconds,
+}: {
+  visible: boolean;
+  onClose: () => void;
+  onComplete: () => void;
+  sets: number;
+  reps: number;
+  restSeconds: number;
+}) => {
+  const [currentSet, setCurrentSet] = useState(1);
+  const [isResting, setIsResting] = useState(false);
+  const [timeLeft, setTimeLeft] = useState(restSeconds);
+
+  // Reset state when modal opens
+  useEffect(() => {
+    if (visible) {
+      setCurrentSet(1);
+      setIsResting(false);
+      setTimeLeft(restSeconds);
+    }
+  }, [visible, restSeconds]);
+
+  // Timer Logic
+  useEffect(() => {
+    let interval: NodeJS.Timeout;
+    if (isResting && timeLeft > 0) {
+      interval = setInterval(() => {
+        setTimeLeft((prev) => prev - 1);
+      }, 1000);
+    } else if (isResting && timeLeft === 0) {
+      // Rest finished
+      Vibration.vibrate(); // Vibrate to notify user
+      handleNextStep();
+    }
+    return () => clearInterval(interval);
+  }, [isResting, timeLeft]);
+
+  const handleNextStep = () => {
+    if (isResting) {
+      // Finished resting, start next set
+      setIsResting(false);
+      setTimeLeft(restSeconds);
+      setCurrentSet((prev) => prev + 1);
+    } else {
+      // Finished a set
+      if (currentSet >= sets) {
+        // Workout Complete!
+        onComplete();
+      } else {
+        // Start Rest
+        setIsResting(true);
+      }
+    }
+  };
+
+  const skipRest = () => {
+    setIsResting(false);
+    setTimeLeft(restSeconds);
+    setCurrentSet((prev) => prev + 1);
+  };
+
+  return (
+    <Modal visible={visible} transparent animationType="slide">
+      <View style={styles.sessionOverlay}>
+        <View style={styles.sessionContent}>
+          <TouchableOpacity style={styles.closeSession} onPress={onClose}>
+            <MaterialCommunityIcons name="close" size={24} color="#fff" />
+          </TouchableOpacity>
+
+          <Text style={styles.sessionTitle}>
+            {isResting ? "Rest Time" : `Set ${currentSet} of ${sets}`}
+          </Text>
+
+          {isResting ? (
+            <View style={styles.timerContainer}>
+              <MaterialCommunityIcons
+                name="timer-sand"
+                size={60}
+                color="#f1c40f"
+              />
+              <Text style={styles.timerText}>
+                {Math.floor(timeLeft / 60)}:
+                {(timeLeft % 60).toString().padStart(2, "0")}
+              </Text>
+              <Text style={styles.subText}>Catch your breath!</Text>
+            </View>
+          ) : (
+            <View style={styles.activeContainer}>
+              <MaterialCommunityIcons
+                name="dumbbell"
+                size={60}
+                color="#4a90e2"
+              />
+              <Text style={styles.repText}>{reps}</Text>
+              <Text style={styles.subText}>REPS</Text>
+            </View>
+          )}
+
+          <TouchableOpacity
+            style={[
+              styles.sessionButton,
+              { backgroundColor: isResting ? "#444" : "#2ecc71" },
+            ]}
+            onPress={isResting ? skipRest : handleNextStep}
+          >
+            <Text style={styles.sessionButtonText}>
+              {isResting
+                ? "Skip Rest"
+                : currentSet === sets
+                  ? "Finish Workout"
+                  : "Complete Set"}
+            </Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    </Modal>
+  );
+};
 
 const ProgressModal = ({
   visible,
@@ -121,7 +247,11 @@ const ChallengeDetailsScreen = ({ route, navigation }: Props) => {
   const [creatorName, setCreatorName] = useState("");
   const [participants, setParticipants] = useState<Participant[]>([]);
   const [loadingParticipants, setLoadingParticipants] = useState(true);
+
+  // Modals state
   const [showProgressModal, setShowProgressModal] = useState(false);
+  const [showSessionModal, setShowSessionModal] = useState(false);
+
   const [userProgress, setUserProgress] = useState(0);
   const [refreshing, setRefreshing] = useState(false);
   const [currentChallenge, setCurrentChallenge] = useState(challenge);
@@ -270,6 +400,35 @@ const ChallengeDetailsScreen = ({ route, navigation }: Props) => {
     }
   };
 
+  const handleSessionComplete = async () => {
+    setShowSessionModal(false);
+    setLoading(true);
+
+    try {
+      // Calculate new progress
+      // Progress increment = 100% / Total Days Duration
+      const dailyIncrement = 100 / (currentChallenge.duration || 1);
+      let newProgress = userProgress + dailyIncrement;
+
+      // Cap at 100%
+      if (newProgress > 100) newProgress = 100;
+
+      // Round to 1 decimal for cleanliness
+      newProgress = Math.round(newProgress * 10) / 10;
+
+      await handleUpdateProgress(newProgress);
+
+      Alert.alert(
+        "Great Job!",
+        "You completed today's goal. Progress updated!"
+      );
+    } catch (error) {
+      console.error("Session complete error", error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const getBadgeIcon = (challenge: any): string => {
     const text = (
       challenge.title +
@@ -374,7 +533,7 @@ const ChallengeDetailsScreen = ({ route, navigation }: Props) => {
       });
 
       // Check for Completion
-      if (progress === 100) {
+      if (progress >= 100) {
         await checkAndAwardBadge(currentUser.uid);
       }
 
@@ -476,6 +635,47 @@ const ChallengeDetailsScreen = ({ route, navigation }: Props) => {
             </View>
           </View>
 
+          {/* WORKOUT CHALLENGE INFO */}
+          {currentChallenge.type === "workout" && (
+            <View style={styles.workoutInfoContainer}>
+              <Text style={styles.sectionTitle}>Daily Workout Goal</Text>
+              <View style={styles.workoutCard}>
+                <View style={styles.workoutHeader}>
+                  <MaterialCommunityIcons
+                    name="dumbbell"
+                    size={24}
+                    color="#fff"
+                  />
+                  <Text style={styles.workoutName}>
+                    {currentChallenge.workoutName}
+                  </Text>
+                </View>
+                <View style={styles.workoutStatsRow}>
+                  <View style={styles.workoutStat}>
+                    <Text style={styles.workoutStatValue}>
+                      {currentChallenge.customSets}
+                    </Text>
+                    <Text style={styles.workoutStatLabel}>Sets</Text>
+                  </View>
+                  <View style={styles.workoutStatDivider} />
+                  <View style={styles.workoutStat}>
+                    <Text style={styles.workoutStatValue}>
+                      {currentChallenge.customReps}
+                    </Text>
+                    <Text style={styles.workoutStatLabel}>Reps</Text>
+                  </View>
+                  <View style={styles.workoutStatDivider} />
+                  <View style={styles.workoutStat}>
+                    <Text style={styles.workoutStatValue}>
+                      {currentChallenge.customRestSeconds}s
+                    </Text>
+                    <Text style={styles.workoutStatLabel}>Rest</Text>
+                  </View>
+                </View>
+              </View>
+            </View>
+          )}
+
           {/* Participants Section */}
           <View style={styles.participantsContainer}>
             <Text style={styles.sectionTitle}>Participants</Text>
@@ -530,10 +730,10 @@ const ChallengeDetailsScreen = ({ route, navigation }: Props) => {
             )}
           </View>
 
+          {/* BUTTON */}
           <View style={styles.buttonContainer}>
             {isParticipant ? (
-              userProgress === 100 ? (
-                // If completed, show Disabled Button
+              userProgress >= 100 ? (
                 <View
                   style={[
                     styles.updateProgressButton,
@@ -549,8 +749,23 @@ const ChallengeDetailsScreen = ({ route, navigation }: Props) => {
                     Challenge Completed
                   </Text>
                 </View>
+              ) : currentChallenge.type === "workout" ? (
+                // Workout Type: Start Goal Button
+                <TouchableOpacity
+                  style={styles.updateProgressButton}
+                  onPress={() => setShowSessionModal(true)}
+                >
+                  <MaterialCommunityIcons
+                    name="play-circle"
+                    size={24}
+                    color="#fff"
+                  />
+                  <Text style={styles.updateProgressButtonText}>
+                    Start Today's Goal
+                  </Text>
+                </TouchableOpacity>
               ) : (
-                // If incomplete show clickable Update Button
+                // Activity Type: Manual Update Button
                 <TouchableOpacity
                   style={styles.updateProgressButton}
                   onPress={() => setShowProgressModal(true)}
@@ -584,6 +799,15 @@ const ChallengeDetailsScreen = ({ route, navigation }: Props) => {
             onUpdate={handleUpdateProgress}
             loading={loading}
             initialProgress={userProgress}
+          />
+
+          <WorkoutSessionModal
+            visible={showSessionModal}
+            onClose={() => setShowSessionModal(false)}
+            onComplete={handleSessionComplete}
+            sets={currentChallenge.customSets || 3}
+            reps={currentChallenge.customReps || 10}
+            restSeconds={currentChallenge.customRestSeconds || 60}
           />
         </View>
       </ScrollView>
@@ -687,6 +911,51 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: "600",
   },
+  workoutInfoContainer: {
+    marginBottom: 24,
+  },
+  workoutCard: {
+    backgroundColor: "#4a90e2",
+    borderRadius: 12,
+    padding: 16,
+  },
+  workoutHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 16,
+  },
+  workoutName: {
+    color: "#fff",
+    fontSize: 18,
+    fontWeight: "bold",
+    marginLeft: 10,
+  },
+  workoutStatsRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    backgroundColor: "rgba(0,0,0,0.1)",
+    borderRadius: 8,
+    padding: 12,
+  },
+  workoutStat: {
+    alignItems: "center",
+    flex: 1,
+  },
+  workoutStatValue: {
+    color: "#fff",
+    fontSize: 20,
+    fontWeight: "bold",
+  },
+  workoutStatLabel: {
+    color: "rgba(255,255,255,0.8)",
+    fontSize: 12,
+  },
+  workoutStatDivider: {
+    width: 1,
+    height: 30,
+    backgroundColor: "rgba(255,255,255,0.2)",
+  },
   participantsContainer: {
     padding: 16,
     marginBottom: 16,
@@ -772,6 +1041,68 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: "600",
     marginLeft: 8,
+  },
+  // Session Modal Styles
+  sessionOverlay: {
+    flex: 1,
+    backgroundColor: "#262135",
+    justifyContent: "center",
+    padding: 20,
+  },
+  sessionContent: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  closeSession: {
+    position: "absolute",
+    top: 40,
+    right: 20,
+    padding: 10,
+  },
+  sessionTitle: {
+    color: "#fff",
+    fontSize: 24,
+    fontWeight: "bold",
+    marginBottom: 40,
+  },
+  timerContainer: {
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 40,
+  },
+  timerText: {
+    fontSize: 60,
+    fontWeight: "bold",
+    color: "#f1c40f",
+    marginVertical: 20,
+  },
+  activeContainer: {
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 40,
+  },
+  repText: {
+    fontSize: 80,
+    fontWeight: "bold",
+    color: "#fff",
+  },
+  subText: {
+    fontSize: 18,
+    color: "#aaa",
+    marginTop: 8,
+  },
+  sessionButton: {
+    paddingVertical: 20,
+    paddingHorizontal: 40,
+    borderRadius: 30,
+    width: "80%",
+    alignItems: "center",
+  },
+  sessionButtonText: {
+    color: "#fff",
+    fontSize: 20,
+    fontWeight: "bold",
   },
   modalOverlay: {
     flex: 1,
