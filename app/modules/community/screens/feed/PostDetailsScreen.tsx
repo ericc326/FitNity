@@ -27,6 +27,8 @@ import {
 } from "firebase/firestore";
 import { db, auth } from "../../../../../firebaseConfig";
 import LoadingIndicator from "../../../../components/LoadingIndicator";
+import { getDisplayTime } from "../../../../utils/dateUtils";
+import UserAvatar from "../../../../components/UserAvatar";
 import { KeyboardAwareScrollView } from "react-native-keyboard-aware-scroll-view";
 
 type Props = NativeStackScreenProps<FeedStackParamList, "PostDetails">;
@@ -37,6 +39,7 @@ type CommentType = {
   userName: string;
   text: string;
   createdAt: string;
+  editedAt?: string;
 };
 
 type LikeState = {
@@ -46,8 +49,8 @@ type LikeState = {
 
 const PostDetailsScreen = ({ route, navigation }: Props) => {
   const { post, likeState: initialLikeState } = route.params;
-  const [comment, setComment] = useState("");
-  const [comments, setComments] = useState<CommentType[]>([]);
+  const [comment, setComment] = useState(""); //for add new comment currently typing
+  const [comments, setComments] = useState<CommentType[]>([]); //for listing comments from db
   const [likeState, setLikeState] = useState<LikeState>({
     isLiked: initialLikeState?.isLiked || false,
     count: initialLikeState?.count || post.likes || 0,
@@ -55,6 +58,9 @@ const PostDetailsScreen = ({ route, navigation }: Props) => {
   const [loading, setLoading] = useState(true); //for comments loading
   const [imageLoading, setImageLoading] = useState(true); // for post image loading
   const [refreshing, setRefreshing] = useState(false); // for pull-to-refresh
+
+  const [editingCommentId, setEditingCommentId] = useState<string | null>(null);
+  const [editText, setEditText] = useState("");
 
   useEffect(() => {
     fetchComments();
@@ -141,6 +147,44 @@ const PostDetailsScreen = ({ route, navigation }: Props) => {
     }
   };
 
+  const startEditing = (comment: CommentType) => {
+    setEditingCommentId(comment.id);
+    setEditText(comment.text);
+  };
+
+  const cancelEditing = () => {
+    setEditingCommentId(null);
+    setEditText("");
+  };
+
+  const handleUpdateComment = async () => {
+    if (!editingCommentId || !editText.trim() || !auth.currentUser) return;
+
+    try {
+      const commentRef = doc(
+        db,
+        `posts/${post.id}/comments/${editingCommentId}`
+      );
+
+      await updateDoc(commentRef, {
+        text: editText.trim(),
+        editedAt: new Date().toISOString(),
+      });
+
+      // Reset editing state
+      setEditingCommentId(null);
+      setEditText("");
+
+      // Refresh comments to show changes
+      fetchComments();
+
+      Alert.alert("Success", "Comment updated successfully");
+    } catch (error) {
+      console.error("Error updating comment:", error);
+      Alert.alert("Error", "Failed to update comment. Please try again.");
+    }
+  };
+
   const handleDeleteComment = async (commentId: string) => {
     if (!auth.currentUser) return;
 
@@ -200,17 +244,6 @@ const PostDetailsScreen = ({ route, navigation }: Props) => {
     }
   };
 
-  const getTimeAgo = (dateString: string) => {
-    const date = new Date(dateString);
-    const now = new Date();
-    const diffInSeconds = Math.floor((now.getTime() - date.getTime()) / 1000);
-
-    if (diffInSeconds < 60) return `${diffInSeconds}s`;
-    if (diffInSeconds < 3600) return `${Math.floor(diffInSeconds / 60)}m`;
-    if (diffInSeconds < 86400) return `${Math.floor(diffInSeconds / 3600)}h`;
-    return `${Math.floor(diffInSeconds / 86400)}d`;
-  };
-
   return (
     <View style={styles.container}>
       <KeyboardAwareScrollView
@@ -227,25 +260,29 @@ const PostDetailsScreen = ({ route, navigation }: Props) => {
           />
         }
       >
-        {/* Post Header */}
-        <View style={styles.header}>
-          <TouchableOpacity
-            style={styles.backButton}
-            onPress={() => navigation.goBack()}
-          >
-            <MaterialCommunityIcons name="arrow-left" size={24} color="#fff" />
-          </TouchableOpacity>
-        </View>
-
         {/* Post Content */}
         <View style={styles.postContainer}>
           <View style={styles.userInfo}>
-            <View style={styles.avatar}>
-              <MaterialCommunityIcons name="account" size={24} color="#fff" />
-            </View>
+            <TouchableOpacity
+              style={styles.inlineBackButton}
+              onPress={() => navigation.goBack()}
+            >
+              <MaterialCommunityIcons
+                name="arrow-left"
+                size={24}
+                color="#fff"
+              />
+            </TouchableOpacity>
+            <UserAvatar
+              userId={post.userId}
+              size={40}
+              style={{ marginRight: 12 }}
+            />
             <View>
               <Text style={styles.userName}>{post.userName}</Text>
-              <Text style={styles.timeAgo}>{getTimeAgo(post.createdAt)}</Text>
+              <Text style={styles.timeAgo}>
+                {getDisplayTime(post.createdAt, post.editedAt)}
+              </Text>
             </View>
           </View>
 
@@ -316,33 +353,79 @@ const PostDetailsScreen = ({ route, navigation }: Props) => {
                     color="#fff"
                   />
                 </View>
+
                 <View style={styles.commentContent}>
-                  <View
-                    style={{
-                      flexDirection: "row",
-                      justifyContent: "space-between",
-                      alignItems: "center",
-                    }}
-                  >
+                  {/* Header: Name + Edit/Delete Buttons */}
+                  <View style={styles.commentHeader}>
                     <Text style={styles.commentUserName}>
                       {comment.userName}
                     </Text>
+
+                    {/* Only show actions if current user owns the comment */}
                     {comment.userId === auth.currentUser?.uid && (
-                      <TouchableOpacity
-                        onPress={() => handleDeleteComment(comment.id)}
-                      >
-                        <MaterialCommunityIcons
-                          name="delete"
-                          size={18}
-                          color="#e74c3c"
-                        />
-                      </TouchableOpacity>
+                      <View style={styles.commentActions}>
+                        {/* Show Edit/Delete buttons ONLY if not currently editing this specific comment */}
+                        {editingCommentId !== comment.id && (
+                          <>
+                            <TouchableOpacity
+                              onPress={() => startEditing(comment)}
+                              style={styles.actionButton}
+                            >
+                              <MaterialCommunityIcons
+                                name="pencil"
+                                size={18}
+                                color="#4a90e2"
+                              />
+                            </TouchableOpacity>
+                            <TouchableOpacity
+                              onPress={() => handleDeleteComment(comment.id)}
+                              style={styles.actionButton}
+                            >
+                              <MaterialCommunityIcons
+                                name="delete"
+                                size={18}
+                                color="#e74c3c"
+                              />
+                            </TouchableOpacity>
+                          </>
+                        )}
+                      </View>
                     )}
                   </View>
-                  <Text style={styles.commentText}>{comment.text}</Text>
-                  <Text style={styles.commentTime}>
-                    {getTimeAgo(comment.createdAt)}
-                  </Text>
+
+                  {/* Content: Edit Input OR Display Text */}
+                  {editingCommentId === comment.id ? (
+                    <View style={styles.editContainer}>
+                      <TextInput
+                        style={styles.editInput}
+                        value={editText}
+                        onChangeText={setEditText}
+                        multiline
+                        autoFocus
+                      />
+                      <View style={styles.editButtons}>
+                        <TouchableOpacity
+                          onPress={cancelEditing}
+                          style={styles.cancelButton}
+                        >
+                          <Text style={styles.buttonText}>Cancel</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                          onPress={handleUpdateComment}
+                          style={styles.saveButton}
+                        >
+                          <Text style={styles.buttonText}>Save</Text>
+                        </TouchableOpacity>
+                      </View>
+                    </View>
+                  ) : (
+                    <>
+                      <Text style={styles.commentText}>{comment.text}</Text>
+                      <Text style={styles.commentTime}>
+                        {getDisplayTime(comment.createdAt, comment.editedAt)}
+                      </Text>
+                    </>
+                  )}
                 </View>
               </View>
             ))
@@ -384,17 +467,9 @@ const styles = StyleSheet.create({
   scrollView: {
     flex: 1,
   },
-  header: {
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: "rgba(255,255,255,0.1)",
-  },
-  backButton: {
-    width: 40,
-    height: 40,
-    justifyContent: "center",
-    alignItems: "center",
+  inlineBackButton: {
+    marginRight: 12,
+    padding: 4,
   },
   postContainer: {
     padding: 16,
@@ -403,15 +478,6 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     marginBottom: 12,
-  },
-  avatar: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: "#3d3654",
-    justifyContent: "center",
-    alignItems: "center",
-    marginRight: 12,
   },
   userName: {
     color: "#fff",
@@ -492,6 +558,54 @@ const styles = StyleSheet.create({
     color: "#8a84a5",
     fontSize: 12,
     marginTop: 4,
+  },
+  commentHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 4,
+  },
+  commentActions: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  actionButton: {
+    marginLeft: 12, // Space between edit and delete icons
+  },
+  editContainer: {
+    marginTop: 8,
+  },
+  editInput: {
+    backgroundColor: "#262135",
+    color: "#fff",
+    borderRadius: 8,
+    padding: 8,
+    fontSize: 14,
+    minHeight: 60,
+    textAlignVertical: "top",
+  },
+  editButtons: {
+    flexDirection: "row",
+    justifyContent: "flex-end",
+    marginTop: 8,
+    gap: 8,
+  },
+  saveButton: {
+    backgroundColor: "#6c5ce7",
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 12,
+  },
+  cancelButton: {
+    backgroundColor: "#4a4a4a",
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 12,
+  },
+  buttonText: {
+    color: "#fff",
+    fontSize: 12,
+    fontWeight: "600",
   },
   commentInputContainer: {
     flexDirection: "row",

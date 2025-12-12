@@ -31,6 +31,7 @@ import {
 } from "firebase/auth";
 import { useNavigation, CommonActions } from "@react-navigation/native";
 import LoadingIndicator from "../../../components/LoadingIndicator";
+import UserAvatar from "../../../components/UserAvatar";
 
 interface PasswordPromptProps {
   isVisible: boolean;
@@ -174,6 +175,8 @@ const EditProfileScreen = () => {
   const [showReAuthModal, setShowReAuthModal] = useState(false);
   const [reAuthPayload, setReAuthPayload] = useState<any>(null);
 
+  const initialPhotoRef = React.useRef<string | null>(null);
+
   const finalizeSave = async (
     currentUser: any,
     userName: string,
@@ -201,9 +204,10 @@ const EditProfileScreen = () => {
 
     // Try to delete previous image (best-effort)
     try {
-      if (previousPhotoUrl && previousPhotoUrl !== photoURL) {
+      if (previousPhotoUrl && photoURL !== previousPhotoUrl) {
         const prevPath = parsePath(previousPhotoUrl);
-        if (prevPath) {
+        const newPath = parsePath(photoURL);
+        if (prevPath && prevPath !== newPath) {
           await deleteObject(ref(storage, prevPath));
           console.log("Deleted previous profile image:", prevPath);
         }
@@ -239,15 +243,22 @@ const EditProfileScreen = () => {
             setUserName(data.name || u.displayName || "");
 
             // Checking strictly for null to handle removal correctly
-            if (data.photoURL === null) {
-              setPhotoUri(null);
-            } else {
-              setPhotoUri(data.photoURL || u.photoURL || null);
+            let currentUrl = null;
+            if (data.photoURL !== null) {
+              currentUrl = data.photoURL || u.photoURL || null;
+            }
+            setPhotoUri(currentUrl);
+
+            if (!initialPhotoRef.current) {
+              initialPhotoRef.current = currentUrl;
             }
           } else {
             // Fallback if no Firestore doc exists yet
             setUserName(u.displayName || "");
             setPhotoUri(u.photoURL || null);
+
+            if (!initialPhotoRef.current)
+              initialPhotoRef.current = u.photoURL || null;
           }
         } catch (e) {
           console.error("Failed to load user from Firestore", e);
@@ -454,7 +465,7 @@ const EditProfileScreen = () => {
     let emailChangeHandled = false;
 
     try {
-      const previousPhotoUrl = currentUser.photoURL ?? null;
+      const previousPhotoUrl = initialPhotoRef.current;
       let photoURL = previousPhotoUrl;
       // User selected a NEW photo
       if (photoUri && photoUri !== currentUser.photoURL) {
@@ -573,14 +584,7 @@ const EditProfileScreen = () => {
     <SafeAreaView style={styles.container}>
       <View style={styles.content}>
         <View style={styles.imageContainer}>
-          <Image
-            source={
-              photoUri
-                ? { uri: photoUri }
-                : require("../../../assets/profile.png")
-            }
-            style={styles.profileImage}
-          />
+          <UserAvatar uri={photoUri} size={120} />
           <TouchableOpacity
             style={styles.changeImageButton}
             onPress={onChangeImagePress}
@@ -651,12 +655,6 @@ const styles = StyleSheet.create({
   imageContainer: {
     alignItems: "center",
     marginBottom: 30,
-  },
-  profileImage: {
-    width: 120,
-    height: 120,
-    borderRadius: 60,
-    backgroundColor: "#222",
   },
   changeImageButton: {
     position: "absolute",

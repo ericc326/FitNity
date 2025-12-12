@@ -33,6 +33,7 @@ import {
 } from "firebase/firestore";
 import moment from "moment";
 import LoadingIndicator from "../../../components/LoadingIndicator";
+import UserAvatar from "../../../components/UserAvatar";
 
 type HomeScreenNavigationProp = CompositeNavigationProp<
   BottomTabNavigationProp<HomeTabParamList, "Home">,
@@ -313,14 +314,7 @@ const HomeScreen: React.FC = () => {
           </View>
 
           <TouchableOpacity onPress={goToProfile}>
-            <Image
-              source={
-                profileImage
-                  ? { uri: profileImage }
-                  : require("../../../assets/profile.png")
-              }
-              style={styles.profilePic}
-            />
+            <UserAvatar uri={profileImage} size={100} />
           </TouchableOpacity>
         </View>
 
@@ -502,14 +496,21 @@ const HomeScreen: React.FC = () => {
 };
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#262135" },
+  container: {
+    flex: 1,
+    backgroundColor: "#262135",
+  },
   header: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
   },
-
-  hiText: { color: "#fff", fontSize: 36, fontWeight: "bold", paddingLeft: 10 },
+  hiText: {
+    color: "#fff",
+    fontSize: 36,
+    fontWeight: "bold",
+    paddingLeft: 10,
+  },
   nameText: {
     color: "#fff",
     fontSize: 36,
@@ -517,7 +518,12 @@ const styles = StyleSheet.create({
     paddingLeft: 10,
   },
 
-  badgeRow: { flexDirection: "row", marginTop: 8, gap: 6, marginBottom: 20 },
+  badgeRow: {
+    flexDirection: "row",
+    marginTop: 8,
+    gap: 6,
+    marginBottom: 20,
+  },
   badge: {
     backgroundColor: "#fff",
     paddingHorizontal: 10,
@@ -525,11 +531,13 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     fontSize: 12,
   },
-  trainingBadge: { backgroundColor: "#f55" },
-  communityBadge: { backgroundColor: "#4a90e2", color: "#fff" },
-
-  profilePic: { width: 100, height: 100, borderRadius: 50 },
-
+  trainingBadge: {
+    backgroundColor: "#f55",
+  },
+  communityBadge: {
+    backgroundColor: "#4a90e2",
+    color: "#fff",
+  },
   statisticsHeader: {
     flexDirection: "row",
     justifyContent: "space-between",
@@ -542,8 +550,10 @@ const styles = StyleSheet.create({
     fontWeight: "bold",
     marginBottom: 10,
   },
-  statisticsContent: { flexDirection: "row", justifyContent: "space-between" },
-
+  statisticsContent: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+  },
   viewButton: {
     flexDirection: "row",
     alignItems: "center",
@@ -552,8 +562,11 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
     borderRadius: 20,
   },
-  viewButtonText: { color: "#fff", fontSize: 14, fontWeight: "500" },
-
+  viewButtonText: {
+    color: "#fff",
+    fontSize: 14,
+    fontWeight: "500",
+  },
   bmiBox: {
     backgroundColor: "#5a6df0",
     flex: 1,
@@ -568,12 +581,24 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     marginLeft: 10,
   },
-
-  statLabel: { color: "#fff", fontSize: 12 },
-  statValue: { color: "#fff", fontSize: 22, fontWeight: "bold" },
-  statDesc: { color: "#fff", fontSize: 12, marginTop: 4 },
-
-  scheduleSection: { marginTop: 20, marginBottom: 20 },
+  statLabel: {
+    color: "#fff",
+    fontSize: 12,
+  },
+  statValue: {
+    color: "#fff",
+    fontSize: 22,
+    fontWeight: "bold",
+  },
+  statDesc: {
+    color: "#fff",
+    fontSize: 12,
+    marginTop: 4,
+  },
+  scheduleSection: {
+    marginTop: 20,
+    marginBottom: 20,
+  },
   scheduleSectionHeader: {
     flexDirection: "row",
     justifyContent: "space-between",
@@ -581,10 +606,14 @@ const styles = StyleSheet.create({
     marginBottom: 15,
     paddingHorizontal: 4,
   },
-  scheduleSectionTitle: { color: "#fff", fontSize: 16, fontWeight: "bold" },
-
-  tasksScrollContainer: { paddingHorizontal: 4 },
-
+  scheduleSectionTitle: {
+    color: "#fff",
+    fontSize: 16,
+    fontWeight: "bold",
+  },
+  tasksScrollContainer: {
+    paddingHorizontal: 4,
+  },
   taskCard: {
     flexDirection: "row",
     backgroundColor: "#3C3952",
@@ -593,10 +622,13 @@ const styles = StyleSheet.create({
     marginRight: 12,
     width: 280,
   },
-
-  taskTimeColumn: { marginRight: 12 },
-  taskTime: { color: "#8a84a5", fontSize: 14 },
-
+  taskTimeColumn: {
+    marginRight: 12,
+  },
+  taskTime: {
+    color: "#8a84a5",
+    fontSize: 14,
+  },
   taskContent: { flex: 1 },
   taskHeader: {
     flexDirection: "row",
@@ -604,11 +636,21 @@ const styles = StyleSheet.create({
     alignItems: "center",
     marginBottom: 4,
   },
-
-  taskTitleContainer: { flexDirection: "row", alignItems: "center" },
-  taskTitle: { color: "#fff", fontSize: 16, fontWeight: "500", marginLeft: 8 },
-  taskDuration: { color: "#8a84a5", fontSize: 14, marginTop: 4 },
-
+  taskTitleContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  taskTitle: {
+    color: "#fff",
+    fontSize: 16,
+    fontWeight: "500",
+    marginLeft: 8,
+  },
+  taskDuration: {
+    color: "#8a84a5",
+    fontSize: 14,
+    marginTop: 4,
+  },
   createWorkoutBtn: {
     backgroundColor: "#fff",
     paddingVertical: 12,
@@ -616,8 +658,9 @@ const styles = StyleSheet.create({
     marginTop: 20,
     alignItems: "center",
   },
-  createWorkoutText: { fontWeight: "bold" },
-
+  createWorkoutText: {
+    fontWeight: "bold",
+  },
   sectionTitle: {
     color: "#fff",
     fontSize: 16,
@@ -625,7 +668,6 @@ const styles = StyleSheet.create({
     marginTop: 30,
     marginBottom: 10,
   },
-
   workoutCard: {
     flexDirection: "row",
     backgroundColor: "#333",
@@ -633,14 +675,24 @@ const styles = StyleSheet.create({
     overflow: "hidden",
     marginBottom: 10,
   },
-
-  workoutImage: { width: 100, height: 100 },
-
-  workoutInfo: { flex: 1, padding: 10, justifyContent: "space-between" },
-
-  workoutTitle: { color: "#fff", fontSize: 16, fontWeight: "bold" },
-  workoutMeta: { color: "#ccc", fontSize: 12 },
-
+  workoutImage: {
+    width: 100,
+    height: 100,
+  },
+  workoutInfo: {
+    flex: 1,
+    padding: 10,
+    justifyContent: "space-between",
+  },
+  workoutTitle: {
+    color: "#fff",
+    fontSize: 16,
+    fontWeight: "bold",
+  },
+  workoutMeta: {
+    color: "#ccc",
+    fontSize: 12,
+  },
   startBtn: {
     backgroundColor: "#f57c00",
     paddingHorizontal: 10,
@@ -648,8 +700,10 @@ const styles = StyleSheet.create({
     borderRadius: 6,
     alignSelf: "flex-start",
   },
-  startBtnText: { color: "#fff", fontWeight: "bold" },
-
+  startBtnText: {
+    color: "#fff",
+    fontWeight: "bold",
+  },
   chatButton: {
     position: "absolute",
     bottom: 10,

@@ -28,6 +28,8 @@ import {
 import { ref as storageRef, deleteObject } from "firebase/storage";
 import { db, auth, storage } from "../../../../../firebaseConfig";
 import LoadingIndicator from "../../../../components/LoadingIndicator";
+import { getDisplayTime } from "../../../../utils/dateUtils";
+import UserAvatar from "../../../../components/UserAvatar";
 
 type FeedTabNavigationProp = NativeStackNavigationProp<
   FeedStackParamList,
@@ -41,6 +43,7 @@ type PostType = {
   text: string;
   imageUrl?: string;
   createdAt: string;
+  editedAt?: string;
   likes: number;
   comments: number;
 };
@@ -130,17 +133,6 @@ const FeedTab = () => {
   const onRefresh = () => {
     setRefreshing(true);
     fetchPosts();
-  };
-
-  const getTimeAgo = (dateString: string) => {
-    const date = new Date(dateString);
-    const now = new Date();
-    const diffInSeconds = Math.floor((now.getTime() - date.getTime()) / 1000);
-
-    if (diffInSeconds < 60) return `${diffInSeconds}s`;
-    if (diffInSeconds < 3600) return `${Math.floor(diffInSeconds / 60)}m`;
-    if (diffInSeconds < 86400) return `${Math.floor(diffInSeconds / 3600)}h`;
-    return `${Math.floor(diffInSeconds / 86400)}d`;
   };
 
   const handleMorePress = (post: PostType) => {
@@ -289,12 +281,16 @@ const FeedTab = () => {
       {/* Header Section */}
       <View style={styles.postHeader}>
         <View style={styles.userInfo}>
-          <View style={styles.avatar}>
-            <MaterialCommunityIcons name="account" size={24} color="#fff" />
-          </View>
+          <UserAvatar
+            userId={post.userId}
+            size={40}
+            style={{ marginRight: 12 }}
+          />
           <View>
             <Text style={styles.userName}>{post.userName}</Text>
-            <Text style={styles.timeAgo}>{getTimeAgo(post.createdAt)}</Text>
+            <Text style={styles.timeAgo}>
+              {getDisplayTime(post.createdAt, post.editedAt)}
+            </Text>
           </View>
         </View>
         <View style={styles.headerButtons}>
@@ -426,15 +422,6 @@ const styles = StyleSheet.create({
   },
   userInfo: {
     flexDirection: "row",
-    alignItems: "center",
-  },
-  avatar: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    marginRight: 12,
-    backgroundColor: "#3d3654",
-    justifyContent: "center",
     alignItems: "center",
   },
   userName: {
