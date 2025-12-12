@@ -23,14 +23,14 @@ const RecommendationWorkoutScreen: React.FC<Props> = ({
 }) => {
   const { workout, level } = route.params;
   const exerciseList = workout.exercises || [];
-
-  // Calculate estimated total duration
   const totalDuration = parseInt(workout.duration) || 30;
 
   return (
-    <SafeAreaView style={styles.safeContainer}>
+    <SafeAreaView
+      style={styles.safeContainer}
+      edges={["top", "bottom", "left", "right"]}
+    >
       <View style={styles.container}>
-        {/* Header Image / Title Area */}
         <View style={styles.headerContainer}>
           <Image
             source={{
@@ -39,11 +39,12 @@ const RecommendationWorkoutScreen: React.FC<Props> = ({
                 "https://images.unsplash.com/photo-1517836357463-d25dfeac3438?auto=format&fit=crop&w=1350&q=80",
             }}
             style={styles.headerImage}
+            resizeMode="contain"
           />
-          <View style={styles.headerOverlay}>
+          <View style={[styles.headerOverlay]}>
             <TouchableOpacity
               style={styles.backButton}
-              onPress={() => navigation.goBack()}
+              onPress={() => navigation.getParent()?.navigate("Home")}
             >
               <MaterialCommunityIcons
                 name="arrow-left"
@@ -61,10 +62,9 @@ const RecommendationWorkoutScreen: React.FC<Props> = ({
           </View>
         </View>
 
-        {/* Exercise List */}
         <ScrollView
           style={styles.contentContainer}
-          contentContainerStyle={{ paddingBottom: 40 }} // Reduced padding since button is gone
+          contentContainerStyle={{ paddingBottom: 40 }}
           showsVerticalScrollIndicator={false}
         >
           <Text style={styles.sectionTitle}>Exercises</Text>
@@ -112,14 +112,13 @@ const styles = StyleSheet.create({
   headerImage: {
     width: "100%",
     height: "100%",
-    resizeMode: "cover",
   },
   headerOverlay: {
     ...StyleSheet.absoluteFillObject,
     backgroundColor: "rgba(0,0,0,0.4)",
     justifyContent: "space-between",
     padding: 20,
-    paddingTop: 50,
+    alignItems: "flex-start",
   },
   backButton: {
     width: 40,
