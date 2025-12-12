@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import {
   View,
   Text,
@@ -7,6 +7,8 @@ import {
   TouchableOpacity,
   Alert,
   Image,
+  Modal,
+  Pressable,
 } from "react-native";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { NativeStackScreenProps } from "@react-navigation/native-stack";
@@ -26,7 +28,14 @@ import LoadingIndicator from "../../../../components/LoadingIndicator";
 type Props = NativeStackScreenProps<ChallengesStackParamList, "EditChallenge">;
 
 const EditChallengeScreen = ({ route, navigation }: Props) => {
-  const { challenge } = route.params;
+  const passedChallenge = route.params?.challenge;
+  const challengeRef = useRef(passedChallenge);
+
+  if (passedChallenge) {
+    challengeRef.current = passedChallenge;
+  }
+
+  const challenge = challengeRef.current;
 
   const [title, setTitle] = useState(challenge.title);
   const [description, setDescription] = useState(challenge.description);
@@ -36,6 +45,37 @@ const EditChallengeScreen = ({ route, navigation }: Props) => {
   );
   const [imageLoading, setImageLoading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+
+  // Workout Fields (only used if challenge.type === 'workout')
+  const isWorkoutType = challenge.type === "workout";
+  const [selectedWorkout, setSelectedWorkout] = useState<string | null>(
+    challenge.workoutName || null
+  );
+  const [selectedWorkoutId, setSelectedWorkoutId] = useState<string | null>(
+    challenge.workoutId || null
+  );
+
+  const [showCustomModal, setShowCustomModal] = useState(false);
+  const [customSets, setCustomSets] = useState<number | null>(
+    challenge.customSets || null
+  );
+  const [customReps, setCustomReps] = useState<number | null>(
+    challenge.customReps || null
+  );
+  const [customRestSec, setCustomRestSec] = useState<number | null>(
+    challenge.customRestSeconds || null
+  );
+  const [customLabel, setCustomLabel] = useState<string | null>(
+    challenge.customLabel || null
+  );
+
+  useEffect(() => {
+    const params = route.params as any;
+    if (params?.selectedExercise) {
+      setSelectedWorkout(params.selectedExercise);
+      setSelectedWorkoutId(params.selectedExerciseId);
+    }
+  }, [route.params]);
 
   const uploadImage = async (uri: string) => {
     const response = await fetch(uri);
@@ -88,6 +128,11 @@ const EditChallengeScreen = ({ route, navigation }: Props) => {
       return;
     }
 
+    if (isWorkoutType && (!selectedWorkoutId || !customSets || !customReps)) {
+      Alert.alert("Error", "Please complete all workout details");
+      return;
+    }
+
     setIsSaving(true);
     try {
       let imageUrl = challenge.imageUrl; // default to old image
@@ -134,13 +179,24 @@ const EditChallengeScreen = ({ route, navigation }: Props) => {
       }
 
       // Update the challenge document
-      await updateDoc(doc(db, "challenges", challenge.id), {
+      const updateData: any = {
         title,
         description,
         duration: parseInt(duration),
         imageUrl,
         updatedAt: serverTimestamp(),
-      });
+      };
+
+      if (isWorkoutType) {
+        updateData.workoutName = selectedWorkout;
+        updateData.workoutId = selectedWorkoutId;
+        updateData.customSets = customSets;
+        updateData.customReps = customReps;
+        updateData.customRestSeconds = customRestSec;
+        updateData.customLabel = customLabel;
+      }
+
+      await updateDoc(doc(db, "challenges", challenge.id), updateData);
 
       Alert.alert("Success", "Challenge updated successfully!", [
         { text: "OK", onPress: () => navigation.goBack() },
@@ -176,6 +232,7 @@ const EditChallengeScreen = ({ route, navigation }: Props) => {
       </View>
 
       <View style={styles.content}>
+        <Text style={styles.label}>Title</Text>
         <TextInput
           style={styles.input}
           placeholder="Challenge Title"
@@ -183,7 +240,7 @@ const EditChallengeScreen = ({ route, navigation }: Props) => {
           value={title}
           onChangeText={setTitle}
         />
-
+        <Text style={styles.label}>Title</Text>
         <TextInput
           style={[styles.input, styles.textArea]}
           placeholder="Challenge Description"
@@ -193,7 +250,7 @@ const EditChallengeScreen = ({ route, navigation }: Props) => {
           multiline
           numberOfLines={4}
         />
-
+        <Text style={styles.label}>Duration</Text>
         <TextInput
           style={styles.input}
           placeholder="Duration (in days)"
@@ -202,7 +259,7 @@ const EditChallengeScreen = ({ route, navigation }: Props) => {
           onChangeText={setDuration}
           keyboardType="numeric"
         />
-
+        {/* Image Handling */}
         {selectedImage && (
           <View style={{ position: "relative" }}>
             <Image
@@ -227,7 +284,6 @@ const EditChallengeScreen = ({ route, navigation }: Props) => {
             </TouchableOpacity>
           </View>
         )}
-
         <TouchableOpacity
           style={styles.photoButton}
           onPress={() => handleImage(false)}
@@ -243,6 +299,40 @@ const EditChallengeScreen = ({ route, navigation }: Props) => {
           <MaterialCommunityIcons name="camera" size={28} color="#6c5ce7" />
           <Text style={styles.photoButtonText}>Change Photo (Camera)</Text>
         </TouchableOpacity>
+
+        {/* WORKOUT FIELDS (Only show if type was workout) */}
+        {isWorkoutType && (
+          <View style={styles.workoutSection}>
+            <Text style={styles.sectionHeader}>Workout Details</Text>
+            <TouchableOpacity
+              style={styles.workoutDetailButton}
+              onPress={() => {
+                navigation.getParent()?.navigate("Workout", {
+                  screen: "SelectExercise",
+                  params: {
+                    returnToEditChallenge: true,
+                    challengeId: challenge.id,
+                  },
+                });
+              }}
+            >
+              <Text style={styles.workoutDetailButtonText}>
+                {selectedWorkout}
+              </Text>
+              <MaterialCommunityIcons name="pencil" size={20} color="#bdbdbd" />
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.workoutDetailButton}
+              onPress={() => setShowCustomModal(true)}
+            >
+              <Text style={styles.workoutDetailButtonText}>
+                {customLabel || "Set Reps"}
+              </Text>
+              <MaterialCommunityIcons name="pencil" size={20} color="#bdbdbd" />
+            </TouchableOpacity>
+          </View>
+        )}
 
         <TouchableOpacity
           style={[
@@ -266,6 +356,60 @@ const EditChallengeScreen = ({ route, navigation }: Props) => {
           )}
         </TouchableOpacity>
       </View>
+      {/* REPS MODAL */}
+      <Modal visible={showCustomModal} transparent animationType="fade">
+        <View style={styles.modalContainer}>
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>Update Workout Goals</Text>
+
+            <View style={styles.modalRow}>
+              <Text style={{ color: "#fff" }}>Sets</Text>
+              <TextInput
+                style={styles.numberInput}
+                value={customSets?.toString()}
+                onChangeText={(t) => setCustomSets(Number(t))}
+                keyboardType="numeric"
+              />
+            </View>
+            <View style={styles.modalRow}>
+              <Text style={{ color: "#fff" }}>Reps</Text>
+              <TextInput
+                style={styles.numberInput}
+                value={customReps?.toString()}
+                onChangeText={(t) => setCustomReps(Number(t))}
+                keyboardType="numeric"
+              />
+            </View>
+            <View style={styles.modalRow}>
+              <Text style={{ color: "#fff" }}>Rest (s)</Text>
+              <TextInput
+                style={styles.numberInput}
+                value={customRestSec?.toString()}
+                onChangeText={(t) => setCustomRestSec(Number(t))}
+                keyboardType="numeric"
+              />
+            </View>
+
+            <View style={styles.modalButtons}>
+              <Pressable
+                style={styles.modalButton}
+                onPress={() => setShowCustomModal(false)}
+              >
+                <Text style={{ color: "#fff" }}>Cancel</Text>
+              </Pressable>
+              <Pressable
+                style={[styles.modalButton, { backgroundColor: "#4a90e2" }]}
+                onPress={() => {
+                  setCustomLabel(`${customSets} Sets × ${customReps} Reps`);
+                  setShowCustomModal(false);
+                }}
+              >
+                <Text style={{ color: "#fff" }}>Save</Text>
+              </Pressable>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </KeyboardAwareScrollView>
   );
 };
@@ -292,6 +436,12 @@ const styles = StyleSheet.create({
     color: "#fff",
     fontSize: 18,
     fontWeight: "600",
+  },
+  label: {
+    color: "#aaa",
+    marginBottom: 6,
+    fontSize: 14,
+    marginLeft: 4,
   },
   input: {
     backgroundColor: "#332c4a",
@@ -349,6 +499,71 @@ const styles = StyleSheet.create({
   },
   updateButtonTextDisabled: {
     color: "#aaa",
+  },
+  workoutSection: {
+    marginTop: 10,
+    marginBottom: 20,
+  },
+  sectionHeader: {
+    color: "#fff",
+    fontSize: 16,
+    fontWeight: "bold",
+    marginBottom: 12,
+  },
+  workoutDetailButton: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    backgroundColor: "#333",
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 12,
+  },
+  workoutDetailButtonText: {
+    color: "#fff",
+    fontSize: 15,
+  },
+  modalContainer: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.6)",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  modalContent: {
+    width: "80%",
+    backgroundColor: "#2b2435",
+    padding: 20,
+    borderRadius: 12,
+  },
+  modalTitle: {
+    color: "#fff",
+    fontSize: 18,
+    fontWeight: "bold",
+    marginBottom: 16,
+  },
+  modalRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 12,
+  },
+  numberInput: {
+    backgroundColor: "#444",
+    color: "#fff",
+    width: 60,
+    padding: 8,
+    borderRadius: 6,
+    textAlign: "center",
+  },
+  modalButtons: {
+    flexDirection: "row",
+    justifyContent: "flex-end",
+    marginTop: 16,
+  },
+  modalButton: {
+    padding: 10,
+    marginLeft: 10,
+    borderRadius: 6,
   },
 });
 
