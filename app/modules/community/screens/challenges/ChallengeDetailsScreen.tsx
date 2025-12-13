@@ -44,6 +44,12 @@ interface Participant {
   joinedAt: any;
 }
 
+const Tag = ({ text }: { text: string }) => (
+  <View style={styles.tag}>
+    <Text style={styles.tagText}>{text}</Text>
+  </View>
+);
+
 const WorkoutSessionModal = ({
   visible,
   onClose,
@@ -248,6 +254,8 @@ const ChallengeDetailsScreen = ({ route, navigation }: Props) => {
   const [participants, setParticipants] = useState<Participant[]>([]);
   const [loadingParticipants, setLoadingParticipants] = useState(true);
 
+  const [exerciseDetails, setExerciseDetails] = useState<any>(null);
+
   // Modals state
   const [showProgressModal, setShowProgressModal] = useState(false);
   const [showSessionModal, setShowSessionModal] = useState(false);
@@ -267,6 +275,7 @@ const ChallengeDetailsScreen = ({ route, navigation }: Props) => {
     await Promise.all([
       fetchCreatorName(latestChallenge),
       fetchParticipants(latestChallenge),
+      fetchExerciseDetails(latestChallenge),
     ]);
     setRefreshing(false);
   };
@@ -275,7 +284,26 @@ const ChallengeDetailsScreen = ({ route, navigation }: Props) => {
     checkIfParticipant();
     fetchCreatorName(currentChallenge);
     fetchParticipants(currentChallenge);
+    fetchExerciseDetails(currentChallenge);
   }, [currentChallenge]);
+
+  // Fetch Full Exercise Details (Instructions, Equipment, etc.)
+  const fetchExerciseDetails = async (challengeObj = currentChallenge) => {
+    if (challengeObj.type === "workout" && challengeObj.workoutId) {
+      try {
+        const exDoc = await getDoc(
+          doc(db, "exercises", challengeObj.workoutId)
+        );
+        if (exDoc.exists()) {
+          setExerciseDetails(exDoc.data());
+        }
+      } catch (error) {
+        console.error("Error fetching exercise details:", error);
+      }
+    } else {
+      setExerciseDetails(null);
+    }
+  };
 
   // Find and set the current user's progress when participants change
   useEffect(() => {
@@ -548,6 +576,22 @@ const ChallengeDetailsScreen = ({ route, navigation }: Props) => {
     }
   };
 
+  const bodyParts: string[] = exerciseDetails
+    ? (Array.isArray(exerciseDetails.bodyParts) && exerciseDetails.bodyParts) ||
+      (exerciseDetails.bodyPart ? [exerciseDetails.bodyPart] : [])
+    : [];
+
+  const equipments: string[] = exerciseDetails
+    ? (Array.isArray(exerciseDetails.equipments) &&
+        exerciseDetails.equipments) ||
+      (exerciseDetails.equipment ? [exerciseDetails.equipment] : [])
+    : [];
+
+  const steps: string[] =
+    exerciseDetails && Array.isArray(exerciseDetails.instructions)
+      ? exerciseDetails.instructions
+      : [];
+
   return (
     <View style={styles.container}>
       {/* Header */}
@@ -635,47 +679,100 @@ const ChallengeDetailsScreen = ({ route, navigation }: Props) => {
             </View>
           </View>
 
-          {/* WORKOUT CHALLENGE INFO */}
+          {/* WORKOUT INFO CARD (Sets/Reps) */}
           {currentChallenge.type === "workout" && (
-            <View style={styles.workoutInfoContainer}>
-              <Text style={styles.sectionTitle}>Daily Workout Goal</Text>
-              <View style={styles.workoutCard}>
-                <View style={styles.workoutHeader}>
-                  <MaterialCommunityIcons
-                    name="dumbbell"
-                    size={24}
-                    color="#fff"
-                  />
-                  <Text style={styles.workoutName}>
-                    {currentChallenge.workoutName}
-                  </Text>
-                </View>
-                <View style={styles.workoutStatsRow}>
-                  <View style={styles.workoutStat}>
-                    <Text style={styles.workoutStatValue}>
-                      {currentChallenge.customSets}
+            <>
+              <View style={styles.workoutInfoContainer}>
+                <Text style={styles.sectionTitle}>Daily Workout Goal</Text>
+                <View style={styles.workoutCard}>
+                  <View style={styles.workoutHeader}>
+                    <MaterialCommunityIcons
+                      name="dumbbell"
+                      size={24}
+                      color="#fff"
+                    />
+                    <Text style={styles.workoutName}>
+                      {currentChallenge.workoutName}
                     </Text>
-                    <Text style={styles.workoutStatLabel}>Sets</Text>
                   </View>
-                  <View style={styles.workoutStatDivider} />
-                  <View style={styles.workoutStat}>
-                    <Text style={styles.workoutStatValue}>
-                      {currentChallenge.customReps}
-                    </Text>
-                    <Text style={styles.workoutStatLabel}>Reps</Text>
-                  </View>
-                  <View style={styles.workoutStatDivider} />
-                  <View style={styles.workoutStat}>
-                    <Text style={styles.workoutStatValue}>
-                      {currentChallenge.customRestSeconds}s
-                    </Text>
-                    <Text style={styles.workoutStatLabel}>Rest</Text>
+                  <View style={styles.workoutStatsRow}>
+                    <View style={styles.workoutStat}>
+                      <Text style={styles.workoutStatValue}>
+                        {currentChallenge.customSets}
+                      </Text>
+                      <Text style={styles.workoutStatLabel}>Sets</Text>
+                    </View>
+                    <View style={styles.workoutStatDivider} />
+                    <View style={styles.workoutStat}>
+                      <Text style={styles.workoutStatValue}>
+                        {currentChallenge.customReps}
+                      </Text>
+                      <Text style={styles.workoutStatLabel}>Reps</Text>
+                    </View>
+                    <View style={styles.workoutStatDivider} />
+                    <View style={styles.workoutStat}>
+                      <Text style={styles.workoutStatValue}>
+                        {currentChallenge.customRestSeconds}s
+                      </Text>
+                      <Text style={styles.workoutStatLabel}>Rest</Text>
+                    </View>
                   </View>
                 </View>
               </View>
-            </View>
-          )}
 
+              {/* EXERCISE INSTRUCTIONS & DETAILS (New Section) */}
+              {exerciseDetails && (
+                <View style={styles.exerciseDetailsContainer}>
+                  <View style={styles.sectionDivider} />
+                  <Text style={styles.sectionTitle}>Exercise Guide</Text>
+
+                  {!!exerciseDetails.gifUrl && (
+                    <Image
+                      source={{ uri: exerciseDetails.gifUrl }}
+                      style={styles.gif}
+                      resizeMode="cover"
+                    />
+                  )}
+
+                  {bodyParts.length > 0 && (
+                    <>
+                      <Text style={styles.subLabel}>Body Part(s)</Text>
+                      <View style={styles.tagsContainer}>
+                        {bodyParts.map((part) => (
+                          <Tag key={part} text={part} />
+                        ))}
+                      </View>
+                    </>
+                  )}
+
+                  {equipments.length > 0 && (
+                    <>
+                      <Text style={styles.subLabel}>Equipment</Text>
+                      <View style={styles.tagsContainer}>
+                        {equipments.map((eq) => (
+                          <Tag key={eq} text={eq} />
+                        ))}
+                      </View>
+                    </>
+                  )}
+
+                  {steps.length > 0 && (
+                    <>
+                      <Text style={styles.subLabel}>Instructions</Text>
+                      <View style={{ marginTop: 6, marginBottom: 10 }}>
+                        {steps.map((s, i) => (
+                          <Text key={i} style={styles.step}>
+                            {s}
+                          </Text>
+                        ))}
+                      </View>
+                    </>
+                  )}
+                  <View style={styles.sectionDivider} />
+                </View>
+              )}
+            </>
+          )}
           {/* Participants Section */}
           <View style={styles.participantsContainer}>
             <Text style={styles.sectionTitle}>Participants</Text>
@@ -955,6 +1052,48 @@ const styles = StyleSheet.create({
     width: 1,
     height: 30,
     backgroundColor: "rgba(255,255,255,0.2)",
+  },
+  exerciseDetailsContainer: { marginTop: 10 },
+  sectionDivider: {
+    height: 1,
+    backgroundColor: "#444",
+    marginVertical: 20,
+  },
+  subLabel: {
+    color: "#ddd",
+    marginTop: 16,
+    fontWeight: "600",
+    fontSize: 16,
+  },
+  gif: {
+    width: "100%",
+    height: 220,
+    borderRadius: 12,
+    backgroundColor: "#444",
+    marginTop: 12,
+  },
+  tagsContainer: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    marginTop: 8,
+  },
+  tag: {
+    backgroundColor: "#4a90e2",
+    borderRadius: 15,
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    margin: 4,
+  },
+  tagText: {
+    color: "#fff",
+    fontWeight: "600",
+    fontSize: 13,
+  },
+  step: {
+    color: "#ddd",
+    fontSize: 15,
+    lineHeight: 22,
+    marginTop: 8,
   },
   participantsContainer: {
     padding: 16,
