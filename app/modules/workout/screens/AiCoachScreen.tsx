@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useMemo } from "react";
+import React, { useEffect, useState, useMemo, useRef } from "react";
 import {
   View,
   Text,
@@ -14,6 +14,7 @@ import LoadingIndicator from "../../../components/LoadingIndicator";
 import { useNavigation } from "@react-navigation/native";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { WorkoutStackParamList } from "../navigation/WorkoutNavigator";
+import * as Speech from "expo-speech";
 
 const API_KEY = "d2b81624-30bb-4207-92c6-9f879a365eec";
 const POSETRACKER_API = "https://app.posetracker.com/pose_tracker/tracking";
@@ -42,10 +43,17 @@ type PoseTrackerCounter = {
   current_count: number;
 };
 
+// 2. DEFINE NEW FEEDBACK TYPE
+type PoseTrackerFeedback = {
+  type: "feedback";
+  message: string;
+};
+
 type PoseTrackerData =
   | PoseTrackerInitialization
   | PoseTrackerKeypoints
-  | PoseTrackerCounter;
+  | PoseTrackerCounter
+  | PoseTrackerFeedback;
 
 export default function AiCoachScreen() {
   const navigation =
@@ -54,8 +62,12 @@ export default function AiCoachScreen() {
   const [poseReady, setPoseReady] = useState(false);
   const [keypoints, setKeypoints] = useState<PoseKeypoint[]>([]);
   const [reps, setReps] = useState(0);
+  const [feedbackMessage, setFeedbackMessage] = useState<string>(""); // 3. NEW STATE FOR TEXT FEEDBACK
   const [exercise, setExercise] = useState("squat");
   const [webLoading, setWebLoading] = useState(true);
+  const [postureMessage, setPostureMessage] = useState<string | null>(null);
+  const lastGoodRepRef = useRef(0);
+  const lastFeedbackRef = useRef(0);
 
   const exercises = ["Squat", "Push-up", "Bicep Curl", "Lunge", "Plank"];
 
@@ -86,9 +98,17 @@ export default function AiCoachScreen() {
     true;
   `;
 
+  // 4. UPDATED MESSAGE HANDLER WITH FEEDBACK LOGIC
   const handleWebViewMessage = (event: any) => {
     try {
       const data: PoseTrackerData = JSON.parse(event.nativeEvent.data);
+
+      // Clear previous feedback when a new count or initialization happens
+      if (data.type === "counter" || data.type === "initialization") {
+        setFeedbackMessage("");
+        Speech.stop();
+      }
+
       switch (data.type) {
         case "initialization":
           setPoseReady(data.ready);
@@ -96,10 +116,32 @@ export default function AiCoachScreen() {
           break;
         case "keypoints":
           setKeypoints(data.data);
+          if (exercise === "squat") {
+            checkSquatPosture(data.data);
+          } else if (exercise === "push-up") {
+            checkPushUpPosture(data.data);
+          } else if (exercise === "plank") {
+            checkPlankPosture(data.data);
+          } else if (exercise === "lunge") {
+            checkLungePosture(data.data);
+          } else if (exercise === "bicep curl") {
+            checkBicepCurlPosture(data.data);
+          }
+
           if (webLoading) setWebLoading(false);
           break;
+
         case "counter":
           setReps(data.current_count);
+          break;
+        case "feedback": // 👈 HANDLE POSTURE FEEDBACK
+          setFeedbackMessage(data.message); // Set text state
+          Speech.speak(data.message, {
+            // Speak the message
+            language: "en-US",
+            rate: 0.9, // Slightly slower speaking rate for coaching
+            pitch: 1.1, // Slightly higher pitch to stand out
+          });
           break;
         default:
           break;
@@ -110,10 +152,207 @@ export default function AiCoachScreen() {
   };
 
   const handleCancel = () => {
+    Speech.stop(); // Stop any ongoing speech when canceling
     setPoseReady(false);
     setKeypoints([]);
     setReps(0);
+    setFeedbackMessage("");
     navigation.goBack(); // navigate back to WorkoutScreen
+  };
+
+  const speakFeedback = (message: string) => {
+    Speech.stop();
+    Speech.speak(message, {
+      language: "en",
+      rate: 0.9,
+    });
+  };
+
+  const calculateAngle = (
+    a: PoseKeypoint,
+    b: PoseKeypoint,
+    c: PoseKeypoint
+  ) => {
+    const ab = { x: a.x - b.x, y: a.y - b.y };
+    const cb = { x: c.x - b.x, y: c.y - b.y };
+
+    const dot = ab.x * cb.x + ab.y * cb.y;
+    const magAB = Math.sqrt(ab.x ** 2 + ab.y ** 2);
+    const magCB = Math.sqrt(cb.x ** 2 + cb.y ** 2);
+
+    return (Math.acos(dot / (magAB * magCB)) * 180) / Math.PI;
+  };
+
+  const speakGoodRep = () => {
+    const now = Date.now();
+
+    if (now - lastGoodRepRef.current > 4000) {
+      lastGoodRepRef.current = now;
+      const message = "Good rep!";
+      setPostureMessage(message);
+      speakFeedback(message);
+    }
+  };
+
+  const checkSquatPosture = (points: PoseKeypoint[]) => {
+    const get = (n: string) =>
+      points.find((p) => p.name === n && p.score > 0.5);
+
+    const hip = get("left_hip");
+    const knee = get("left_knee");
+    const ankle = get("left_ankle");
+    const shoulder = get("left_shoulder");
+
+    if (!hip || !knee || !ankle || !shoulder) return;
+
+    const kneeAngle = calculateAngle(hip, knee, ankle);
+    const backAngle = calculateAngle(shoulder, hip, knee);
+
+    let message: string | null = null;
+
+    if (kneeAngle > 160) message = "Go deeper into the squat";
+    else if (backAngle < 150) message = "Keep your back straight";
+
+    const now = Date.now();
+    if (message && now - lastFeedbackRef.current > 3000) {
+      lastFeedbackRef.current = now;
+      setPostureMessage(message);
+      speakFeedback(message);
+    }
+
+    if (!message) {
+      speakGoodRep();
+    }
+  };
+
+  const checkPushUpPosture = (points: PoseKeypoint[]) => {
+    const get = (n: string) =>
+      points.find((p) => p.name === n && p.score > 0.5);
+
+    const shoulder = get("left_shoulder");
+    const hip = get("left_hip");
+    const ankle = get("left_ankle");
+    const elbow = get("left_elbow");
+    const wrist = get("left_wrist");
+
+    if (!shoulder || !hip || !ankle || !elbow || !wrist) return;
+
+    // Body alignment (shoulder-hip-ankle should be straight)
+    const bodyAngle = calculateAngle(shoulder, hip, ankle);
+
+    // Elbow angle (depth check)
+    const elbowAngle = calculateAngle(shoulder, elbow, wrist);
+
+    let message: string | null = null;
+
+    if (bodyAngle < 160) {
+      message = "Keep your body straight";
+    } else if (elbowAngle > 160) {
+      message = "Lower your chest closer to the ground";
+    }
+
+    const now = Date.now();
+    if (message && now - lastFeedbackRef.current > 3000) {
+      lastFeedbackRef.current = now;
+      setPostureMessage(message);
+      speakFeedback(message);
+    }
+    if (!message) {
+      speakGoodRep();
+    }
+  };
+
+  const checkPlankPosture = (points: PoseKeypoint[]) => {
+    const get = (n: string) =>
+      points.find((p) => p.name === n && p.score > 0.5);
+
+    const shoulder = get("left_shoulder");
+    const hip = get("left_hip");
+    const ankle = get("left_ankle");
+
+    if (!shoulder || !hip || !ankle) return;
+
+    const bodyAngle = calculateAngle(shoulder, hip, ankle);
+
+    let message: string | null = null;
+
+    if (bodyAngle < 165) {
+      message = "Keep your body in a straight line";
+    }
+
+    const now = Date.now();
+    if (message && now - lastFeedbackRef.current > 3000) {
+      lastFeedbackRef.current = now;
+      setPostureMessage(message);
+      speakFeedback(message);
+    }
+
+    if (!message) {
+      speakGoodRep();
+    }
+  };
+
+  const checkLungePosture = (points: PoseKeypoint[]) => {
+    const get = (n: string) =>
+      points.find((p) => p.name === n && p.score > 0.5);
+
+    const hip = get("left_hip");
+    const knee = get("left_knee");
+    const ankle = get("left_ankle");
+    const shoulder = get("left_shoulder");
+
+    if (!hip || !knee || !ankle || !shoulder) return;
+
+    const kneeAngle = calculateAngle(hip, knee, ankle);
+    const torsoAngle = calculateAngle(shoulder, hip, knee);
+
+    let message: string | null = null;
+
+    if (kneeAngle < 70) {
+      message = "Do not let your knee go too far forward";
+    } else if (torsoAngle < 150) {
+      message = "Keep your chest upright";
+    }
+
+    const now = Date.now();
+    if (message && now - lastFeedbackRef.current > 3000) {
+      lastFeedbackRef.current = now;
+      setPostureMessage(message);
+      speakFeedback(message);
+    }
+
+    if (!message) {
+      speakGoodRep();
+    }
+  };
+
+  const checkBicepCurlPosture = (points: PoseKeypoint[]) => {
+    const get = (n: string) =>
+      points.find((p) => p.name === n && p.score > 0.5);
+
+    const shoulder = get("left_shoulder");
+    const elbow = get("left_elbow");
+    const wrist = get("left_wrist");
+
+    if (!shoulder || !elbow || !wrist) return;
+
+    const elbowAngle = calculateAngle(shoulder, elbow, wrist);
+
+    let message: string | null = null;
+
+    if (elbowAngle < 40) {
+      message = "Do not swing your arm";
+    }
+
+    const now = Date.now();
+    if (message && now - lastFeedbackRef.current > 3000) {
+      lastFeedbackRef.current = now;
+      setPostureMessage(message);
+      speakFeedback(message);
+    }
+    if (!message) {
+      speakGoodRep();
+    }
   };
 
   return (
@@ -138,6 +377,8 @@ export default function AiCoachScreen() {
                 setKeypoints([]);
                 setPoseReady(false);
                 setWebLoading(true);
+                setFeedbackMessage("");
+                Speech.stop();
               }}
             >
               <Text
@@ -166,6 +407,16 @@ export default function AiCoachScreen() {
           <>
             <Text style={styles.infoText}>AI Ready ✅</Text>
             <Text style={styles.infoText}>Reps: {reps}</Text>
+            {/* 6. DISPLAY TEXT FEEDBACK */}
+            {feedbackMessage ? (
+              <Text style={[styles.infoText, styles.feedbackText]}>
+                🛑 {feedbackMessage}
+              </Text>
+            ) : (
+              <Text style={styles.infoText}>
+                {exercise.charAt(0).toUpperCase() + exercise.slice(1)} Mode
+              </Text>
+            )}
           </>
         )}
       </View>
@@ -190,6 +441,11 @@ export default function AiCoachScreen() {
           mixedContentMode="always"
           mediaCapturePermissionGrantType="grant"
         />
+        {postureMessage && (
+          <View style={styles.postureOverlay}>
+            <Text style={styles.postureText}>{postureMessage}</Text>
+          </View>
+        )}
 
         {/* Loading Indicator centered over WebView */}
         {(permissionPending || webLoading || !poseReady) && (
@@ -261,6 +517,13 @@ const styles = StyleSheet.create({
     fontWeight: "600",
     marginVertical: 2,
   },
+  // 7. NEW STYLE FOR FEEDBACK TEXT
+  feedbackText: {
+    color: "#FF4444", // Red color for warnings
+    fontWeight: "bold",
+    fontSize: 18,
+    marginVertical: 4,
+  },
   exerciseButton: {
     backgroundColor: "#333",
     paddingHorizontal: 20,
@@ -303,5 +566,20 @@ const styles = StyleSheet.create({
     color: "#fff",
     fontWeight: "bold",
     fontSize: 16,
+  },
+  postureOverlay: {
+    position: "absolute",
+    top: 120,
+    alignSelf: "center",
+    backgroundColor: "rgba(255,68,68,0.9)",
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    borderRadius: 20,
+    zIndex: 30,
+  },
+  postureText: {
+    color: "#fff",
+    fontSize: 16,
+    fontWeight: "bold",
   },
 });
