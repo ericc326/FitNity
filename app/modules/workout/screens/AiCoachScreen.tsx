@@ -3,7 +3,6 @@ import {
   View,
   Text,
   StyleSheet,
-  Dimensions,
   TouchableOpacity,
   ScrollView,
 } from "react-native";
@@ -18,7 +17,6 @@ import * as Speech from "expo-speech";
 
 const API_KEY = "d2b81624-30bb-4207-92c6-9f879a365eec";
 const POSETRACKER_API = "https://app.posetracker.com/pose_tracker/tracking";
-// const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get("window");
 
 type PoseKeypoint = {
   name: string;
@@ -378,6 +376,7 @@ export default function AiCoachScreen() {
                 setPoseReady(false);
                 setWebLoading(true);
                 setFeedbackMessage("");
+                setPostureMessage(null);
                 Speech.stop();
               }}
             >
@@ -517,7 +516,6 @@ const styles = StyleSheet.create({
     fontWeight: "600",
     marginVertical: 2,
   },
-  // 7. NEW STYLE FOR FEEDBACK TEXT
   feedbackText: {
     color: "#FF4444", // Red color for warnings
     fontWeight: "bold",
