@@ -17,6 +17,22 @@ type Props = NativeStackScreenProps<
   "RecommendationWorkout"
 >;
 
+type PlanDetails = {
+  sets: number;
+  reps: number;
+  rest: number;
+};
+
+type WorkoutPlan = {
+  [key: string]: PlanDetails;
+};
+
+const plans: WorkoutPlan = {
+  Beginner: { sets: 3, reps: 8, rest: 90 },
+  Intermediate: { sets: 4, reps: 10, rest: 60 },
+  Advanced: { sets: 5, reps: 12, rest: 45 },
+};
+
 const RecommendationWorkoutScreen: React.FC<Props> = ({
   route,
   navigation,
@@ -24,6 +40,7 @@ const RecommendationWorkoutScreen: React.FC<Props> = ({
   const { workout, level } = route.params;
   const exerciseList = workout.exercises || [];
   const totalDuration = parseInt(workout.duration) || 30;
+  const currentPlan = plans[level] || plans["Beginner"];
 
   return (
     <SafeAreaView
@@ -67,6 +84,21 @@ const RecommendationWorkoutScreen: React.FC<Props> = ({
           contentContainerStyle={{ paddingBottom: 40 }}
           showsVerticalScrollIndicator={false}
         >
+          <View style={styles.planSummaryContainer}>
+            <Text style={styles.sectionTitle}>Plan Details</Text>
+            <View style={styles.planBadgesRow}>
+              <View style={styles.badge}>
+                <Text style={styles.badgeText}>{currentPlan.sets} Sets</Text>
+              </View>
+              <View style={styles.badge}>
+                <Text style={styles.badgeText}>{currentPlan.reps} Reps</Text>
+              </View>
+              <View style={styles.badge}>
+                <Text style={styles.badgeText}>{currentPlan.rest}s Rest</Text>
+              </View>
+            </View>
+          </View>
+
           <Text style={styles.sectionTitle}>Exercises</Text>
 
           {exerciseList.map((exercise: any, index: number) => (
@@ -82,7 +114,8 @@ const RecommendationWorkoutScreen: React.FC<Props> = ({
               <View style={styles.exerciseInfo}>
                 <Text style={styles.exerciseName}>{exercise.name}</Text>
                 <Text style={styles.exerciseDetails}>
-                  {exercise.bodyPart} • 3 Sets x 10 Reps
+                  {exercise.bodyPart} • {currentPlan.sets} Sets x{" "}
+                  {currentPlan.reps} Reps
                 </Text>
               </View>
             </View>
@@ -145,6 +178,24 @@ const styles = StyleSheet.create({
   contentContainer: {
     flex: 1,
     padding: 20,
+  },
+  planSummaryContainer: {
+    marginBottom: 20,
+  },
+  planBadgesRow: {
+    flexDirection: "row",
+    gap: 10,
+  },
+  badge: {
+    backgroundColor: "#4CAF50",
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    borderRadius: 8,
+  },
+  badgeText: {
+    color: "#fff",
+    fontWeight: "bold",
+    fontSize: 12,
   },
   sectionTitle: {
     color: "#fff",

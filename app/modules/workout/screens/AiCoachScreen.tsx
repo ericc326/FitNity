@@ -378,6 +378,9 @@ export default function AiCoachScreen() {
                 setFeedbackMessage("");
                 setPostureMessage(null);
                 Speech.stop();
+
+                lastFeedbackRef.current = 0;
+                lastGoodRepRef.current = 0;
               }}
             >
               <Text
