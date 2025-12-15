@@ -167,9 +167,9 @@ const PersonalInformationScreen: React.FC = () => {
         const newRef = await addDoc(colRef, payload);
         setHealthInfoDocId(newRef.id);
       }
-      Alert.alert("Success", "Your health info has been updated.");
+      Alert.alert("Success", "Your personal info has been updated.");
     } catch {
-      Alert.alert("Error", "Failed to save health info.");
+      Alert.alert("Error", "Failed to save personal info.");
     } finally {
       setSaving(false);
     }
