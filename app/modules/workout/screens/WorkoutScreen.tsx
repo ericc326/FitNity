@@ -389,7 +389,7 @@ const WorkoutScreen = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#1c1c2e",
+    backgroundColor: "#262135",
     paddingTop: 80,
   },
   tabContainer: {
