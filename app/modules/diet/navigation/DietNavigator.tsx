@@ -3,7 +3,11 @@ import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import DietScreen from "../screens/DietScreen";
 import FoodDetailsScreen from "../screens/FoodDetailsScreen";
 import FoodScannerScreen from "../screens/FoodScannerScreen";
-import MealRecipesScreen from "../screens/MealRecipesScreen"; // Import the new screen
+import MealRecipesScreen from "../screens/MealRecipesScreen";
+import AiMealPlanner from "../screens/AiMealPlanner";
+import RecipeDetailScreen from "../screens/RecipeDetailScreen";
+import { Recipe } from "../services/RecipeService";
+import RecipeList from "../screens/RecipeList";
 
 // Define the FoodItem type
 export type FoodItem = {
@@ -28,6 +32,9 @@ export type DietStackParamList = {
   FoodDetails: { food: FoodItem };
   FoodScanner: undefined;
   MealRecipes: { mealType: string }; // Add the new route with params
+  AiMealPlanner: undefined;
+  RecipeList: { recipes: Recipe[]; loading?: boolean };
+  RecipeDetail: { recipe: any };
 };
 
 const DietStack = createNativeStackNavigator<DietStackParamList>();
@@ -74,6 +81,32 @@ const DietNavigator: React.FC = () => {
           headerBackTitle: "Back",
         }}
       />
+
+      <DietStack.Screen
+        name="AiMealPlanner"
+        component={AiMealPlanner}
+        options={{
+          headerShown: true,
+          headerStyle: { backgroundColor: "#262135" },
+          headerTintColor: "#fff",
+          title: "AI Meal Planner",
+          headerBackTitle: "Back",
+        }}
+      />
+
+      <DietStack.Screen
+        name="RecipeList"
+        component={RecipeList}
+        options={{
+          headerShown: true,
+          headerStyle: { backgroundColor: "#262135" },
+          headerTintColor: "#fff",
+          title: "All Recipes",
+          headerBackTitle: "Back",
+        }}
+      />
+
+      <DietStack.Screen name="RecipeDetail" component={RecipeDetailScreen} />
     </DietStack.Navigator>
   );
 };
