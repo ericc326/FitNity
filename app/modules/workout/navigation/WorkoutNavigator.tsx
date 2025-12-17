@@ -16,7 +16,7 @@ export type WorkoutStackParamList = {
   AiCoach: undefined;
   RecommendationWorkout: {
     workout: any;
-    level?: "Beginner" | "Intermediate" | "Advanced";
+    level: string;
   };
 };
 
