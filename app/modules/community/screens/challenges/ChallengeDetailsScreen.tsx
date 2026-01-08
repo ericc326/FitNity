@@ -50,6 +50,107 @@ const Tag = ({ text }: { text: string }) => (
   </View>
 );
 
+const ProgressModal = ({
+  visible,
+  onClose,
+  onUpdate,
+  loading,
+  initialProgress = 0,
+  maxAllowed,
+}: {
+  visible: boolean;
+  onClose: () => void;
+  onUpdate: (progress: number) => void;
+  loading: boolean;
+  initialProgress?: number;
+  maxAllowed: number;
+}) => {
+  const [localProgress, setLocalProgress] = useState(initialProgress);
+
+  useEffect(() => {
+    if (visible) {
+      setLocalProgress(initialProgress);
+    }
+  }, [visible, initialProgress]);
+
+  return (
+    <Modal
+      visible={visible}
+      transparent
+      animationType="slide"
+      onRequestClose={onClose}
+    >
+      <View style={styles.modalOverlay}>
+        <View style={styles.modalContent}>
+          <Text style={styles.modalTitle}>Update Progress</Text>
+
+          <View style={styles.progressInputContainer}>
+            <Text style={styles.progressLabel}>
+              Current: {localProgress.toFixed(1)}%
+            </Text>
+
+            {/* Display the Max Allowed Limit to the User */}
+            <Text
+              style={{
+                color: "#aaa",
+                fontSize: 12,
+                textAlign: "center",
+                marginBottom: 10,
+              }}
+            >
+              Max allowed based on duration: {maxAllowed.toFixed(1)}%
+            </Text>
+
+            <Slider
+              style={styles.slider}
+              minimumValue={0}
+              maximumValue={100}
+              step={1}
+              value={localProgress}
+              onValueChange={(val) => {
+                // --- INTEGRITY CHECK UI ---
+                if (val > maxAllowed) {
+                  // Snap back to max allowed
+                  setLocalProgress(maxAllowed);
+                  // Provide haptic feedback so know why it stopped
+                  Vibration.vibrate();
+                } else {
+                  setLocalProgress(val);
+                }
+              }}
+              minimumTrackTintColor="#4a90e2"
+              maximumTrackTintColor="#444"
+              // Turn the thumb red if they are hitting the limit
+              thumbTintColor={
+                localProgress >= maxAllowed ? "#e74c3c" : "#4a90e2"
+              }
+            />
+          </View>
+
+          <View style={styles.modalButtons}>
+            <TouchableOpacity
+              style={[styles.modalButton, styles.cancelButton]}
+              onPress={onClose}
+            >
+              <Text style={styles.modalButtonText}>Cancel</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[styles.modalButton, styles.updateButton]}
+              onPress={() => onUpdate(localProgress)}
+              disabled={loading}
+            >
+              <Text style={styles.modalButtonText}>
+                {loading ? "Updating..." : "Update"}
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </View>
+    </Modal>
+  );
+};
+
 const WorkoutSessionModal = ({
   visible,
   onClose,
@@ -175,77 +276,7 @@ const WorkoutSessionModal = ({
   );
 };
 
-const ProgressModal = ({
-  visible,
-  onClose,
-  onUpdate,
-  loading,
-  initialProgress = 0,
-}: {
-  visible: boolean;
-  onClose: () => void;
-  onUpdate: (progress: number) => void;
-  loading: boolean;
-  initialProgress?: number;
-}) => {
-  const [localProgress, setLocalProgress] = useState(initialProgress);
-
-  useEffect(() => {
-    if (visible) {
-      setLocalProgress(initialProgress);
-    }
-  }, [visible, initialProgress]);
-
-  return (
-    <Modal
-      visible={visible}
-      transparent
-      animationType="slide"
-      onRequestClose={onClose}
-    >
-      <View style={styles.modalOverlay}>
-        <View style={styles.modalContent}>
-          <Text style={styles.modalTitle}>Update Progress</Text>
-
-          <View style={styles.progressInputContainer}>
-            <Text style={styles.progressLabel}>Progress: {localProgress}%</Text>
-            <Slider
-              style={styles.slider}
-              minimumValue={0}
-              maximumValue={100}
-              step={1}
-              value={localProgress}
-              onValueChange={setLocalProgress}
-              minimumTrackTintColor="#4a90e2"
-              maximumTrackTintColor="#444"
-              thumbTintColor="#4a90e2"
-            />
-          </View>
-
-          <View style={styles.modalButtons}>
-            <TouchableOpacity
-              style={[styles.modalButton, styles.cancelButton]}
-              onPress={onClose}
-            >
-              <Text style={styles.modalButtonText}>Cancel</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={[styles.modalButton, styles.updateButton]}
-              onPress={() => onUpdate(localProgress)}
-              disabled={loading}
-            >
-              <Text style={styles.modalButtonText}>
-                {loading ? "Updating..." : "Update"}
-              </Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      </View>
-    </Modal>
-  );
-};
-
+// --- MAIN SCREEN ---
 const ChallengeDetailsScreen = ({ route, navigation }: Props) => {
   const { challenge } = route.params;
   const [isParticipant, setIsParticipant] = useState(false);
@@ -263,6 +294,12 @@ const ChallengeDetailsScreen = ({ route, navigation }: Props) => {
   const [userProgress, setUserProgress] = useState(0);
   const [refreshing, setRefreshing] = useState(false);
   const [currentChallenge, setCurrentChallenge] = useState(challenge);
+
+  // --- DATA INTEGRITY STATES ---
+  const [maxAllowedProgress, setMaxAllowedProgress] = useState(100);
+  const [participantJoinDate, setParticipantJoinDate] = useState<Date | null>(
+    null
+  );
 
   const onRefresh = async () => {
     setRefreshing(true);
@@ -287,7 +324,33 @@ const ChallengeDetailsScreen = ({ route, navigation }: Props) => {
     fetchExerciseDetails(currentChallenge);
   }, [currentChallenge]);
 
-  // Fetch Full Exercise Details (Instructions, Equipment, etc.)
+  // --- INTEGRITY LOGIC: CALCULATE MAX ALLOWED PROGRESS ---
+  useEffect(() => {
+    // If challenge is 1 day or less, no restriction needed (or user allows instant finish)
+    if (currentChallenge.duration <= 1) {
+      setMaxAllowedProgress(100);
+      return;
+    }
+
+    if (participantJoinDate) {
+      const now = new Date();
+      // Calculate difference in days (start counting from join day as Day 1)
+      const diffTime = Math.abs(now.getTime() - participantJoinDate.getTime());
+      // ceil to ensure if they join today, it's day 1
+      const daysPassed = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) || 1;
+
+      // Formula: (Days Active / Total Duration) * 100
+      let limit = (daysPassed / currentChallenge.duration) * 100;
+
+      // Allow a small buffer (e.g., if user is on Day 2 but technically 23.9 hours passed)
+      // or simply cap at 100 and min 0
+      if (limit > 100) limit = 100;
+      if (limit < 0) limit = 0;
+
+      setMaxAllowedProgress(limit);
+    }
+  }, [participantJoinDate, currentChallenge]);
+
   const fetchExerciseDetails = async (challengeObj = currentChallenge) => {
     if (challengeObj.type === "workout" && challengeObj.workoutId) {
       try {
@@ -335,7 +398,9 @@ const ChallengeDetailsScreen = ({ route, navigation }: Props) => {
   const fetchParticipants = async (challengeObj = challenge) => {
     try {
       setLoadingParticipants(true);
+      const currentUser = auth.currentUser;
       const participantsData: Participant[] = [];
+
       for (const participantId of challengeObj.participants || []) {
         const userDoc = await getDoc(doc(db, "users", participantId));
         if (userDoc.exists()) {
@@ -349,14 +414,36 @@ const ChallengeDetailsScreen = ({ route, navigation }: Props) => {
               participantId
             )
           );
-          const progressData = progressDoc.exists()
-            ? progressDoc.data()
-            : { progress: 0, joinedAt: serverTimestamp() };
+
+          let joinedAtVal = null;
+          let progressVal = 0;
+
+          if (progressDoc.exists()) {
+            const d = progressDoc.data();
+            progressVal = d.progress || 0;
+            joinedAtVal = d.joinedAt;
+          } else {
+            joinedAtVal = serverTimestamp();
+          }
+
+          // --- CAPTURE CURRENT USER JOIN DATE FOR INTEGRITY CHECK ---
+          if (currentUser && participantId === currentUser.uid) {
+            if (joinedAtVal && joinedAtVal.toDate) {
+              setParticipantJoinDate(joinedAtVal.toDate());
+            } else if (joinedAtVal) {
+              // If it's a JS Date or newly created timestamp
+              setParticipantJoinDate(new Date(joinedAtVal));
+            } else {
+              // Fallback if not yet written
+              setParticipantJoinDate(new Date());
+            }
+          }
+
           participantsData.push({
             id: participantId,
             name: userData.name,
-            progress: progressData.progress || 0,
-            joinedAt: progressData.joinedAt,
+            progress: progressVal,
+            joinedAt: joinedAtVal,
           });
         }
       }
@@ -419,6 +506,9 @@ const ChallengeDetailsScreen = ({ route, navigation }: Props) => {
       });
 
       setIsParticipant(true);
+      // Immediately set join date to now so local checks work instantly
+      setParticipantJoinDate(new Date());
+
       Alert.alert("Success", "You have joined the challenge!");
       fetchParticipants();
     } catch (error: any) {
@@ -464,43 +554,29 @@ const ChallengeDetailsScreen = ({ route, navigation }: Props) => {
       (challenge.description || "")
     ).toLowerCase();
 
-    // Check Duration (Long term challenges get a Trophy)
-    if (challenge.duration >= 30) {
-      return "trophy";
-    }
-
-    // Check Activity Type keywords
+    if (challenge.duration >= 30) return "trophy";
     if (
       text.includes("run") ||
       text.includes("jog") ||
       text.includes("marathon")
-    ) {
+    )
       return "run";
-    }
     if (
       text.includes("yoga") ||
       text.includes("meditate") ||
       text.includes("stretch")
-    ) {
+    )
       return "yoga";
-    }
     if (
       text.includes("muscle") ||
       text.includes("strength") ||
       text.includes("lift") ||
-      text.includes("gym") ||
-      text.includes("dumbbell")
-    ) {
+      text.includes("gym")
+    )
       return "dumbbell";
-    }
-    if (text.includes("cycle") || text.includes("bike")) {
-      return "bike";
-    }
-    if (text.includes("walk") || text.includes("step")) {
-      return "shoe-print";
-    }
+    if (text.includes("cycle") || text.includes("bike")) return "bike";
+    if (text.includes("walk") || text.includes("step")) return "shoe-print";
 
-    // Default fallback
     return "medal";
   };
 
@@ -538,6 +614,7 @@ const ChallengeDetailsScreen = ({ route, navigation }: Props) => {
     }
   };
 
+  //  UPDATE HANDLER FOR INTEGRITY
   const handleUpdateProgress = async (progress: number) => {
     setLoading(true);
     try {
@@ -545,6 +622,28 @@ const ChallengeDetailsScreen = ({ route, navigation }: Props) => {
       if (!currentUser) {
         Alert.alert("Error", "You must be logged in to update progress");
         return;
+      }
+
+      // --- SERVER-SIDE/LOGIC INTEGRITY CHECK ---
+      // Even if user bypassed UI, check math here before writing
+      if (participantJoinDate && currentChallenge.duration > 1) {
+        const now = new Date();
+        const diffTime = Math.abs(
+          now.getTime() - participantJoinDate.getTime()
+        );
+        const daysPassed = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) || 1;
+        const calculatedLimit = (daysPassed / currentChallenge.duration) * 100;
+
+        // Check if progress is significantly higher than allowed (allowing 1% buffer for rounding)
+        if (progress > calculatedLimit + 1) {
+          Alert.alert(
+            "Action Blocked",
+            "You cannot mark a multi-day challenge as complete ahead of time."
+          );
+          setShowProgressModal(false);
+          setLoading(false);
+          return;
+        }
       }
 
       const statsRef = doc(
@@ -555,19 +654,22 @@ const ChallengeDetailsScreen = ({ route, navigation }: Props) => {
         currentUser.uid
       );
 
-      // Update the progress
       await updateDoc(statsRef, {
         progress: progress,
+        lastUpdated: serverTimestamp(), // Useful for debugging/auditing
       });
 
-      // Check for Completion
       if (progress >= 100) {
         await checkAndAwardBadge(currentUser.uid);
       }
 
       setShowProgressModal(false);
       fetchParticipants(currentChallenge);
-      Alert.alert("Success", "Progress updated successfully!");
+
+      // Only show success alert if this wasn't called by handleSessionComplete (which has its own alert)
+      if (!showSessionModal) {
+        Alert.alert("Success", "Progress updated successfully!");
+      }
     } catch (error: any) {
       console.error("Update error:", error);
       Alert.alert("Error", error.message);
@@ -896,6 +998,7 @@ const ChallengeDetailsScreen = ({ route, navigation }: Props) => {
             onUpdate={handleUpdateProgress}
             loading={loading}
             initialProgress={userProgress}
+            maxAllowed={maxAllowedProgress} // Pass the Integrity Check Limit
           />
 
           <WorkoutSessionModal
