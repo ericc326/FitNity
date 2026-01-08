@@ -121,14 +121,10 @@ const ScheduleScreen = () => {
     }
   };
 
-  useEffect(() => {
-    fetchSchedules(false);
-  }, [selectedDate]);
-
   useFocusEffect(
     useCallback(() => {
       fetchSchedules(false);
-    }, [])
+    }, [selectedDate])
   );
 
   const onRefresh = () => {
