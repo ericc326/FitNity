@@ -14,6 +14,7 @@ import {
 import { useMealPlan } from "../component/MealPlanContext";
 import PersonalInfoModal from "../component/PersonalInfoModal";
 import { GEMINI_API_KEY } from "@env";
+import { auth } from "../../../../firebaseConfig";
 
 interface FoodItem {
   id: string;
@@ -56,8 +57,12 @@ const AIFoodRecommendation: React.FC<AIFoodRecommendationProps> = ({
   const [isLoading, setIsLoading] = useState(false);
   const [personalInfo, setPersonalInfo] = useState<PersonalInfo | null>(null);
   const [hasCompletedSetup, setHasCompletedSetup] = useState(false);
-
-  const { meals, personalInfo: contextPersonalInfo } = useMealPlan();
+  const {
+    meals,
+    dietInfo: contextDietInfo,
+    healthInfo: contextHealthInfo,
+    saveDietInfo,
+  } = useMealPlan();
 
   // Set API key from .env automatically
   useEffect(() => {
@@ -71,9 +76,27 @@ const AIFoodRecommendation: React.FC<AIFoodRecommendationProps> = ({
   }, [visible]);
 
   const loadPersonalInfo = async () => {
-    const info = contextPersonalInfo || null;
-    setPersonalInfo(info);
-    setHasCompletedSetup(!!info);
+    // Check if both data pieces exist
+    if (contextDietInfo && contextHealthInfo) {
+      const info: PersonalInfo = {
+        name: auth.currentUser?.displayName || "User",
+        // Use REAL data from healthinfo collection
+        age: contextHealthInfo.age || "0",
+        gender: contextHealthInfo.gender || "Not Specified",
+        weight: contextHealthInfo.weight || "0",
+        height: contextHealthInfo.height || "0",
+        // Use REAL data from dietinfo collection
+        activityLevel: contextHealthInfo.level || "moderate",
+        goal: contextDietInfo.goal,
+        dietaryRestrictions: contextDietInfo.dietaryRestrictions,
+        allergies: contextDietInfo.allergies,
+        targetCalories: contextDietInfo.targetCalories,
+      };
+      setPersonalInfo(info);
+      setHasCompletedSetup(true);
+    } else {
+      setHasCompletedSetup(false);
+    }
   };
 
   const handleGenerateRecommendations = async () => {
@@ -84,11 +107,12 @@ const AIFoodRecommendation: React.FC<AIFoodRecommendationProps> = ({
     await generateRecommendations();
   };
 
-  const handlePersonalInfoComplete = async (info: PersonalInfo) => {
-    setPersonalInfo(info);
+  const handlePersonalInfoComplete = async (info: any) => {
+    // Save to Firebase via the context function we created earlier
+    await saveDietInfo(info);
     setHasCompletedSetup(true);
     setShowPersonalInfoModal(false);
-    await generateRecommendations();
+    // The useEffect will trigger generateRecommendations once dietInfo updates
   };
 
   const generateRecommendations = async () => {

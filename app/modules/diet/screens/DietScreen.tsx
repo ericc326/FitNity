@@ -1,8 +1,9 @@
 import AIFoodRecommendation from "../component/AiFoodRecommendation";
 import { useMealPlan } from "../component/MealPlanContext";
-import StorageService from "../services/StorageService";
 import React, { useEffect, useState } from "react";
-import { GEMINI_API_KEY } from "@env";
+import { useFocusEffect } from "@react-navigation/native";
+
+import { GEMINI_API_KEY, SPOONACULAR_API_KEY } from "@env";
 import {
   ActivityIndicator,
   Alert,
@@ -14,6 +15,7 @@ import {
   TouchableOpacity,
   View,
   Image,
+  Platform,
 } from "react-native";
 import { useNavigation } from "@react-navigation/native";
 import { DietStackParamList } from "../navigation/DietNavigator";
@@ -21,7 +23,6 @@ import { MaterialCommunityIcons, Ionicons } from "@expo/vector-icons";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { SafeAreaView } from "react-native-safe-area-context";
 import DateTimePicker from "@react-native-community/datetimepicker";
-import { fetchRecommendedRecipes } from "../services/RecipeService";
 
 const MealsScreen = () => {
   const [showAIRecommendations, setShowAIRecommendations] = useState(false);
@@ -34,13 +35,17 @@ const MealsScreen = () => {
     carbs: "",
     fat: "",
   });
-  const [isLoading, setIsLoading] = useState(false);
   const [hasCompletedSetup, setHasCompletedSetup] = useState(false);
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [recommendedMeals, setRecommendedMeals] = useState<any[]>([]);
   const [loadingRecipes, setLoadingRecipes] = useState(false);
   const [showDisclaimer, setShowDisclaimer] = useState(true); // true to show on first load
+
+  useEffect(() => {
+    const todayString = new Date().toISOString().split("T")[0];
+    changeDate(todayString);
+  }, []);
 
   const navigation = useNavigation<DietScreenNavigationProp>();
   type DietScreenNavigationProp = NativeStackNavigationProp<
@@ -54,47 +59,13 @@ const MealsScreen = () => {
     removeMeal,
     getTotalNutrition,
     addCustomMeal,
-    clearAllMeals,
-    personalInfo,
-    isLoading: contextLoading,
+    dietInfo,
+    healthInfo,
+    isLoading,
     changeDate,
   } = useMealPlan();
 
   const totalNutrition = getTotalNutrition();
-
-  useEffect(() => {
-    checkSetupStatus();
-  }, []);
-
-  const loadRecommendations = async () => {
-    if (!personalInfo) return;
-
-    setLoadingRecipes(true);
-
-    const remainingCalories =
-      parseInt(personalInfo.targetCalories) - totalNutrition.calories;
-
-    const maxCalories = Math.max(remainingCalories / 3, 300);
-
-    const recipes = await fetchRecommendedRecipes(maxCalories);
-    setRecommendedMeals(recipes);
-
-    setLoadingRecipes(false);
-  };
-
-  useEffect(() => {
-    loadRecommendations();
-  }, [selectedDate, totalNutrition.calories]);
-  const checkSetupStatus = async () => {
-    try {
-      const [hasSetup] = await Promise.all([
-        StorageService.hasCompletedSetup(),
-      ]);
-      setHasCompletedSetup(hasSetup);
-    } catch (error) {
-      console.error("Error checking setup status:", error);
-    }
-  };
 
   const handleSelectFood = (food: any) => {
     if (selectedMealId) {
@@ -105,25 +76,20 @@ const MealsScreen = () => {
   };
 
   const handleRemoveMeal = (mealId: string) => {
-    Alert.alert("Remove Meal", "Are you sure you want to remove this meal?", [
-      { text: "Cancel", style: "cancel" },
+    // mealId here is like "breakfast"
+    const mealItem = meals.find((m) => m.id === mealId);
+
+    if (!mealItem?.docId) return;
+
+    Alert.alert("Remove Meal", "Are you sure?", [
+      { text: "Cancel" },
       {
         text: "Remove",
         style: "destructive",
-        onPress: () => removeMeal(mealId),
+        // Pass the docId to the context function
+        onPress: () => removeMeal(mealItem.docId!),
       },
     ]);
-  };
-
-  const handleClearAllMeals = () => {
-    Alert.alert(
-      "Clear All Meals",
-      "Are you sure you want to clear all meals? This action cannot be undone.",
-      [
-        { text: "Cancel", style: "cancel" },
-        { text: "Clear All", style: "destructive", onPress: clearAllMeals },
-      ]
-    );
   };
 
   const handleAddCustomMeal = () => {
@@ -158,28 +124,21 @@ const MealsScreen = () => {
     }
   };
 
+  // 2. Add a conditional check inside fetchRecommendedMeals as a second layer of protection
   const fetchRecommendedMeals = async () => {
-    if (!personalInfo) return;
+    // Gatekeeper: If we already have data, don't call the API again
+    if (recommendedMeals.length > 0 || !SPOONACULAR_API_KEY) return;
 
     setLoadingRecipes(true);
-
     try {
-      const remainingCalories =
-        parseInt(personalInfo.targetCalories) - totalNutrition.calories;
+      const target = dietInfo ? parseInt(dietInfo.targetCalories) : 2000;
+      const remainingCalories = Math.max(target - totalNutrition.calories, 300);
+      const maxCalories = Math.round(remainingCalories / 2);
 
-      const maxCalories = Math.max(remainingCalories / 3, 300);
-
-      const url =
-        `https://api.spoonacular.com/recipes/complexSearch?` +
-        `apiKey=${process.env.SPOONACULAR_API_KEY}` +
-        `&number=6` +
-        `&minProtein=20` +
-        `&maxCalories=${Math.round(maxCalories)}` +
-        `&addRecipeNutrition=true`;
+      const url = `https://api.spoonacular.com/recipes/complexSearch?apiKey=${SPOONACULAR_API_KEY}&number=6&minProtein=20&maxCalories=${maxCalories}&addRecipeNutrition=true`;
 
       const res = await fetch(url);
       const data = await res.json();
-
       setRecommendedMeals(data.results || []);
     } catch (error) {
       console.error("Spoonacular error:", error);
@@ -189,8 +148,10 @@ const MealsScreen = () => {
   };
 
   useEffect(() => {
-    fetchRecommendedMeals();
-  }, [selectedDate, totalNutrition.calories]);
+    if (!isLoading && dietInfo && recommendedMeals.length === 0) {
+      fetchRecommendedMeals();
+    }
+  }, [isLoading, dietInfo, totalNutrition.calories]);
 
   const handleAIRecommendations = () => {
     if (!hasCompletedSetup) {
@@ -205,6 +166,28 @@ const MealsScreen = () => {
     }
 
     setShowAIRecommendations(true);
+  };
+
+  const handleClearAll = async () => {
+    Alert.alert(
+      "Clear All Meals",
+      "This will delete today's logs from the cloud. Continue?",
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Clear",
+          style: "destructive",
+          onPress: async () => {
+            // Iterate through today's meals and remove them by docId
+            for (const meal of meals) {
+              if (meal.docId) {
+                await removeMeal(meal.docId);
+              }
+            }
+          },
+        },
+      ]
+    );
   };
 
   const MealItem = ({ meal }: { meal: any }) => (
@@ -255,7 +238,7 @@ const MealsScreen = () => {
     </View>
   );
 
-  if (contextLoading) {
+  if (isLoading) {
     return (
       <SafeAreaView style={styles.container}>
         <View style={styles.loadingContainer}>
@@ -269,7 +252,7 @@ const MealsScreen = () => {
   return (
     <SafeAreaView style={styles.container}>
       <Modal visible={showDisclaimer} transparent animationType="fade">
-        <View style={styles.modalOverlay}>
+        <View style={styles.modalOverlayDisclaimer}>
           <View style={styles.disclaimerContent}>
             {/* Exclamation mark */}
             <Text style={styles.exclamationMark}>❗</Text>
@@ -307,15 +290,15 @@ const MealsScreen = () => {
             <View>
               <Text style={styles.metricLabel}>Calories</Text>
               <Text style={styles.metricValue}>
-                {totalNutrition.calories}/{personalInfo?.targetCalories}
+                {totalNutrition.calories}/{dietInfo?.targetCalories}
               </Text>
               <Text style={styles.metricUnit}>kcal</Text>
               <Text style={styles.metricPercentage}>
-                {personalInfo?.targetCalories
+                {dietInfo?.targetCalories
                   ? `${Math.min(
                       Math.round(
                         (totalNutrition.calories /
-                          parseInt(personalInfo.targetCalories)) *
+                          parseInt(dietInfo.targetCalories)) *
                           100
                       ),
                       100
@@ -335,14 +318,14 @@ const MealsScreen = () => {
                 numberOfLines={1}
                 adjustsFontSizeToFit
               >
-                {totalNutrition.protein}/{personalInfo?.targetProtein || "0"}g
+                {totalNutrition.protein}/{dietInfo?.targetProtein || "0"}g
               </Text>
               <Text style={styles.metricPercentage}>
-                {personalInfo?.targetProtein
+                {dietInfo?.targetProtein
                   ? `${Math.min(
                       Math.round(
                         (totalNutrition.protein /
-                          parseInt(personalInfo.targetProtein.toString())) *
+                          parseInt(dietInfo.targetProtein.toString())) *
                           100
                       ),
                       100
@@ -362,14 +345,14 @@ const MealsScreen = () => {
                 numberOfLines={1}
                 adjustsFontSizeToFit
               >
-                {totalNutrition.carbs}/{personalInfo?.targetCarbs || "0"}g
+                {totalNutrition.carbs}/{dietInfo?.targetCarbs || "0"}g
               </Text>
               <Text style={styles.metricPercentage}>
-                {personalInfo?.targetCarbs
+                {dietInfo?.targetCarbs
                   ? `${Math.min(
                       Math.round(
                         (totalNutrition.carbs /
-                          parseInt(personalInfo.targetCarbs.toString())) *
+                          parseInt(dietInfo.targetCarbs.toString())) *
                           100
                       ),
                       100
@@ -531,7 +514,6 @@ const MealsScreen = () => {
         onClose={() => {
           setShowAIRecommendations(false);
           setSelectedMealId(null);
-          checkSetupStatus();
         }}
         onSelectFood={handleSelectFood}
         selectedMealType={selectedMealId || "breakfast"}
@@ -625,6 +607,7 @@ const MealsScreen = () => {
           </ScrollView>
         </SafeAreaView>
       </Modal>
+
       <TouchableOpacity
         style={styles.floatingScanButton}
         onPress={() => navigation.navigate("AiMealPlanner")}
@@ -632,23 +615,61 @@ const MealsScreen = () => {
         <MaterialCommunityIcons name="camera" size={26} color="#fff" />
       </TouchableOpacity>
 
-      {showDatePicker && (
-        <DateTimePicker
-          value={selectedDate}
-          mode="date"
-          display="default"
-          onChange={(event, date) => {
-            setShowDatePicker(false);
+      {/* DATE PICKER LOGIC (SEPARATE iOS / Android) */}
+      {showDatePicker &&
+        (Platform.OS === "ios" ? (
+          <Modal
+            transparent={true}
+            animationType="slide"
+            visible={showDatePicker}
+            onRequestClose={() => setShowDatePicker(false)}
+          >
+            <View style={styles.modalOverlayDatePicker}>
+              <View style={styles.datePickerContainerIOS}>
+                {/* Toolbar with Done button */}
+                <View style={styles.datePickerHeader}>
+                  <TouchableOpacity
+                    onPress={() => setShowDatePicker(false)}
+                    style={styles.doneButton}
+                  >
+                    <Text style={styles.doneButtonText}>Done</Text>
+                  </TouchableOpacity>
+                </View>
 
-            if (date) {
-              const formattedDate = date.toISOString().split("T")[0];
-
-              setSelectedDate(date);
-              changeDate(formattedDate);
-            }
-          }}
-        />
-      )}
+                {/* The Picker */}
+                <DateTimePicker
+                  value={selectedDate}
+                  mode="date"
+                  display="spinner"
+                  textColor="black"
+                  onChange={(event, date) => {
+                    if (date) {
+                      const formattedDate = date.toISOString().split("T")[0];
+                      setSelectedDate(date);
+                      changeDate(formattedDate);
+                    }
+                  }}
+                  style={{ height: 200 }}
+                />
+              </View>
+            </View>
+          </Modal>
+        ) : (
+          // Android logic
+          <DateTimePicker
+            value={selectedDate}
+            mode="date"
+            display="default"
+            onChange={(event, date) => {
+              setShowDatePicker(false);
+              if (date) {
+                const formattedDate = date.toISOString().split("T")[0];
+                setSelectedDate(date);
+                changeDate(formattedDate);
+              }
+            }}
+          />
+        ))}
     </SafeAreaView>
   );
 };
@@ -991,10 +1012,11 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     backgroundColor: "#eee",
   },
-  modalOverlay: {
+  // 3. STYLES FOR CENTERED DISCLAIMER
+  modalOverlayDisclaimer: {
     flex: 1,
     backgroundColor: "rgba(0,0,0,0.5)",
-    justifyContent: "center",
+    justifyContent: "center", // CENTER
     alignItems: "center",
   },
   disclaimerContent: {
@@ -1027,7 +1049,7 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
   okButton: {
-    backgroundColor: "#262135", // dark button to contrast
+    backgroundColor: "#262135",
     borderRadius: 8,
     paddingVertical: 10,
     paddingHorizontal: 20,
@@ -1043,5 +1065,30 @@ const styles = StyleSheet.create({
   },
   viewMoreButton: {
     marginTop: -10,
+  },
+  modalOverlayDatePicker: {
+    flex: 1,
+    justifyContent: "flex-end",
+  },
+  datePickerContainerIOS: {
+    backgroundColor: "white",
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    paddingBottom: 40,
+  },
+  datePickerHeader: {
+    width: "100%",
+    padding: 16,
+    alignItems: "flex-end",
+    borderBottomWidth: 1,
+    borderBottomColor: "#eee",
+  },
+  doneButton: {
+    padding: 8,
+  },
+  doneButtonText: {
+    color: "#007AFF",
+    fontWeight: "bold",
+    fontSize: 16,
   },
 });

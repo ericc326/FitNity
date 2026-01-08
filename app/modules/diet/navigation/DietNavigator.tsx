@@ -1,13 +1,10 @@
 import React from "react";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import DietScreen from "../screens/DietScreen";
-import FoodDetailsScreen from "../screens/FoodDetailsScreen";
-import FoodScannerScreen from "../screens/FoodScannerScreen";
 import MealRecipesScreen from "../screens/MealRecipesScreen";
 import AiMealPlanner from "../screens/AiMealPlanner";
 import RecipeDetailScreen from "../screens/RecipeDetailScreen";
-import { Recipe } from "../services/RecipeService";
-import RecipeList from "../screens/RecipeList";
+import RecipeList, { Recipe } from "../screens/RecipeList";
 
 // Define the FoodItem type
 export type FoodItem = {
@@ -47,28 +44,6 @@ const DietNavigator: React.FC = () => {
       }}
     >
       <DietStack.Screen name="DietHome" component={DietScreen} />
-
-      <DietStack.Screen
-        name="FoodDetails"
-        component={FoodDetailsScreen}
-        options={{
-          headerShown: true,
-          title: "Food Details",
-          headerStyle: { backgroundColor: "#262135" },
-          headerTintColor: "#fff",
-          headerBackTitle: "Back",
-        }}
-      />
-
-      <DietStack.Screen
-        name="FoodScanner"
-        component={FoodScannerScreen}
-        options={{
-          headerShown: true,
-          title: "Scan Food",
-          presentation: "modal",
-        }}
-      />
 
       <DietStack.Screen
         name="MealRecipes"

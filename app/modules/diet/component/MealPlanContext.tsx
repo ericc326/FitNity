@@ -1,4 +1,3 @@
-import StorageService from "../services/StorageService";
 import React, {
   createContext,
   ReactNode,
@@ -6,6 +5,19 @@ import React, {
   useEffect,
   useState,
 } from "react";
+import { db, auth } from "../../../../firebaseConfig";
+import {
+  doc,
+  collection,
+  query,
+  where,
+  onSnapshot,
+  serverTimestamp,
+  setDoc,
+  addDoc,
+  deleteDoc,
+  getDocs,
+} from "firebase/firestore";
 
 /* ===================== TYPES ===================== */
 
@@ -25,6 +37,7 @@ interface Meal {
   time: string;
   food?: FoodItem;
   hasFood: boolean;
+  docId?: string;
 }
 
 interface NutritionalData {
@@ -34,50 +47,36 @@ interface NutritionalData {
   fat: number;
 }
 
-interface PersonalInfo {
-  name: string;
-  age: string;
-  gender: string;
-  weight: string;
-  height: string;
-  activityLevel: string;
+interface DietInfo {
   goal: string;
   dietaryRestrictions: string[];
   allergies: string[];
   targetCalories: string;
   targetProtein: string;
   targetCarbs: string;
-  targetFat?: string;
+  targetFat: string;
 }
 
 interface MealPlanContextType {
-  mealsByDate: Record<string, Meal[]>;
   meals: Meal[];
   selectedDate: string;
   changeDate: (date: string) => void;
-  personalInfo: PersonalInfo | null;
+  dietInfo: DietInfo | null;
+  healthInfo: any | null;
   isLoading: boolean;
-
-  updateMeal: (mealId: string, food: FoodItem) => void;
-  removeMeal: (mealId: string) => void;
+  updateMeal: (mealId: string, food: FoodItem) => Promise<void>;
+  removeMeal: (docId: string) => Promise<void>;
   addCustomMeal: (
     mealId: string,
-    foodName: string,
+    name: string,
     calories: number,
     protein: number,
     carbs: number,
     fat: number
-  ) => void;
-  clearAllMeals: () => void;
+  ) => Promise<void>;
   getTotalNutrition: () => NutritionalData;
-
-  savePersonalInfo: (info: PersonalInfo) => Promise<void>;
-  loadPersonalInfo: () => Promise<PersonalInfo | null>;
-  clearPersonalInfo: () => Promise<void>;
-  hasCompletedSetup: () => Promise<boolean>;
+  saveDietInfo: (info: DietInfo) => Promise<void>;
 }
-
-/* ===================== DEFAULT MEALS (FACTORY) ===================== */
 
 const createDefaultMeals = (): Meal[] => [
   { id: "breakfast", title: "Breakfast", time: "7 AM", hasFood: false },
@@ -86,85 +85,171 @@ const createDefaultMeals = (): Meal[] => [
   { id: "dinner", title: "Dinner", time: "7 PM", hasFood: false },
 ];
 
-/* ===================== CONTEXT ===================== */
-
 const MealPlanContext = createContext<MealPlanContextType | undefined>(
   undefined
 );
 
 export const MealPlanProvider = ({ children }: { children: ReactNode }) => {
   const today = new Date().toISOString().split("T")[0];
-
   const [selectedDate, setSelectedDate] = useState(today);
-  const [mealsByDate, setMealsByDate] = useState<Record<string, Meal[]>>({});
-  const [personalInfo, setPersonalInfo] = useState<PersonalInfo | null>(null);
+  const [meals, setMeals] = useState<Meal[]>(createDefaultMeals());
+  const [dietInfo, setDietInfo] = useState<DietInfo | null>(null);
+  const [healthInfo, setHealthInfo] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(true);
 
-  const meals = mealsByDate[selectedDate] ?? createDefaultMeals();
+  /* ===================== CONSOLIDATED DATA FETCHING ===================== */
 
-  /* ===================== DATE CHANGE ===================== */
+  useEffect(() => {
+    if (!auth.currentUser) {
+      setIsLoading(false);
+      return;
+    }
+
+    const uid = auth.currentUser.uid;
+    setIsLoading(true);
+
+    const syncAllData = async () => {
+      try {
+        // 1. Force the Profile to fetch FIRST so the UI has context
+        const [healthSnap, dietSnap] = await Promise.all([
+          getDocs(collection(db, "users", uid, "healthinfo")),
+          getDocs(collection(db, "users", uid, "dietinfo")),
+        ]);
+
+        if (!healthSnap.empty) setHealthInfo(healthSnap.docs[0].data());
+        if (!dietSnap.empty) {
+          const dietData =
+            dietSnap.docs.find((d) => d.id === "profile")?.data() ||
+            dietSnap.docs[0].data();
+          setDietInfo(dietData as DietInfo);
+        }
+
+        // 2. ONLY start the meal listener after the profile is known
+        const mealsRef = collection(db, "users", uid, "meals");
+        const mealQuery = query(mealsRef, where("date", "==", selectedDate));
+
+        const unsubscribe = onSnapshot(
+          mealQuery,
+          (snapshot) => {
+            const fetchedMeals = createDefaultMeals();
+            snapshot.forEach((doc) => {
+              const data = doc.data();
+              const index = fetchedMeals.findIndex(
+                (m) => m.id === data.mealType
+              );
+              if (index !== -1) {
+                fetchedMeals[index] = {
+                  ...fetchedMeals[index],
+                  food: data.food,
+                  hasFood: true,
+                  docId: doc.id,
+                };
+              }
+            });
+            setMeals(fetchedMeals);
+            setIsLoading(false); // UI is now fully ready with Profile AND Meals
+          },
+          (error) => {
+            setIsLoading(false);
+          }
+        );
+
+        return unsubscribe;
+      } catch (e) {
+        console.error("Sync error:", e);
+        setIsLoading(false);
+      }
+    };
+
+    const unsubPromise = syncAllData();
+
+    return () => {
+      unsubPromise.then((unsub) => unsub && unsub());
+    };
+  }, [auth.currentUser, selectedDate]);
+
+  /* ===================== ACTIONS ===================== */
 
   const changeDate = (date: string) => {
     setSelectedDate(date);
-
-    setMealsByDate((prev) => {
-      if (prev[date]) return prev;
-
-      return {
-        ...prev,
-        [date]: createDefaultMeals(),
-      };
-    });
+    setIsLoading(true);
   };
 
-  /* ===================== MEAL ACTIONS ===================== */
+  const updateMeal = async (mealType: string, food: FoodItem) => {
+    if (!auth.currentUser) return;
+    const mealsRef = collection(db, "users", auth.currentUser.uid, "meals");
+    const existingMeal = meals.find((m) => m.id === mealType && m.hasFood);
 
-  const updateMeal = (mealId: string, food: FoodItem) => {
-    const updatedMeals = meals.map((meal) =>
-      meal.id === mealId ? { ...meal, food, hasFood: true } : meal
-    );
-
-    setMealsByDate((prev) => ({
-      ...prev,
-      [selectedDate]: updatedMeals,
-    }));
+    if (existingMeal?.docId) {
+      await setDoc(
+        doc(mealsRef, existingMeal.docId),
+        {
+          date: selectedDate,
+          mealType,
+          food,
+          updatedAt: serverTimestamp(),
+        },
+        { merge: true }
+      );
+    } else {
+      await addDoc(collection(db, "users", auth.currentUser.uid, "meals"), {
+        date: selectedDate,
+        mealType,
+        food,
+        createdAt: serverTimestamp(),
+      });
+    }
   };
 
-  const removeMeal = (mealId: string) => {
-    const updatedMeals = meals.map((meal) =>
-      meal.id === mealId ? { ...meal, food: undefined, hasFood: false } : meal
-    );
-
-    setMealsByDate((prev) => ({
-      ...prev,
-      [selectedDate]: updatedMeals,
-    }));
+  const removeMeal = async (docId: string) => {
+    if (!auth.currentUser || !docId) return;
+    try {
+      // Direct path to the specific meal document
+      await deleteDoc(doc(db, "users", auth.currentUser.uid, "meals", docId));
+    } catch (e) {
+      console.error("Delete error:", e);
+    }
   };
 
-  const addCustomMeal = (
+  const addCustomMeal = async (
     mealId: string,
-    foodName: string,
+    name: string,
     calories: number,
     protein: number,
     carbs: number,
     fat: number
   ) => {
-    updateMeal(mealId, {
+    const food: FoodItem = {
       id: `custom-${Date.now()}`,
-      name: foodName,
+      name,
       calories,
       protein,
       carbs,
       fat,
       category: "custom",
-    });
+    };
+    await updateMeal(mealId, food);
   };
 
-  const clearAllMeals = () => {
-    setMealsByDate((prev) => ({
-      ...prev,
-      [selectedDate]: createDefaultMeals(),
-    }));
+  // CORRECTED: Uses setDoc with fixed ID to prevent "re-filling" issue
+  const saveDietInfo = async (info: DietInfo) => {
+    if (!auth.currentUser) return;
+
+    // We save to a specific document "profile" so it overwrites duplicates
+    const dietInfoRef = doc(
+      db,
+      "users",
+      auth.currentUser.uid,
+      "dietinfo",
+      "profile"
+    );
+
+    await setDoc(dietInfoRef, {
+      ...info,
+      updatedAt: serverTimestamp(),
+    });
+
+    setDietInfo(info);
   };
 
   const getTotalNutrition = (): NutritionalData => {
@@ -182,63 +267,20 @@ export const MealPlanProvider = ({ children }: { children: ReactNode }) => {
     );
   };
 
-  /* ===================== STORAGE ===================== */
-
-  useEffect(() => {
-    const loadData = async () => {
-      setIsLoading(true);
-
-      const savedMeals = await StorageService.getMeals();
-      if (savedMeals) {
-        setMealsByDate(savedMeals);
-
-        if (!savedMeals[today]) {
-          setMealsByDate((prev) => ({
-            ...prev,
-            [today]: createDefaultMeals(),
-          }));
-        }
-      } else {
-        setMealsByDate({
-          [today]: createDefaultMeals(),
-        });
-      }
-
-      const info = await StorageService.getPersonalInfo();
-      if (info) setPersonalInfo(info);
-
-      setIsLoading(false);
-    };
-
-    loadData();
-  }, []);
-
-  useEffect(() => {
-    if (!isLoading) {
-      StorageService.saveMeals(mealsByDate);
-    }
-  }, [mealsByDate, isLoading]);
-
-  /* ===================== PROVIDER ===================== */
-
   return (
     <MealPlanContext.Provider
       value={{
-        mealsByDate,
         meals,
         selectedDate,
         changeDate,
-        personalInfo,
+        dietInfo,
+        healthInfo,
         isLoading,
         updateMeal,
         removeMeal,
         addCustomMeal,
-        clearAllMeals,
         getTotalNutrition,
-        savePersonalInfo: StorageService.savePersonalInfo,
-        loadPersonalInfo: StorageService.getPersonalInfo,
-        clearPersonalInfo: StorageService.clearPersonalInfo,
-        hasCompletedSetup: StorageService.hasCompletedSetup,
+        saveDietInfo,
       }}
     >
       {children}
@@ -248,8 +290,7 @@ export const MealPlanProvider = ({ children }: { children: ReactNode }) => {
 
 export const useMealPlan = () => {
   const context = useContext(MealPlanContext);
-  if (!context) {
+  if (!context)
     throw new Error("useMealPlan must be used within MealPlanProvider");
-  }
   return context;
 };

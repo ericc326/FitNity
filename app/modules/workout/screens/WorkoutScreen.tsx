@@ -17,8 +17,9 @@ import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { useNavigation } from "@react-navigation/native";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { WorkoutStackParamList } from "../navigation/WorkoutNavigator";
-import { collection, getDocs, query, where } from "firebase/firestore";
-import { db } from "../../../../firebaseConfig";
+import { collection, getDocs, query, where, orderBy } from "firebase/firestore";
+import { db, auth } from "../../../../firebaseConfig"; // Added auth to get current user
+import { LineChart } from "react-native-chart-kit";
 
 const { width } = Dimensions.get("window");
 
@@ -36,30 +37,10 @@ export interface Exercise {
 interface ProgressItem {
   id: string;
   exercise: string;
-  category: string;
   weight: string;
   startingBest: number;
   currentBest: number;
 }
-
-const progressData: ProgressItem[] = [
-  {
-    id: "1",
-    exercise: "Push Ups",
-    category: "Chest",
-    weight: "Body Weight",
-    startingBest: 30,
-    currentBest: 42,
-  },
-  {
-    id: "2",
-    exercise: "Squats",
-    category: "Legs",
-    weight: "80kg",
-    startingBest: 6,
-    currentBest: 10,
-  },
-];
 
 const WorkoutScreen = () => {
   const navigation =
@@ -76,6 +57,8 @@ const WorkoutScreen = () => {
   );
   const [selectedBodyPart, setSelectedBodyPart] = useState<string>("All");
   const [bodyParts, setBodyParts] = useState<string[]>([]);
+  const [dynamicProgress, setDynamicProgress] = useState<ProgressItem[]>([]);
+  const [progressLoading, setProgressLoading] = useState(false);
 
   const fetchExercisesFromFirestore = async (bodyPart: string = "All") => {
     setLoading(true);
@@ -150,6 +133,68 @@ const WorkoutScreen = () => {
     const growth = ((current - start) / start) * 100;
     return `${growth >= 0 ? "+" : ""}${Math.round(growth)}%`;
   };
+
+  const fetchProgressFromFirebase = async () => {
+    if (!auth.currentUser) return;
+    setProgressLoading(true);
+
+    try {
+      // Query the schedules collection as shown in your edited-image.png
+      const q = query(
+        collection(db, "users", auth.currentUser.uid, "schedules"),
+        orderBy("scheduledAt", "asc")
+      );
+
+      const snapshot = await getDocs(q);
+
+      if (snapshot.empty) {
+        setDynamicProgress([]);
+        return;
+      }
+
+      const allSchedules = snapshot.docs.map((doc) => doc.data());
+
+      // Group by workout name to find progress over time
+      const exerciseGroups: { [key: string]: any[] } = {};
+      allSchedules.forEach((item) => {
+        const title = item.selectedWorkoutName || "Unknown Exercise";
+        if (!exerciseGroups[title]) exerciseGroups[title] = [];
+        exerciseGroups[title].push(item);
+      });
+
+      const progressItems: ProgressItem[] = Object.keys(exerciseGroups).map(
+        (title, index) => {
+          const logs = exerciseGroups[title];
+          const firstEntry = logs[0];
+          const latestEntry = logs[logs.length - 1];
+
+          return {
+            id: index.toString(),
+            exercise: title,
+            // FR-015: Pulling weight if you add it, otherwise defaulting to Bodyweight
+            weight: latestEntry.weightLifted || "Bodyweight",
+            // FR-015: Using the field names from your screenshot
+            startingBest: firstEntry.customReps || 0,
+            currentBest: latestEntry.customReps || 0,
+          };
+        }
+      );
+
+      setDynamicProgress(progressItems);
+    } catch (error) {
+      console.error("Error fetching schedule progress:", error);
+    } finally {
+      setProgressLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchExercisesFromFirestore();
+    fetchBodyPartsFromFirestore();
+    if (activeTab === "progress") {
+      fetchProgressFromFirebase();
+    }
+  }, [activeTab]);
 
   const renderExerciseItem = ({ item }: { item: Exercise }) => (
     <TouchableOpacity
@@ -260,6 +305,50 @@ const WorkoutScreen = () => {
     );
   }
 
+  const renderProgressChart = () => {
+    if (dynamicProgress.length === 0) return null;
+
+    const data = {
+      labels: dynamicProgress.map((item) => item.exercise.substring(0, 6)), // Shortened names for X-axis
+      datasets: [
+        {
+          data: dynamicProgress.map((item) => item.startingBest),
+          color: (opacity = 1) => `rgba(255, 255, 255, ${opacity})`, // Starting Best in White
+          strokeWidth: 2,
+        },
+        {
+          data: dynamicProgress.map((item) => item.currentBest),
+          color: (opacity = 1) => `rgba(90, 59, 255, ${opacity})`, // Current Best in Purple
+          strokeWidth: 2,
+        },
+      ],
+      legend: ["Starting Reps", "Current Reps"],
+    };
+
+    return (
+      <View style={styles.chartContainer}>
+        <Text style={styles.chartTitle}>Performance Growth</Text>
+        <LineChart
+          data={data}
+          width={width - 40}
+          height={220}
+          chartConfig={{
+            backgroundColor: "#262135",
+            backgroundGradientFrom: "#2a2a3a",
+            backgroundGradientTo: "#262135",
+            decimalPlaces: 0,
+            color: (opacity = 1) => `rgba(255, 255, 255, ${opacity})`,
+            labelColor: (opacity = 1) => `rgba(255, 255, 255, ${opacity})`,
+            style: { borderRadius: 16 },
+            propsForDots: { r: "6", strokeWidth: "2", stroke: "#5A3BFF" },
+          }}
+          bezier // Makes the line curved
+          style={{ marginVertical: 8, borderRadius: 16 }}
+        />
+      </View>
+    );
+  };
+
   return (
     <View style={styles.container}>
       {/* Tabs */}
@@ -362,22 +451,42 @@ const WorkoutScreen = () => {
           )}
         </>
       ) : (
-        // Progress Tab
         <ScrollView>
+          {renderProgressChart()}
           <View style={styles.progressSection}>
-            <Text style={styles.muscleGroupTitle}>Your Progress</Text>
-            <View style={styles.progressTable}>
-              <View style={styles.progressHeaderRow}>
-                <Text style={[styles.headerCell, { flex: 1.2 }]}>Exercise</Text>
-                <Text style={styles.headerCell}>Weight</Text>
-                <Text style={styles.headerCell}>Start</Text>
-                <Text style={styles.headerCell}>Current</Text>
-                <Text style={styles.headerCell}>Growth</Text>
+            <View style={styles.progressSection}>
+              <View
+                style={{
+                  flexDirection: "row",
+                  justifyContent: "space-between",
+                  paddingRight: 20,
+                }}
+              >
+                <Text style={styles.muscleGroupTitle}>Your Progress</Text>
+                {progressLoading && <ActivityIndicator color="#5A3BFF" />}
               </View>
 
-              {progressData.map((item) => (
-                <View key={item.id}>{renderProgressItem({ item })}</View>
-              ))}
+              <View style={styles.progressTable}>
+                <View style={styles.progressHeaderRow}>
+                  <Text style={[styles.headerCell, { flex: 1.2 }]}>
+                    Exercise
+                  </Text>
+                  <Text style={styles.headerCell}>Weight</Text>
+                  <Text style={styles.headerCell}>Start</Text>
+                  <Text style={styles.headerCell}>Current</Text>
+                  <Text style={styles.headerCell}>Growth</Text>
+                </View>
+
+                {dynamicProgress.length > 0 ? (
+                  dynamicProgress.map((item) => (
+                    <View key={item.id}>{renderProgressItem({ item })}</View>
+                  ))
+                ) : (
+                  <Text style={styles.emptyStateText}>
+                    No workout history found yet.
+                  </Text>
+                )}
+              </View>
             </View>
           </View>
         </ScrollView>
@@ -578,6 +687,18 @@ const styles = StyleSheet.create({
   growthCell: {
     color: "#4CAF50",
     fontWeight: "bold",
+  },
+  chartContainer: {
+    marginHorizontal: 20,
+    marginTop: 10,
+    alignItems: "center",
+  },
+  chartTitle: {
+    color: "white",
+    fontSize: 18,
+    fontWeight: "bold",
+    alignSelf: "flex-start",
+    marginBottom: 10,
   },
 });
 
