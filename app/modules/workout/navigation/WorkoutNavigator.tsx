@@ -3,7 +3,6 @@ import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import { useNavigation, useRoute, RouteProp } from "@react-navigation/native";
 import WorkoutScreen from "../screens/WorkoutScreen";
 import SelectExercise from "../screens/SelectExercise";
-import FilterExercise from "../screens/FilterExercise";
 import HomeScreen from "../../home/screens/HomeScreen";
 import AiCoachScreen from "../screens/AiCoachScreen";
 import RecommendationWorkoutScreen from "../screens/RecommendationWorkoutScreen";
@@ -11,7 +10,6 @@ import RecommendationWorkoutScreen from "../screens/RecommendationWorkoutScreen"
 export type WorkoutStackParamList = {
   WorkoutMain: undefined;
   SelectExercise: { fromHome?: boolean } | undefined;
-  FilterExercise: undefined;
   HomeScreen: undefined;
   AiCoach: undefined;
   RecommendationWorkout: {
@@ -50,8 +48,6 @@ const WorkoutNavigator: React.FC = () => {
       {/* Main Workout Screens */}
       <Stack.Screen name="WorkoutMain" component={WorkoutScreen} />
       <Stack.Screen name="SelectExercise" component={SelectExercise} />
-      <Stack.Screen name="FilterExercise" component={FilterExercise} />
-
       {/* Integration with Home + AI */}
       <Stack.Screen name="HomeScreen" component={HomeScreen} />
       <Stack.Screen name="AiCoach" component={AiCoachScreen} />

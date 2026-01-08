@@ -65,6 +65,7 @@ const CreateScheduleScreen = ({ navigation, route }: Props) => {
   const [customReps, setCustomReps] = useState<number | null>(null); //determine rep in one set
   const [customRestSec, setCustomRestSec] = useState<number | null>(null);
   const [customLabel, setCustomLabel] = useState<string | null>(null);
+  const [customWeight, setCustomWeight] = useState<string>("Bodyweight");
 
   //For suggesting optimal time loading indicator
   const [isSuggesting, setIsSuggesting] = useState(false);
@@ -240,6 +241,7 @@ const CreateScheduleScreen = ({ navigation, route }: Props) => {
         selectedWorkoutId: selectedWorkoutId ?? null,
         customSets: customSets ?? undefined,
         customReps: customReps ?? undefined,
+        weightLifted: customWeight || "Bodyweight",
         customRestSeconds: customRestSec ?? undefined,
         customLabel: customLabel ?? undefined,
         notificationId: notificationId ?? null, // store so you can cancel/update later
@@ -518,6 +520,18 @@ const CreateScheduleScreen = ({ navigation, route }: Props) => {
                       }
                       keyboardType="numeric"
                       placeholder="e.g. 60"
+                      placeholderTextColor="#777"
+                    />
+                  </View>
+                  <View style={styles.modalRow}>
+                    <Text style={{ color: "#fff", marginBottom: 6 }}>
+                      Weight (kg / lbs)
+                    </Text>
+                    <TextInput
+                      style={styles.numberInput}
+                      value={customWeight}
+                      onChangeText={setCustomWeight}
+                      placeholder="e.g. 20kg or Bodyweight"
                       placeholderTextColor="#777"
                     />
                   </View>

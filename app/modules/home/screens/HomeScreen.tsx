@@ -437,7 +437,7 @@ const HomeScreen: React.FC = () => {
         </TouchableOpacity>
 
         {/* Suggested Workouts */}
-        <Text style={styles.sectionTitle}>Suggested Workouts</Text>
+        <Text style={styles.sectionTitle}>Personalized Workouts</Text>
 
         {loadingWorkouts || !userLevel ? (
           <View style={{ height: 120, justifyContent: "center" }}>

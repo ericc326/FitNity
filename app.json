@@ -28,6 +28,11 @@
       "favicon": "./assets/favicon.png"
     },
     "scheme": "fitnity",
-    "plugins": ["expo-web-browser", "expo-notifications"]
+    "plugins": [
+      "expo-web-browser",
+      "expo-notifications",
+      "expo-asset",
+      "expo-secure-store"
+    ]
   }
 }

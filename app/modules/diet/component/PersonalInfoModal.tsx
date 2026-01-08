@@ -11,25 +11,27 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import { useMealPlan } from "./MealPlanContext";
 
 interface PersonalInfo {
-  name: string;
+  // New fields for the 'dietinfo' subcollection
+  goal: string;
+  dietaryRestrictions: string[];
+  allergies: string[];
+  targetCalories: string;
+  // Local fields used only for calculation (existing in healthinfo)
   age: string;
   gender: string;
   weight: string;
   height: string;
   activityLevel: string;
-  goal: string;
-  dietaryRestrictions: string[];
-  allergies: string[];
-  targetCalories: string;
-  // Calculated automatically based on user data
 }
 
 interface PersonalInfoModalProps {
   visible: boolean;
   onClose: () => void;
-  onComplete: (info: PersonalInfo) => void;
+  // onComplete now returns the data intended for the 'dietinfo' subcollection
+  onComplete: (dietInfo: any) => void;
 }
 
 const PersonalInfoModal: React.FC<PersonalInfoModalProps> = ({
@@ -37,9 +39,9 @@ const PersonalInfoModal: React.FC<PersonalInfoModalProps> = ({
   onClose,
   onComplete,
 }) => {
+  const { healthInfo } = useMealPlan();
   const [currentStep, setCurrentStep] = useState(0);
   const [personalInfo, setPersonalInfo] = useState<PersonalInfo>({
-    name: "",
     age: "",
     gender: "",
     weight: "",
@@ -48,45 +50,26 @@ const PersonalInfoModal: React.FC<PersonalInfoModalProps> = ({
     goal: "",
     dietaryRestrictions: [],
     allergies: [],
-    targetCalories: "", // This will be calculated automatically
+    targetCalories: "",
   });
 
   const [dietaryRestrictionInput, setDietaryRestrictionInput] = useState("");
   const [allergyInput, setAllergyInput] = useState("");
 
-  const steps = [
-    "Basic Info",
-    "Physical Stats",
-    "Activity & Goals",
-    "Dietary Preferences",
-  ];
+  // Simplified steps focusing on your new requirements
+  const steps = ["Activity & Goal", "Dietary Preferences"];
 
   const activityLevels = [
-    { label: "Sedentary (little or no exercise)", value: "sedentary" },
-    {
-      label: "Lightly active (light exercise 1-3 days/week)",
-      value: "lightly_active",
-    },
-    {
-      label: "Moderately active (moderate exercise 3-5 days/week)",
-      value: "moderately_active",
-    },
-    {
-      label: "Very active (hard exercise 6-7 days/week)",
-      value: "very_active",
-    },
-    {
-      label: "Extremely active (very hard exercise, physical job)",
-      value: "extremely_active",
-    },
+    { label: "Sedentary", value: "sedentary" },
+    { label: "Lightly active", value: "lightly_active" },
+    { label: "Moderately active", value: "moderately_active" },
+    { label: "Very active", value: "very_active" },
   ];
 
   const goals = [
     { label: "Lose Weight", value: "lose_weight" },
     { label: "Maintain Weight", value: "maintain_weight" },
     { label: "Gain Weight", value: "gain_weight" },
-    { label: "Build Muscle", value: "build_muscle" },
-    { label: "Improve Health", value: "improve_health" },
   ];
 
   const dietaryRestrictions = [
@@ -96,9 +79,6 @@ const PersonalInfoModal: React.FC<PersonalInfoModalProps> = ({
     "Dairy-Free",
     "Keto",
     "Paleo",
-    "Mediterranean",
-    "Low-Carb",
-    "Low-Fat",
   ];
 
   const handleNext = () => {
@@ -110,72 +90,64 @@ const PersonalInfoModal: React.FC<PersonalInfoModalProps> = ({
   };
 
   const handleBack = () => {
-    if (currentStep > 0) {
-      setCurrentStep(currentStep - 1);
-    }
+    if (currentStep > 0) setCurrentStep(currentStep - 1);
   };
 
   const handleComplete = () => {
-    // Validate required fields
-    if (
-      !personalInfo.name ||
-      !personalInfo.age ||
-      !personalInfo.gender ||
-      !personalInfo.weight ||
-      !personalInfo.height ||
-      !personalInfo.activityLevel ||
-      !personalInfo.goal
-    ) {
-      Alert.alert("Missing Information", "Please fill in all required fields.");
+    if (!personalInfo.goal) {
+      Alert.alert("Missing Goal", "Please select a caloric goal.");
       return;
     }
 
-    // Always calculate target calories automatically
     const calculatedCalories = calculateTargetCalories();
-    const finalPersonalInfo = {
-      ...personalInfo,
+
+    // Data specifically for the 'dietinfo' subcollection
+    const dietInfoData = {
+      dietaryRestrictions: personalInfo.dietaryRestrictions,
+      allergies: personalInfo.allergies,
+      goal: personalInfo.goal,
       targetCalories: calculatedCalories.toString(),
+      updatedAt: new Date().toISOString(),
     };
 
-    onComplete(finalPersonalInfo);
+    onComplete(dietInfoData);
   };
 
   const calculateTargetCalories = (): number => {
-    const age = parseInt(personalInfo.age);
-    const weight = parseFloat(personalInfo.weight);
-    const height = parseFloat(personalInfo.height);
+    // Priority 1: Data from Firebase (healthInfo)
+    // Priority 2: Fallback to local state if Firebase is still empty
+    const age = parseInt(healthInfo?.age || personalInfo.age || "25");
+    const weight = parseFloat(
+      healthInfo?.weight || personalInfo.weight || "70"
+    );
+    const height = parseFloat(
+      healthInfo?.height || personalInfo.height || "170"
+    );
+    const gender = healthInfo?.gender || personalInfo.gender || "male";
 
-    // Basic BMR calculation (Mifflin-St Jeor Equation)
+    // Mifflin-St Jeor Equation
     let bmr = 10 * weight + 6.25 * height - 5 * age;
-    bmr = personalInfo.gender === "male" ? bmr + 5 : bmr - 161;
+    bmr = gender.toLowerCase() === "male" ? bmr + 5 : bmr - 161;
 
-    // Activity multiplier
-    const activityMultipliers = {
+    // Use activity level from modal or existing level from Firebase
+    const activeVal =
+      personalInfo.activityLevel ||
+      healthInfo?.level?.toLowerCase() ||
+      "sedentary";
+
+    const multipliers = {
       sedentary: 1.2,
       lightly_active: 1.375,
       moderately_active: 1.55,
       very_active: 1.725,
-      extremely_active: 1.9,
     };
 
     let tdee =
-      bmr *
-      activityMultipliers[
-        personalInfo.activityLevel as keyof typeof activityMultipliers
-      ];
+      bmr * (multipliers[activeVal as keyof typeof multipliers] || 1.2);
 
-    // Goal adjustment
-    switch (personalInfo.goal) {
-      case "lose_weight":
-        tdee -= 500; // 500 calorie deficit
-        break;
-      case "gain_weight":
-        tdee += 300; // 300 calorie surplus
-        break;
-      case "build_muscle":
-        tdee += 200; // 200 calorie surplus
-        break;
-    }
+    // Apply Goal Offset
+    if (personalInfo.goal === "lose_weight") tdee -= 500;
+    else if (personalInfo.goal === "gain_weight") tdee += 300;
 
     return Math.round(tdee);
   };
@@ -198,155 +170,31 @@ const PersonalInfoModal: React.FC<PersonalInfoModalProps> = ({
     }));
   };
 
-  const addCustomDietaryRestriction = () => {
-    if (dietaryRestrictionInput.trim()) {
-      setPersonalInfo((prev) => ({
-        ...prev,
-        dietaryRestrictions: [
-          ...prev.dietaryRestrictions,
-          dietaryRestrictionInput.trim(),
-        ],
-      }));
-      setDietaryRestrictionInput("");
-    }
-  };
-
-  const addCustomAllergy = () => {
-    if (allergyInput.trim()) {
-      setPersonalInfo((prev) => ({
-        ...prev,
-        allergies: [...prev.allergies, allergyInput.trim()],
-      }));
-      setAllergyInput("");
-    }
-  };
-
   const renderStep = () => {
     switch (currentStep) {
-      case 0:
+      case 0: // Step 1: Caloric Goal & Activity
         return (
           <View style={styles.stepContainer}>
-            <Text style={styles.stepTitle}>Basic Information</Text>
+            <Text style={styles.stepTitle}>Caloric Goal</Text>
             <Text style={styles.stepDescription}>
-              Let's start with some basic details about you.
+              Select your primary nutritional target.
             </Text>
-
-            <View style={styles.inputGroup}>
-              <Text style={styles.inputLabel}>Name *</Text>
-              <TextInput
-                style={styles.textInput}
-                value={personalInfo.name}
-                onChangeText={(text) =>
-                  setPersonalInfo((prev) => ({ ...prev, name: text }))
+            {goals.map((g) => (
+              <TouchableOpacity
+                key={g.value}
+                style={[
+                  styles.radioButton,
+                  personalInfo.goal === g.value && styles.radioButtonActive,
+                ]}
+                onPress={() =>
+                  setPersonalInfo((p) => ({ ...p, goal: g.value }))
                 }
-                placeholder="Enter your name"
-              />
-            </View>
-
+              >
+                <Text>{g.label}</Text>
+              </TouchableOpacity>
+            ))}
             <View style={styles.inputGroup}>
-              <Text style={styles.inputLabel}>Age *</Text>
-              <TextInput
-                style={styles.textInput}
-                value={personalInfo.age}
-                onChangeText={(text) =>
-                  setPersonalInfo((prev) => ({ ...prev, age: text }))
-                }
-                placeholder="Enter your age"
-                keyboardType="numeric"
-              />
-            </View>
-
-            <View style={styles.inputGroup}>
-              <Text style={styles.inputLabel}>Gender *</Text>
-              <View style={styles.radioGroup}>
-                <TouchableOpacity
-                  style={[
-                    styles.radioButton,
-                    personalInfo.gender === "male" && styles.radioButtonActive,
-                  ]}
-                  onPress={() =>
-                    setPersonalInfo((prev) => ({ ...prev, gender: "male" }))
-                  }
-                >
-                  <View
-                    style={[
-                      styles.radioCircle,
-                      personalInfo.gender === "male" &&
-                        styles.radioCircleActive,
-                    ]}
-                  />
-                  <Text style={styles.radioLabel}>Male</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={[
-                    styles.radioButton,
-                    personalInfo.gender === "female" &&
-                      styles.radioButtonActive,
-                  ]}
-                  onPress={() =>
-                    setPersonalInfo((prev) => ({ ...prev, gender: "female" }))
-                  }
-                >
-                  <View
-                    style={[
-                      styles.radioCircle,
-                      personalInfo.gender === "female" &&
-                        styles.radioCircleActive,
-                    ]}
-                  />
-                  <Text style={styles.radioLabel}>Female</Text>
-                </TouchableOpacity>
-              </View>
-            </View>
-          </View>
-        );
-
-      case 1:
-        return (
-          <View style={styles.stepContainer}>
-            <Text style={styles.stepTitle}>Physical Statistics</Text>
-            <Text style={styles.stepDescription}>
-              Help us understand your current physical stats.
-            </Text>
-
-            <View style={styles.inputGroup}>
-              <Text style={styles.inputLabel}>Weight (kg) *</Text>
-              <TextInput
-                style={styles.textInput}
-                value={personalInfo.weight}
-                onChangeText={(text) =>
-                  setPersonalInfo((prev) => ({ ...prev, weight: text }))
-                }
-                placeholder="Enter your weight in kg"
-                keyboardType="numeric"
-              />
-            </View>
-
-            <View style={styles.inputGroup}>
-              <Text style={styles.inputLabel}>Height (cm) *</Text>
-              <TextInput
-                style={styles.textInput}
-                value={personalInfo.height}
-                onChangeText={(text) =>
-                  setPersonalInfo((prev) => ({ ...prev, height: text }))
-                }
-                placeholder="Enter your height in cm"
-                keyboardType="numeric"
-              />
-            </View>
-          </View>
-        );
-
-      case 2:
-        return (
-          <View style={styles.stepContainer}>
-            <Text style={styles.stepTitle}>Activity Level & Goals</Text>
-            <Text style={styles.stepDescription}>
-              Tell us about your activity level and what you want to achieve.
-            </Text>
-
-            <View style={styles.inputGroup}>
-              <Text style={styles.inputLabel}>Activity Level *</Text>
+              <Text style={styles.inputLabel}>Activity Level</Text>
               {activityLevels.map((level) => (
                 <TouchableOpacity
                   key={level.value}
@@ -362,160 +210,63 @@ const PersonalInfoModal: React.FC<PersonalInfoModalProps> = ({
                     }))
                   }
                 >
-                  <View
-                    style={[
-                      styles.radioCircle,
-                      personalInfo.activityLevel === level.value &&
-                        styles.radioCircleActive,
-                    ]}
-                  />
-                  <Text style={styles.radioLabel}>{level.label}</Text>
+                  <Text>{level.label}</Text>
                 </TouchableOpacity>
               ))}
-            </View>
-
-            <View style={styles.inputGroup}>
-              <Text style={styles.inputLabel}>Goal *</Text>
-              {goals.map((goal) => (
-                <TouchableOpacity
-                  key={goal.value}
-                  style={[
-                    styles.radioButton,
-                    personalInfo.goal === goal.value &&
-                      styles.radioButtonActive,
-                  ]}
-                  onPress={() =>
-                    setPersonalInfo((prev) => ({ ...prev, goal: goal.value }))
-                  }
-                >
-                  <View
-                    style={[
-                      styles.radioCircle,
-                      personalInfo.goal === goal.value &&
-                        styles.radioCircleActive,
-                    ]}
-                  />
-                  <Text style={styles.radioLabel}>{goal.label}</Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-
-            <View style={styles.calorieInfo}>
-              <Text style={styles.calorieInfoTitle}>Target Calories</Text>
-              <Text style={styles.calorieInfoDescription}>
-                Your daily calorie target will be automatically calculated based
-                on your age, gender, weight, height, activity level, and goal.
-              </Text>
-              {personalInfo.age &&
-                personalInfo.gender &&
-                personalInfo.weight &&
-                personalInfo.height &&
-                personalInfo.activityLevel &&
-                personalInfo.goal && (
-                  <View style={styles.calculatedCalories}>
-                    <Text style={styles.calculatedCaloriesLabel}>
-                      Estimated Daily Target:
-                    </Text>
-                    <Text style={styles.calculatedCaloriesValue}>
-                      {calculateTargetCalories()} calories
-                    </Text>
-                  </View>
-                )}
             </View>
           </View>
         );
-
-      case 3:
+      case 1:
         return (
           <View style={styles.stepContainer}>
             <Text style={styles.stepTitle}>Dietary Preferences</Text>
-            <Text style={styles.stepDescription}>
-              Let us know about any dietary restrictions or allergies.
-            </Text>
-
-            <View style={styles.inputGroup}>
-              <Text style={styles.inputLabel}>Dietary Restrictions</Text>
-              <View style={styles.checkboxGrid}>
-                {dietaryRestrictions.map((restriction) => (
-                  <TouchableOpacity
-                    key={restriction}
-                    style={[
-                      styles.checkboxButton,
-                      personalInfo.dietaryRestrictions.includes(restriction) &&
-                        styles.checkboxButtonActive,
-                    ]}
-                    onPress={() => toggleDietaryRestriction(restriction)}
-                  >
-                    <Ionicons
-                      name={
-                        personalInfo.dietaryRestrictions.includes(restriction)
-                          ? "checkmark-circle"
-                          : "ellipse-outline"
-                      }
-                      size={20}
-                      color={
-                        personalInfo.dietaryRestrictions.includes(restriction)
-                          ? "#4CAF50"
-                          : "#666"
-                      }
-                    />
-                    <Text style={styles.checkboxLabel}>{restriction}</Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
-
-              <View style={styles.customInputContainer}>
-                <TextInput
-                  style={styles.customInput}
-                  value={dietaryRestrictionInput}
-                  onChangeText={setDietaryRestrictionInput}
-                  placeholder="Add custom restriction"
-                />
+            <Text style={styles.inputLabel}>Restrictions</Text>
+            <View style={styles.checkboxGrid}>
+              {dietaryRestrictions.map((r) => (
                 <TouchableOpacity
-                  style={styles.addButton}
-                  onPress={addCustomDietaryRestriction}
+                  key={r}
+                  style={[
+                    styles.checkboxButton,
+                    personalInfo.dietaryRestrictions.includes(r) &&
+                      styles.checkboxButtonActive,
+                  ]}
+                  onPress={() => toggleDietaryRestriction(r)}
                 >
-                  <Ionicons name="add" size={20} color="#4CAF50" />
+                  <Text>{r}</Text>
                 </TouchableOpacity>
-              </View>
+              ))}
             </View>
-
-            <View style={styles.inputGroup}>
-              <Text style={styles.inputLabel}>Allergies</Text>
-              <View style={styles.customInputContainer}>
-                <TextInput
-                  style={styles.customInput}
-                  value={allergyInput}
-                  onChangeText={setAllergyInput}
-                  placeholder="Add allergy"
-                />
-                <TouchableOpacity
-                  style={styles.addButton}
-                  onPress={addCustomAllergy}
-                >
-                  <Ionicons name="add" size={20} color="#4CAF50" />
-                </TouchableOpacity>
-              </View>
-
-              {personalInfo.allergies.length > 0 && (
-                <View style={styles.tagContainer}>
-                  {personalInfo.allergies.map((allergy, index) => (
-                    <View key={index} style={styles.tag}>
-                      <Text style={styles.tagText}>{allergy}</Text>
-                      <TouchableOpacity
-                        onPress={() => toggleAllergy(allergy)}
-                        style={styles.tagRemove}
-                      >
-                        <Ionicons name="close" size={16} color="#FF5722" />
-                      </TouchableOpacity>
-                    </View>
-                  ))}
+            <Text style={[styles.inputLabel, { marginTop: 20 }]}>
+              Allergies
+            </Text>
+            <View style={styles.customInputContainer}>
+              <TextInput
+                style={styles.customInput}
+                value={allergyInput}
+                onChangeText={setAllergyInput}
+                placeholder="Add allergy"
+              />
+              <TouchableOpacity
+                style={styles.addButton}
+                onPress={() => {
+                  if (allergyInput) {
+                    toggleAllergy(allergyInput);
+                    setAllergyInput("");
+                  }
+                }}
+              >
+                <Ionicons name="add" size={20} color="#4CAF50" />
+              </TouchableOpacity>
+            </View>
+            <View style={styles.tagContainer}>
+              {personalInfo.allergies.map((a) => (
+                <View key={a} style={styles.tag}>
+                  <Text style={styles.tagText}>{a}</Text>
                 </View>
-              )}
+              ))}
             </View>
           </View>
         );
-
       default:
         return null;
     }
@@ -526,54 +277,25 @@ const PersonalInfoModal: React.FC<PersonalInfoModalProps> = ({
       visible={visible}
       animationType="slide"
       presentationStyle="pageSheet"
-      onRequestClose={onClose}
     >
       <SafeAreaView style={styles.container}>
-        {/* Header */}
         <View style={styles.header}>
           <TouchableOpacity onPress={onClose}>
             <Ionicons name="close" size={24} color="#333" />
           </TouchableOpacity>
-          <Text style={styles.headerTitle}>Personal Information</Text>
+          <Text style={styles.headerTitle}>Dietary Assessment</Text>
           <View style={{ width: 24 }} />
         </View>
-
-        {/* Progress Bar */}
-        <View style={styles.progressContainer}>
-          <View style={styles.progressBar}>
-            <View
-              style={[
-                styles.progressFill,
-                { width: `${((currentStep + 1) / steps.length) * 100}%` },
-              ]}
-            />
-          </View>
-          <Text style={styles.progressText}>
-            Step {currentStep + 1} of {steps.length}
-          </Text>
-        </View>
-
-        {/* Content */}
-        <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-          {renderStep()}
-        </ScrollView>
-
-        {/* Footer */}
+        <ScrollView style={styles.content}>{renderStep()}</ScrollView>
         <View style={styles.footer}>
           {currentStep > 0 && (
             <TouchableOpacity style={styles.backButton} onPress={handleBack}>
-              <Text style={styles.backButtonText}>Back</Text>
+              <Text>Back</Text>
             </TouchableOpacity>
           )}
-          <TouchableOpacity
-            style={[
-              styles.nextButton,
-              currentStep === steps.length - 1 && styles.completeButton,
-            ]}
-            onPress={handleNext}
-          >
-            <Text style={styles.nextButtonText}>
-              {currentStep === steps.length - 1 ? "Complete" : "Next"}
+          <TouchableOpacity style={styles.nextButton} onPress={handleNext}>
+            <Text style={{ color: "white" }}>
+              {currentStep === steps.length - 1 ? "Save Diet Profile" : "Next"}
             </Text>
           </TouchableOpacity>
         </View>
@@ -583,254 +305,88 @@ const PersonalInfoModal: React.FC<PersonalInfoModalProps> = ({
 };
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: "#f1e3ec",
-  },
+  container: { flex: 1, backgroundColor: "#f1e3ec" },
   header: {
     flexDirection: "row",
     justifyContent: "space-between",
-    alignItems: "center",
-    paddingHorizontal: 20,
-    paddingTop: 20,
-    paddingBottom: 20,
+    padding: 20,
     borderBottomWidth: 1,
     borderBottomColor: "#E0E0E0",
   },
-  headerTitle: {
-    fontSize: 18,
-    fontWeight: "bold",
-    color: "#333",
-  },
-  progressContainer: {
-    paddingHorizontal: 20,
-    paddingVertical: 16,
-  },
-  progressBar: {
-    height: 4,
-    backgroundColor: "#E0E0E0",
-    borderRadius: 2,
-    marginBottom: 8,
-  },
-  progressFill: {
-    height: "100%",
-    backgroundColor: "#4CAF50",
-    borderRadius: 2,
-  },
-  progressText: {
-    fontSize: 12,
-    color: "#666",
-    textAlign: "center",
-  },
-  content: {
-    flex: 1,
-    paddingHorizontal: 20,
-  },
-  stepContainer: {
-    paddingVertical: 20,
-  },
-  stepTitle: {
-    fontSize: 24,
-    fontWeight: "bold",
-    color: "#333",
-    marginBottom: 8,
-  },
-  stepDescription: {
-    fontSize: 16,
-    color: "#666",
-    marginBottom: 24,
-  },
-  inputGroup: {
-    marginBottom: 24,
-  },
-  inputLabel: {
-    fontSize: 16,
-    fontWeight: "600",
-    color: "#333",
-    marginBottom: 8,
-  },
+  headerTitle: { fontSize: 18, fontWeight: "bold" },
+  content: { flex: 1, paddingHorizontal: 20 },
+  stepContainer: { paddingVertical: 20 },
+  stepTitle: { fontSize: 24, fontWeight: "bold", marginBottom: 8 },
+  stepDescription: { fontSize: 16, color: "#666", marginBottom: 20 },
+  inputGroup: { marginTop: 20 },
+  inputLabel: { fontSize: 16, fontWeight: "600", marginBottom: 10 },
   textInput: {
     backgroundColor: "white",
     borderRadius: 12,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    fontSize: 16,
+    padding: 12,
     borderWidth: 1,
     borderColor: "#E0E0E0",
   },
-  radioGroup: {
-    flexDirection: "row",
-    gap: 16,
-  },
   radioButton: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingVertical: 12,
-    paddingHorizontal: 16,
+    padding: 12,
     backgroundColor: "white",
     borderRadius: 12,
     borderWidth: 1,
     borderColor: "#E0E0E0",
-    flex: 1,
+    marginBottom: 10,
   },
-  radioButtonActive: {
-    borderColor: "#4CAF50",
-    backgroundColor: "#E8F5E8",
-  },
-  radioCircle: {
-    width: 20,
-    height: 20,
-    borderRadius: 10,
-    borderWidth: 2,
-    borderColor: "#E0E0E0",
-    marginRight: 8,
-  },
-  radioCircleActive: {
-    borderColor: "#4CAF50",
-    backgroundColor: "#4CAF50",
-  },
-  radioLabel: {
-    fontSize: 14,
-    color: "#333",
-  },
-  checkboxGrid: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 8,
-  },
+  radioButtonActive: { borderColor: "#4CAF50", backgroundColor: "#E8F5E8" },
+  checkboxGrid: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
   checkboxButton: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingVertical: 8,
-    paddingHorizontal: 12,
+    padding: 10,
     backgroundColor: "white",
     borderRadius: 8,
     borderWidth: 1,
     borderColor: "#E0E0E0",
-    minWidth: "45%",
   },
-  checkboxButtonActive: {
-    borderColor: "#4CAF50",
-    backgroundColor: "#E8F5E8",
-  },
-  checkboxLabel: {
-    fontSize: 14,
-    color: "#333",
-    marginLeft: 8,
-  },
-  customInputContainer: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginTop: 12,
-    gap: 8,
-  },
+  checkboxButtonActive: { borderColor: "#4CAF50", backgroundColor: "#E8F5E8" },
+  customInputContainer: { flexDirection: "row", gap: 8 },
   customInput: {
     flex: 1,
     backgroundColor: "white",
     borderRadius: 12,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    fontSize: 16,
+    padding: 12,
     borderWidth: 1,
     borderColor: "#E0E0E0",
   },
-  addButton: {
-    padding: 12,
-    backgroundColor: "#E8F5E8",
-    borderRadius: 12,
-  },
+  addButton: { padding: 12, backgroundColor: "#E8F5E8", borderRadius: 12 },
   tagContainer: {
     flexDirection: "row",
     flexWrap: "wrap",
     gap: 8,
-    marginTop: 12,
+    marginTop: 10,
   },
   tag: {
-    flexDirection: "row",
-    alignItems: "center",
     backgroundColor: "#FF5722",
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: 16,
   },
-  tagText: {
-    fontSize: 12,
-    color: "white",
-    marginRight: 4,
-  },
-  tagRemove: {
-    padding: 2,
-  },
+  tagText: { color: "white", fontSize: 12 },
   footer: {
     flexDirection: "row",
     justifyContent: "space-between",
-    paddingHorizontal: 20,
-    paddingVertical: 20,
+    padding: 20,
     borderTopWidth: 1,
     borderTopColor: "#E0E0E0",
   },
   backButton: {
-    paddingVertical: 12,
-    paddingHorizontal: 24,
+    padding: 12,
     borderRadius: 12,
     borderWidth: 1,
     borderColor: "#E0E0E0",
-  },
-  backButtonText: {
-    fontSize: 16,
-    color: "#666",
   },
   nextButton: {
-    paddingVertical: 12,
-    paddingHorizontal: 24,
+    padding: 12,
     backgroundColor: "#4CAF50",
     borderRadius: 12,
-  },
-  completeButton: {
-    backgroundColor: "#2196F3",
-  },
-  nextButtonText: {
-    fontSize: 16,
-    color: "white",
-    fontWeight: "600",
-  },
-  calorieInfo: {
-    marginTop: 24,
-    padding: 16,
-    backgroundColor: "#F5F5F5",
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: "#E0E0E0",
-  },
-  calorieInfoTitle: {
-    fontSize: 18,
-    fontWeight: "bold",
-    color: "#333",
-    marginBottom: 8,
-  },
-  calorieInfoDescription: {
-    fontSize: 14,
-    color: "#666",
-    marginBottom: 12,
-  },
-  calculatedCalories: {
-    flexDirection: "row",
+    minWidth: 100,
     alignItems: "center",
-    backgroundColor: "#E8F5E8",
-    borderRadius: 12,
-    paddingVertical: 10,
-    paddingHorizontal: 12,
-  },
-  calculatedCaloriesLabel: {
-    fontSize: 14,
-    color: "#4CAF50",
-    fontWeight: "600",
-  },
-  calculatedCaloriesValue: {
-    fontSize: 16,
-    color: "#4CAF50",
-    fontWeight: "bold",
-    marginLeft: 8,
   },
 });
 
