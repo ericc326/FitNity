@@ -1,6 +1,6 @@
 import GeminiService from "../services/GeminiService";
 import { Ionicons } from "@expo/vector-icons";
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useMemo } from "react";
 import {
   ActivityIndicator,
   Modal,
@@ -26,18 +26,8 @@ interface FoodItem {
   category: string;
 }
 
-interface PersonalInfo {
-  name: string;
-  age: string;
-  gender: string;
-  weight: string;
-  height: string;
-  activityLevel: string;
-  goal: string;
-  dietaryRestrictions: string[];
-  allergies: string[];
-  targetCalories: string;
-}
+// Helper to safely format context data
+const safeString = (value: any) => (value ? String(value) : "");
 
 interface AIFoodRecommendationProps {
   visible: boolean;
@@ -55,8 +45,7 @@ const AIFoodRecommendation: React.FC<AIFoodRecommendationProps> = ({
   const [showPersonalInfoModal, setShowPersonalInfoModal] = useState(false);
   const [recommendations, setRecommendations] = useState<FoodItem[]>([]);
   const [isLoading, setIsLoading] = useState(false);
-  const [personalInfo, setPersonalInfo] = useState<PersonalInfo | null>(null);
-  const [hasCompletedSetup, setHasCompletedSetup] = useState(false);
+
   const {
     meals,
     dietInfo: contextDietInfo,
@@ -64,40 +53,36 @@ const AIFoodRecommendation: React.FC<AIFoodRecommendationProps> = ({
     saveDietInfo,
   } = useMealPlan();
 
+  // DERIVED STATE: Calculate profile directly from Context.
+  // This ensures it is always up-to-date with the latest database info.
+  const personalInfo = useMemo(() => {
+    if (!contextDietInfo || !contextHealthInfo) return null;
+
+    return {
+      name: auth.currentUser?.displayName || "User",
+      // Health Info (Read directly from Context)
+      age: safeString(contextHealthInfo.age),
+      gender: safeString(contextHealthInfo.gender),
+      weight: safeString(contextHealthInfo.weight),
+      height: safeString(contextHealthInfo.height),
+      activityLevel: safeString(contextHealthInfo.level),
+      // Diet Info (Read directly from Context)
+      goal: contextDietInfo.goal,
+      dietaryRestrictions: contextDietInfo.dietaryRestrictions,
+      allergies: contextDietInfo.allergies,
+      targetCalories: contextDietInfo.targetCalories,
+    };
+  }, [contextDietInfo, contextHealthInfo]);
+
+  console.log("Personal Info:", personalInfo);
+
+  // Check if setup is complete based on data existence
+  const hasCompletedSetup = !!personalInfo;
+
   // Set API key from .env automatically
   useEffect(() => {
     GeminiService.setApiKey(GEMINI_API_KEY);
   }, []);
-
-  useEffect(() => {
-    if (visible) {
-      loadPersonalInfo();
-    }
-  }, [visible]);
-
-  const loadPersonalInfo = async () => {
-    // Check if both data pieces exist
-    if (contextDietInfo && contextHealthInfo) {
-      const info: PersonalInfo = {
-        name: auth.currentUser?.displayName || "User",
-        // Use REAL data from healthinfo collection
-        age: contextHealthInfo.age || "0",
-        gender: contextHealthInfo.gender || "Not Specified",
-        weight: contextHealthInfo.weight || "0",
-        height: contextHealthInfo.height || "0",
-        // Use REAL data from dietinfo collection
-        activityLevel: contextHealthInfo.level || "moderate",
-        goal: contextDietInfo.goal,
-        dietaryRestrictions: contextDietInfo.dietaryRestrictions,
-        allergies: contextDietInfo.allergies,
-        targetCalories: contextDietInfo.targetCalories,
-      };
-      setPersonalInfo(info);
-      setHasCompletedSetup(true);
-    } else {
-      setHasCompletedSetup(false);
-    }
-  };
 
   const handleGenerateRecommendations = async () => {
     if (!hasCompletedSetup || !personalInfo) {
@@ -108,11 +93,11 @@ const AIFoodRecommendation: React.FC<AIFoodRecommendationProps> = ({
   };
 
   const handlePersonalInfoComplete = async (info: any) => {
-    // Save to Firebase via the context function we created earlier
+    // 1. Save to Firebase/Context
+    // The Context will update 'contextDietInfo', which triggers the useMemo above
+    // causing the UI to update automatically.
     await saveDietInfo(info);
-    setHasCompletedSetup(true);
     setShowPersonalInfoModal(false);
-    // The useEffect will trigger generateRecommendations once dietInfo updates
   };
 
   const generateRecommendations = async () => {
