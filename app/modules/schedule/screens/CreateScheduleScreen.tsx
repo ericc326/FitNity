@@ -65,7 +65,7 @@ const CreateScheduleScreen = ({ navigation, route }: Props) => {
   const [customReps, setCustomReps] = useState<number | null>(null); //determine rep in one set
   const [customRestSec, setCustomRestSec] = useState<number | null>(null);
   const [customLabel, setCustomLabel] = useState<string | null>(null);
-  const [customWeight, setCustomWeight] = useState<string>("Bodyweight");
+  const [customWeight, setCustomWeight] = useState<string | null>("Bodyweight");
 
   //For suggesting optimal time loading indicator
   const [isSuggesting, setIsSuggesting] = useState(false);
@@ -529,8 +529,8 @@ const CreateScheduleScreen = ({ navigation, route }: Props) => {
                     </Text>
                     <TextInput
                       style={styles.numberInput}
-                      value={customWeight}
-                      onChangeText={setCustomWeight}
+                      value={customWeight ?? ""}
+                      onChangeText={(t) => setCustomWeight(t || null)}
                       placeholder="e.g. 20kg or Bodyweight"
                       placeholderTextColor="#777"
                     />
