@@ -31,8 +31,7 @@
     "plugins": [
       "expo-web-browser",
       "expo-notifications",
-      "expo-asset",
-      "expo-secure-store"
+      "expo-asset"
     ]
   }
 }

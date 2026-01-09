@@ -1,7 +1,6 @@
 import AIFoodRecommendation from "../component/AiFoodRecommendation";
 import { useMealPlan } from "../component/MealPlanContext";
 import React, { useEffect, useState } from "react";
-import { useFocusEffect } from "@react-navigation/native";
 
 import { GEMINI_API_KEY, SPOONACULAR_API_KEY } from "@env";
 import {
@@ -28,6 +27,8 @@ const MealsScreen = () => {
   const [showAIRecommendations, setShowAIRecommendations] = useState(false);
   const [showCustomMealModal, setShowCustomMealModal] = useState(false);
   const [selectedMealId, setSelectedMealId] = useState<string | null>(null);
+
+  // Custom Meal Form State
   const [customMealData, setCustomMealData] = useState({
     name: "",
     calories: "",
@@ -35,17 +36,12 @@ const MealsScreen = () => {
     carbs: "",
     fat: "",
   });
-  const [hasCompletedSetup, setHasCompletedSetup] = useState(false);
+
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [recommendedMeals, setRecommendedMeals] = useState<any[]>([]);
   const [loadingRecipes, setLoadingRecipes] = useState(false);
-  const [showDisclaimer, setShowDisclaimer] = useState(true); // true to show on first load
-
-  useEffect(() => {
-    const todayString = new Date().toISOString().split("T")[0];
-    changeDate(todayString);
-  }, []);
+  const [showDisclaimer, setShowDisclaimer] = useState(true);
 
   const navigation = useNavigation<DietScreenNavigationProp>();
   type DietScreenNavigationProp = NativeStackNavigationProp<
@@ -60,12 +56,24 @@ const MealsScreen = () => {
     getTotalNutrition,
     addCustomMeal,
     dietInfo,
-    healthInfo,
     isLoading,
     changeDate,
   } = useMealPlan();
 
+  // This automatically becomes true if dietInfo exists and has calories
+  const hasCompletedSetup = !!(dietInfo && dietInfo.targetCalories);
+
+  useEffect(() => {
+    if (!hasCompletedSetup) setRecommendedMeals([]);
+  }, [hasCompletedSetup]);
+
   const totalNutrition = getTotalNutrition();
+
+  // Initialize Date
+  useEffect(() => {
+    const todayString = new Date().toISOString().split("T")[0];
+    changeDate(todayString);
+  }, []);
 
   const handleSelectFood = (food: any) => {
     if (selectedMealId) {
@@ -76,9 +84,7 @@ const MealsScreen = () => {
   };
 
   const handleRemoveMeal = (mealId: string) => {
-    // mealId here is like "breakfast"
     const mealItem = meals.find((m) => m.id === mealId);
-
     if (!mealItem?.docId) return;
 
     Alert.alert("Remove Meal", "Are you sure?", [
@@ -86,7 +92,6 @@ const MealsScreen = () => {
       {
         text: "Remove",
         style: "destructive",
-        // Pass the docId to the context function
         onPress: () => removeMeal(mealItem.docId!),
       },
     ]);
@@ -124,9 +129,9 @@ const MealsScreen = () => {
     }
   };
 
-  // 2. Add a conditional check inside fetchRecommendedMeals as a second layer of protection
   const fetchRecommendedMeals = async () => {
-    // Gatekeeper: If we already have data, don't call the API again
+    if (!hasCompletedSetup) return;
+    // Gatekeeper: If we already have data or no API key, don't call
     if (recommendedMeals.length > 0 || !SPOONACULAR_API_KEY) return;
 
     setLoadingRecipes(true);
@@ -154,7 +159,12 @@ const MealsScreen = () => {
   }, [isLoading, dietInfo, totalNutrition.calories]);
 
   const handleAIRecommendations = () => {
+    // If setup is not complete, we might still want to show the modal
+    // to let the AI help set them up, or redirect them.
+    // Based on your UI text "Complete Setup", users expect an action here.
     if (!hasCompletedSetup) {
+      // You can either open the AI to help them setup, or navigate to a setup screen.
+      // For now, I'll keep your original logic which opens the modal:
       setShowAIRecommendations(true);
       return;
     }
@@ -168,28 +178,7 @@ const MealsScreen = () => {
     setShowAIRecommendations(true);
   };
 
-  const handleClearAll = async () => {
-    Alert.alert(
-      "Clear All Meals",
-      "This will delete today's logs from the cloud. Continue?",
-      [
-        { text: "Cancel", style: "cancel" },
-        {
-          text: "Clear",
-          style: "destructive",
-          onPress: async () => {
-            // Iterate through today's meals and remove them by docId
-            for (const meal of meals) {
-              if (meal.docId) {
-                await removeMeal(meal.docId);
-              }
-            }
-          },
-        },
-      ]
-    );
-  };
-
+  // Helper for rendering a single meal row
   const MealItem = ({ meal }: { meal: any }) => (
     <View style={styles.mealItem}>
       <View style={styles.mealHeader}>
@@ -242,7 +231,7 @@ const MealsScreen = () => {
     return (
       <SafeAreaView style={styles.container}>
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#4CAF50" />
+          <ActivityIndicator size="large" color="fff" />
           <Text style={styles.loadingText}>Loading your meals...</Text>
         </View>
       </SafeAreaView>
@@ -251,19 +240,17 @@ const MealsScreen = () => {
 
   return (
     <SafeAreaView style={styles.container}>
+      {/* Disclaimer Modal */}
       <Modal visible={showDisclaimer} transparent animationType="fade">
         <View style={styles.modalOverlayDisclaimer}>
           <View style={styles.disclaimerContent}>
-            {/* Exclamation mark */}
             <Text style={styles.exclamationMark}>❗</Text>
-
             <Text style={styles.disclaimerTitle}>Important Disclaimer</Text>
             <Text style={styles.modalText}>
               The recommendations provided in this app are for informational
               purposes only. Please follow your doctor's advice and consult a
               healthcare professional if you have any health concerns.
             </Text>
-
             <TouchableOpacity
               style={styles.okButton}
               onPress={() => setShowDisclaimer(false)}
@@ -282,6 +269,7 @@ const MealsScreen = () => {
           <Text style={styles.headerTitle}>Are You Eating Healthy?</Text>
         </View>
 
+        {/* Nutrition Circles */}
         <View style={styles.topNutritionOverview}>
           <View style={styles.circleMetric}>
             <View style={[styles.circleIcon, { backgroundColor: "#FF572220" }]}>
@@ -307,6 +295,7 @@ const MealsScreen = () => {
               </Text>
             </View>
           </View>
+
           <View style={styles.circleMetric}>
             <View style={[styles.circleIcon, { backgroundColor: "#4CAF5020" }]}>
               <Ionicons name="restaurant" size={18} color="#4CAF50" />
@@ -334,6 +323,7 @@ const MealsScreen = () => {
               </Text>
             </View>
           </View>
+
           <View style={styles.circleMetric}>
             <View style={[styles.circleIcon, { backgroundColor: "#2196F320" }]}>
               <Ionicons name="leaf" size={18} color="#2196F3" />
@@ -363,6 +353,7 @@ const MealsScreen = () => {
           </View>
         </View>
 
+        {/* Recommended For You Section */}
         <View style={styles.sectionHeader}>
           <Text style={styles.sectionTitle}>Recommended For You</Text>
           <TouchableOpacity
@@ -370,7 +361,7 @@ const MealsScreen = () => {
             onPress={() =>
               navigation.navigate("RecipeList", {
                 recipes: recommendedMeals,
-                loading: false, // optional
+                loading: false,
               })
             }
           >
@@ -388,16 +379,10 @@ const MealsScreen = () => {
           ) : (
             recommendedMeals.map((recipe) => {
               const nutrients = recipe.nutrition?.nutrients || [];
-
               const calories =
                 nutrients.find((n: any) => n.name === "Calories")?.amount || 0;
               const protein =
                 nutrients.find((n: any) => n.name === "Protein")?.amount || 0;
-              const carbs =
-                nutrients.find((n: any) => n.name === "Carbohydrates")
-                  ?.amount || 0;
-              const fat =
-                nutrients.find((n: any) => n.name === "Fat")?.amount || 0;
 
               return (
                 <TouchableOpacity
@@ -414,11 +399,9 @@ const MealsScreen = () => {
                     style={styles.recipeImage}
                     resizeMode="cover"
                   />
-
                   <Text style={styles.recipeTitle} numberOfLines={2}>
                     {recipe.title}
                   </Text>
-
                   <Text style={{ fontSize: 12, color: "#666" }}>
                     {Math.round(calories)} kcal · {Math.round(protein)}g protein
                   </Text>
@@ -428,9 +411,9 @@ const MealsScreen = () => {
           )}
         </ScrollView>
 
+        {/* My Meals Header */}
         <View style={styles.myMealsHeader}>
           <Text style={styles.myMealsTitle}>My Meals</Text>
-
           <View style={styles.headerRight}>
             <TouchableOpacity
               style={{ marginTop: -6 }}
@@ -441,9 +424,9 @@ const MealsScreen = () => {
           </View>
         </View>
 
+        {/* Today's Nutrition Details */}
         <View style={styles.todayNutritionCard}>
           <Text style={styles.todayNutritionTitle}>Today's Nutrition</Text>
-
           <View style={styles.nutritionRowDetail}>
             <View style={styles.nutritionItemDetail}>
               <Text style={styles.nutritionLabelDetail}>Calories</Text>
@@ -474,16 +457,17 @@ const MealsScreen = () => {
           </View>
         </View>
 
+        {/* Meals List */}
         <View style={styles.mealsContainer}>
           <View style={styles.sectionHeaderRow}>
             <Text style={styles.sectionTitle}>Today's Meals</Text>
           </View>
 
-          {/* Meals list */}
           {meals.map((meal) => (
             <MealItem key={meal.id} meal={meal} />
           ))}
 
+          {/* Bottom Action Buttons */}
           <View style={styles.mealActionColumn}>
             <TouchableOpacity
               style={styles.mealActionButtonFull}
@@ -509,6 +493,7 @@ const MealsScreen = () => {
         </View>
       </ScrollView>
 
+      {/* AI Recommendation Component */}
       <AIFoodRecommendation
         visible={showAIRecommendations}
         onClose={() => {
@@ -519,6 +504,7 @@ const MealsScreen = () => {
         selectedMealType={selectedMealId || "breakfast"}
       />
 
+      {/* Custom Meal Modal */}
       <Modal
         visible={showCustomMealModal}
         animationType="slide"
@@ -608,6 +594,7 @@ const MealsScreen = () => {
         </SafeAreaView>
       </Modal>
 
+      {/* Floating Camera Button */}
       <TouchableOpacity
         style={styles.floatingScanButton}
         onPress={() => navigation.navigate("AiMealPlanner")}
@@ -615,7 +602,7 @@ const MealsScreen = () => {
         <MaterialCommunityIcons name="camera" size={26} color="#fff" />
       </TouchableOpacity>
 
-      {/* DATE PICKER LOGIC (SEPARATE iOS / Android) */}
+      {/* Date Picker (Platform Specific) */}
       {showDatePicker &&
         (Platform.OS === "ios" ? (
           <Modal
@@ -626,7 +613,6 @@ const MealsScreen = () => {
           >
             <View style={styles.modalOverlayDatePicker}>
               <View style={styles.datePickerContainerIOS}>
-                {/* Toolbar with Done button */}
                 <View style={styles.datePickerHeader}>
                   <TouchableOpacity
                     onPress={() => setShowDatePicker(false)}
@@ -635,8 +621,6 @@ const MealsScreen = () => {
                     <Text style={styles.doneButtonText}>Done</Text>
                   </TouchableOpacity>
                 </View>
-
-                {/* The Picker */}
                 <DateTimePicker
                   value={selectedDate}
                   mode="date"
@@ -655,7 +639,6 @@ const MealsScreen = () => {
             </View>
           </Modal>
         ) : (
-          // Android logic
           <DateTimePicker
             value={selectedDate}
             mode="date"
@@ -718,7 +701,6 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     padding: 10,
   },
-
   circleIcon: {
     width: 36,
     height: 36,
@@ -858,7 +840,6 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: "#CCC",
   },
-
   floatingScanButton: {
     position: "absolute",
     bottom: 10,
@@ -869,12 +850,10 @@ const styles = StyleSheet.create({
     elevation: 4,
     zIndex: 10,
   },
-
   modalContainer: {
     flex: 1,
     backgroundColor: "#f1e3ec",
   },
-
   modalHeader: {
     flexDirection: "row",
     justifyContent: "space-between",
@@ -933,23 +912,20 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: "600",
   },
-
   mealActionColumn: {
     paddingHorizontal: 20,
     marginTop: 10,
     gap: 12,
   },
-
   mealActionButtonFull: {
     width: "100%",
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: "#E8F5E9", // light green background
+    backgroundColor: "#E8F5E9",
     borderRadius: 20,
     paddingVertical: 14,
   },
-
   mealActionTextGreen: {
     color: "#4CAF50",
     fontSize: 15,
@@ -964,14 +940,12 @@ const styles = StyleSheet.create({
     padding: 10,
     marginBottom: 20,
   },
-
   recipeImagePlaceholder: {
     width: "100%",
     height: 100,
     backgroundColor: "#EEE",
     borderRadius: 12,
   },
-
   recipeTitle: {
     fontSize: 14,
     fontWeight: "600",
@@ -994,7 +968,6 @@ const styles = StyleSheet.create({
     alignItems: "center",
     marginBottom: 12,
   },
-
   sectionHeader: {
     flexDirection: "row",
     alignItems: "center",
@@ -1003,7 +976,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
   },
   headerRight: {
-    maxWidth: 200, // adjust (60–100 is common)
+    maxWidth: 200,
     alignItems: "flex-end",
   },
   recipeImage: {
@@ -1012,15 +985,14 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     backgroundColor: "#eee",
   },
-  // 3. STYLES FOR CENTERED DISCLAIMER
   modalOverlayDisclaimer: {
     flex: 1,
     backgroundColor: "rgba(0,0,0,0.5)",
-    justifyContent: "center", // CENTER
+    justifyContent: "center",
     alignItems: "center",
   },
   disclaimerContent: {
-    backgroundColor: "#FFD700", // bright yellow
+    backgroundColor: "#FFD700",
     padding: 25,
     borderRadius: 16,
     width: "85%",

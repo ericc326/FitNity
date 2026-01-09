@@ -37,6 +37,7 @@ type ScheduleDoc = {
   customSets?: number | null;
   customReps?: number | null;
   customRestSeconds?: number | null;
+  weightLifted?: string | null;
   customLabel?: string | null;
   completed?: boolean;
   [k: string]: any;
@@ -320,7 +321,10 @@ export default function ScheduleDetailScreen({ route, navigation }: Props) {
         <Text style={styles.label}>Workout</Text>
         <Text style={styles.value}>{data.selectedWorkoutName}</Text>
 
-        {(data.customSets || data.customReps || data.customRestSeconds) && (
+        {(data.customSets ||
+          data.customReps ||
+          data.customRestSeconds ||
+          data.weightLifted) && (
           <>
             <View style={styles.sectionDivider} />
             <Text style={styles.sectionTitle}>Your Plan</Text>
@@ -344,6 +348,20 @@ export default function ScheduleDetailScreen({ route, navigation }: Props) {
                   icon="timer-sand"
                   value={`${data.customRestSeconds}s`}
                   label="Rest"
+                />
+              )}
+              {data.weightLifted != null && data.weightLifted !== "" && (
+                <StatBox
+                  icon="weight-kilogram"
+                  value={
+                    typeof data.weightLifted === "string" &&
+                    data.weightLifted.trim().toLowerCase() === "bodyweight"
+                      ? "Body"
+                      : typeof data.weightLifted === "string"
+                        ? data.weightLifted
+                        : `${data.weightLifted} kg`
+                  }
+                  label="Weight"
                 />
               )}
             </View>

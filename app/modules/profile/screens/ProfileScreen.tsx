@@ -253,10 +253,6 @@ const ProfileScreen = () => {
             <Text style={styles.statValue}>{dailyCalories}</Text>
             <Text style={styles.statLabel}>Est. Daily Cal. Burn</Text>
           </View>
-          <View style={styles.statBox}>
-            <Text style={styles.statValue}>48</Text>
-            <Text style={styles.statLabel}>Hours</Text>
-          </View>
         </View>
 
         {/* Menu Items */}

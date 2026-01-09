@@ -54,6 +54,7 @@ const EditScheduleScreen = ({ navigation, route }: Props) => {
   const [customReps, setCustomReps] = useState<number | null>(null); //determine rep in one set
   const [customRestSec, setCustomRestSec] = useState<number | null>(null);
   const [customLabel, setCustomLabel] = useState<string | null>(null);
+  const [customWeight, setCustomWeight] = useState<string | null>(null); // body weight (kg)
 
   //schedule time for notification
   const [prevScheduledAt, setPrevScheduledAt] = useState<Date | null>(null);
@@ -104,6 +105,7 @@ const EditScheduleScreen = ({ navigation, route }: Props) => {
           setCustomReps(data.customReps ?? null);
           setCustomRestSec(data.customRestSeconds ?? null);
           setCustomLabel(data.customLabel ?? null);
+          setCustomWeight(data.weightLifted ?? null);
         } else {
           Alert.alert("Error", "Schedule not found.");
           navigation.goBack();
@@ -263,6 +265,7 @@ const EditScheduleScreen = ({ navigation, route }: Props) => {
         customSets: customSets ?? undefined,
         customReps: customReps ?? undefined,
         customRestSeconds: customRestSec ?? undefined,
+        weightLifted: customWeight ?? undefined,
         customLabel: customLabel ?? undefined,
         notificationId: newNotificationId ?? null,
       });
@@ -535,6 +538,19 @@ const EditScheduleScreen = ({ navigation, route }: Props) => {
                     onChangeText={(t) => setCustomRestSec(t ? Number(t) : null)}
                     keyboardType="numeric"
                     placeholder="e.g. 60"
+                    placeholderTextColor="#777"
+                  />
+                </View>
+
+                <View style={styles.modalRow}>
+                  <Text style={{ color: "#fff", marginBottom: 6 }}>
+                    Weight (kg / lbs)
+                  </Text>
+                  <TextInput
+                    style={styles.numberInput}
+                    value={customWeight ?? ""}
+                    onChangeText={(t) => setCustomWeight(t || null)}
+                    placeholder="e.g. 20kg or Bodyweight"
                     placeholderTextColor="#777"
                   />
                 </View>

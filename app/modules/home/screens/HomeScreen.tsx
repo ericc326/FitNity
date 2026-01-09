@@ -279,8 +279,6 @@ const HomeScreen: React.FC = () => {
 
   const goToProfile = () => navigation.navigate("Profile");
 
-  const goToStatistic = () => navigation.navigate("Statistic");
-
   const getTaskIcon = (type: string) => {
     switch (type) {
       case "workout":
@@ -322,15 +320,6 @@ const HomeScreen: React.FC = () => {
         <View>
           <View style={styles.statisticsHeader}>
             <Text style={styles.statisticsSectionTitle}>Statistics</Text>
-
-            <TouchableOpacity style={styles.viewButton} onPress={goToStatistic}>
-              <Text style={styles.viewButtonText}>View All</Text>
-              <MaterialCommunityIcons
-                name="chevron-right"
-                size={20}
-                color="#fff"
-              />
-            </TouchableOpacity>
           </View>
 
           <View style={styles.statisticsContent}>

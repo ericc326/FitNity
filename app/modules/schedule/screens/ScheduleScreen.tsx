@@ -226,7 +226,9 @@ const ScheduleScreen = () => {
 
     // Filter out "Mark as Done" if already completed
     const filteredOptions = isCompleted
-      ? options.filter((opt) => opt.text !== "Mark as Done")
+      ? options.filter(
+          (opt) => opt.text !== "Mark as Done" && opt.text !== "Edit"
+        )
       : options;
 
     Alert.alert(

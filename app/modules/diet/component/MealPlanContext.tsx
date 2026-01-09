@@ -17,6 +17,7 @@ import {
   addDoc,
   deleteDoc,
   getDocs,
+  limit,
 } from "firebase/firestore";
 
 /* ===================== TYPES ===================== */
@@ -97,10 +98,51 @@ export const MealPlanProvider = ({ children }: { children: ReactNode }) => {
   const [healthInfo, setHealthInfo] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(true);
 
-  /* ===================== CONSOLIDATED DATA FETCHING ===================== */
+  // 1. EFFECT: Fetch Profile Data (One-time fetch)
+  // This runs once on login to get the static profile data.
+  useEffect(() => {
+    // Immediate state reset on logout
+    if (!auth.currentUser) {
+      setDietInfo(null);
+      setHealthInfo(null);
+      return;
+    }
 
+    const uid = auth.currentUser.uid;
+
+    const fetchProfileData = async () => {
+      try {
+        const [healthSnap, dietSnap] = await Promise.all([
+          getDocs(collection(db, "users", uid, "healthinfo")),
+          // Query for the first available diet document (since we use Auto-IDs)
+          getDocs(query(collection(db, "users", uid, "dietinfo"), limit(1))),
+        ]);
+
+        if (!healthSnap.empty) {
+          setHealthInfo(healthSnap.docs[0].data());
+        } else {
+          setHealthInfo(null);
+        }
+
+        if (!dietSnap.empty) {
+          // Grab the first document found (assuming only 1 exists per your rule)
+          setDietInfo(dietSnap.docs[0].data() as DietInfo);
+        } else {
+          setDietInfo(null);
+        }
+      } catch (error) {
+        console.error("Error fetching profile:", error);
+      }
+    };
+
+    fetchProfileData();
+  }, [auth.currentUser]);
+
+  // 2. EFFECT: Listen to Meals (Real-time listener)
+  // Separating this allows synchronous cleanup, fixing the "permission-denied" error on logout.
   useEffect(() => {
     if (!auth.currentUser) {
+      setMeals(createDefaultMeals());
       setIsLoading(false);
       return;
     }
@@ -108,63 +150,40 @@ export const MealPlanProvider = ({ children }: { children: ReactNode }) => {
     const uid = auth.currentUser.uid;
     setIsLoading(true);
 
-    const syncAllData = async () => {
-      try {
-        // 1. Force the Profile to fetch FIRST so the UI has context
-        const [healthSnap, dietSnap] = await Promise.all([
-          getDocs(collection(db, "users", uid, "healthinfo")),
-          getDocs(collection(db, "users", uid, "dietinfo")),
-        ]);
+    const mealsRef = collection(db, "users", uid, "meals");
+    const mealQuery = query(mealsRef, where("date", "==", selectedDate));
 
-        if (!healthSnap.empty) setHealthInfo(healthSnap.docs[0].data());
-        if (!dietSnap.empty) {
-          const dietData =
-            dietSnap.docs.find((d) => d.id === "profile")?.data() ||
-            dietSnap.docs[0].data();
-          setDietInfo(dietData as DietInfo);
-        }
-
-        // 2. ONLY start the meal listener after the profile is known
-        const mealsRef = collection(db, "users", uid, "meals");
-        const mealQuery = query(mealsRef, where("date", "==", selectedDate));
-
-        const unsubscribe = onSnapshot(
-          mealQuery,
-          (snapshot) => {
-            const fetchedMeals = createDefaultMeals();
-            snapshot.forEach((doc) => {
-              const data = doc.data();
-              const index = fetchedMeals.findIndex(
-                (m) => m.id === data.mealType
-              );
-              if (index !== -1) {
-                fetchedMeals[index] = {
-                  ...fetchedMeals[index],
-                  food: data.food,
-                  hasFood: true,
-                  docId: doc.id,
-                };
-              }
-            });
-            setMeals(fetchedMeals);
-            setIsLoading(false); // UI is now fully ready with Profile AND Meals
-          },
-          (error) => {
-            setIsLoading(false);
+    const unsubscribe = onSnapshot(
+      mealQuery,
+      (snapshot) => {
+        const fetchedMeals = createDefaultMeals();
+        snapshot.forEach((doc) => {
+          const data = doc.data();
+          const index = fetchedMeals.findIndex((m) => m.id === data.mealType);
+          if (index !== -1) {
+            fetchedMeals[index] = {
+              ...fetchedMeals[index],
+              food: data.food,
+              hasFood: true,
+              docId: doc.id,
+            };
           }
-        );
-
-        return unsubscribe;
-      } catch (e) {
-        console.error("Sync error:", e);
+        });
+        setMeals(fetchedMeals);
+        setIsLoading(false);
+      },
+      (error) => {
+        // Silently ignore permission errors caused by logout race conditions
+        if (error.code !== "permission-denied") {
+          console.error("Meal listener error:", error);
+        }
         setIsLoading(false);
       }
-    };
+    );
 
-    const unsubPromise = syncAllData();
-
+    // Cleanup runs instantly when auth changes
     return () => {
-      unsubPromise.then((unsub) => unsub && unsub());
+      unsubscribe();
     };
   }, [auth.currentUser, selectedDate]);
 
@@ -204,7 +223,6 @@ export const MealPlanProvider = ({ children }: { children: ReactNode }) => {
   const removeMeal = async (docId: string) => {
     if (!auth.currentUser || !docId) return;
     try {
-      // Direct path to the specific meal document
       await deleteDoc(doc(db, "users", auth.currentUser.uid, "meals", docId));
     } catch (e) {
       console.error("Delete error:", e);
@@ -231,25 +249,45 @@ export const MealPlanProvider = ({ children }: { children: ReactNode }) => {
     await updateMeal(mealId, food);
   };
 
-  // CORRECTED: Uses setDoc with fixed ID to prevent "re-filling" issue
+  /**
+   * SAVES DIET INFO (Create Once, Never Update)
+   * Uses Automatic ID generation.
+   */
   const saveDietInfo = async (info: DietInfo) => {
     if (!auth.currentUser) return;
 
-    // We save to a specific document "profile" so it overwrites duplicates
-    const dietInfoRef = doc(
-      db,
-      "users",
-      auth.currentUser.uid,
-      "dietinfo",
-      "profile"
-    );
+    const uid = auth.currentUser.uid;
+    const dietCollectionRef = collection(db, "users", uid, "dietinfo");
 
-    await setDoc(dietInfoRef, {
-      ...info,
-      updatedAt: serverTimestamp(),
-    });
+    try {
+      // 1. Check if a profile ALREADY exists
+      const q = query(dietCollectionRef, limit(1));
+      const snapshot = await getDocs(q);
 
-    setDietInfo(info);
+      if (!snapshot.empty) {
+        // === SCENARIO: PROFILE EXISTS ===
+        // We strictly refuse to update it, as per your requirement.
+        console.log("Profile already exists. Updates are not allowed.");
+
+        // We still update local state so the UI reflects the (attempted) change for this session
+        setDietInfo(info);
+        return;
+      }
+
+      // === SCENARIO: NEW USER (First Time Setup) ===
+      // No document found, so we generate a NEW Automatic ID
+      await addDoc(dietCollectionRef, {
+        ...info,
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+      });
+
+      // 2. Update local state immediately
+      setDietInfo(info);
+    } catch (error) {
+      console.error("Error saving diet info:", error);
+      throw error;
+    }
   };
 
   const getTotalNutrition = (): NutritionalData => {

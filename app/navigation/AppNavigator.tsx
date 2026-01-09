@@ -11,7 +11,6 @@ import HomeScreen from "../modules/home/screens/HomeScreen";
 import WorkoutScreen from "../modules/workout/screens/WorkoutScreen";
 import DietScreen from "../modules/diet/screens/DietScreen";
 import CommunityScreen from "../modules/community/screens/CommunityScreen";
-import StatisticScreen from "../modules/statistics/screens/StatisticScreen";
 import ProfileNavigator from "../modules/profile/navigation/ProfileNavigator";
 import DietNavigator, {
   DietStackParamList,
@@ -37,7 +36,6 @@ export type HomeTabParamList = {
 export type RootStackParamList = {
   Auth: NavigatorScreenParams<AuthStackParamList>;
   HomeTab: NavigatorScreenParams<HomeTabParamList>;
-  Statistic: undefined;
   Profile: undefined;
   AiCoach: undefined;
 };
@@ -143,11 +141,6 @@ export default function AppNavigator() {
     >
       <RootStack.Screen name="Auth" component={AuthNavigator} />
       <RootStack.Screen name="HomeTab" component={TabNavigator} />
-      <RootStack.Screen
-        name="Statistic"
-        component={StatisticScreen}
-        options={{ headerShown: false }}
-      />
       <RootStack.Screen
         name="Profile"
         component={ProfileNavigator}
