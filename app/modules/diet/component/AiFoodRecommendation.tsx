@@ -4,13 +4,13 @@ import React, { useEffect, useState, useMemo } from "react";
 import {
   ActivityIndicator,
   Modal,
-  SafeAreaView,
   ScrollView,
   StyleSheet,
   Text,
   TouchableOpacity,
   View,
 } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 import { useMealPlan } from "../component/MealPlanContext";
 import PersonalInfoModal from "../component/PersonalInfoModal";
 import { GEMINI_API_KEY } from "@env";
@@ -73,8 +73,6 @@ const AIFoodRecommendation: React.FC<AIFoodRecommendationProps> = ({
       targetCalories: contextDietInfo.targetCalories,
     };
   }, [contextDietInfo, contextHealthInfo]);
-
-  console.log("Personal Info:", personalInfo);
 
   // Check if setup is complete based on data existence
   const hasCompletedSetup = !!personalInfo;
@@ -341,7 +339,7 @@ const AIFoodRecommendation: React.FC<AIFoodRecommendationProps> = ({
       presentationStyle="pageSheet"
       onRequestClose={onClose}
     >
-      <SafeAreaView style={styles.container}>
+      <SafeAreaView style={styles.container} edges={["top", "bottom"]}>
         <View style={styles.modalHeader}>
           <TouchableOpacity onPress={onClose}>
             <Ionicons name="close" size={24} color="#333" />
