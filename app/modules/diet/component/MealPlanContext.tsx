@@ -53,9 +53,9 @@ interface DietInfo {
   dietaryRestrictions: string[];
   allergies: string[];
   targetCalories: string;
-  targetProtein: string;
-  targetCarbs: string;
-  targetFat: string;
+  targetProtein?: string;
+  targetCarbs?: string;
+  targetFat?: string;
 }
 
 interface MealPlanContextType {
@@ -98,58 +98,90 @@ export const MealPlanProvider = ({ children }: { children: ReactNode }) => {
   const [healthInfo, setHealthInfo] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(true);
 
-  // 1. EFFECT: Fetch Profile Data (One-time fetch)
-  // This runs once on login to get the static profile data.
+  // 1. EFFECT: Auth State Listener
   useEffect(() => {
-    // Immediate state reset on logout
+    const unsubscribe = auth.onAuthStateChanged((user) => {
+      if (!user) {
+        setDietInfo(null);
+        setHealthInfo(null);
+        setMeals(createDefaultMeals());
+        setIsLoading(false);
+      } else {
+        // We set loading true here, and wait for the listeners below to turn it off
+        setIsLoading(true);
+      }
+    });
+    return () => unsubscribe();
+  }, []);
+
+  // 2. EFFECT: Health Info Listener
+  // FIX: Added [auth.currentUser] so it runs when user logs in
+  useEffect(() => {
     if (!auth.currentUser) {
-      setDietInfo(null);
       setHealthInfo(null);
       return;
     }
 
     const uid = auth.currentUser.uid;
+    const healthRef = collection(db, "users", uid, "healthinfo");
 
-    const fetchProfileData = async () => {
-      try {
-        const [healthSnap, dietSnap] = await Promise.all([
-          getDocs(collection(db, "users", uid, "healthinfo")),
-          // Query for the first available diet document (since we use Auto-IDs)
-          getDocs(query(collection(db, "users", uid, "dietinfo"), limit(1))),
-        ]);
-
-        if (!healthSnap.empty) {
-          setHealthInfo(healthSnap.docs[0].data());
+    const unsubscribe = onSnapshot(
+      healthRef,
+      (snapshot) => {
+        if (!snapshot.empty) {
+          setHealthInfo(snapshot.docs[0].data());
         } else {
           setHealthInfo(null);
         }
+      },
+      (error) => console.error("Health listener error:", error)
+    );
 
-        if (!dietSnap.empty) {
-          // Grab the first document found (assuming only 1 exists per your rule)
-          setDietInfo(dietSnap.docs[0].data() as DietInfo);
-        } else {
-          setDietInfo(null);
-        }
-      } catch (error) {
-        console.error("Error fetching profile:", error);
-      }
-    };
-
-    fetchProfileData();
+    return () => unsubscribe();
   }, [auth.currentUser]);
 
-  // 2. EFFECT: Listen to Meals (Real-time listener)
-  // Separating this allows synchronous cleanup, fixing the "permission-denied" error on logout.
+  // 3. EFFECT: Diet Info Listener (CONTROLS LOADING STATE)
+  // FIX: Added [auth.currentUser] so it runs when user logs in
   useEffect(() => {
     if (!auth.currentUser) {
-      setMeals(createDefaultMeals());
+      setDietInfo(null);
       setIsLoading(false);
       return;
     }
 
     const uid = auth.currentUser.uid;
-    setIsLoading(true);
+    const dietRef = collection(db, "users", uid, "dietinfo");
+    const q = query(dietRef, limit(1));
 
+    const unsubscribe = onSnapshot(
+      q,
+      (snapshot) => {
+        if (!snapshot.empty) {
+          setDietInfo(snapshot.docs[0].data() as DietInfo);
+        } else {
+          setDietInfo(null); // New user (empty diet info)
+        }
+        // CRITICAL: This turns off the loading screen once we know the diet status
+        setIsLoading(false);
+      },
+      (error) => {
+        console.error("Diet listener error:", error);
+        setIsLoading(false); // Ensure we don't get stuck on error
+      }
+    );
+
+    return () => unsubscribe();
+  }, [auth.currentUser]);
+
+  // 4. EFFECT: Meals Listener
+  // FIX: Added [auth.currentUser] to dependency array
+  useEffect(() => {
+    if (!auth.currentUser) {
+      setMeals(createDefaultMeals());
+      return;
+    }
+
+    const uid = auth.currentUser.uid;
     const mealsRef = collection(db, "users", uid, "meals");
     const mealQuery = query(mealsRef, where("date", "==", selectedDate));
 
@@ -170,28 +202,18 @@ export const MealPlanProvider = ({ children }: { children: ReactNode }) => {
           }
         });
         setMeals(fetchedMeals);
-        setIsLoading(false);
       },
-      (error) => {
-        // Silently ignore permission errors caused by logout race conditions
-        if (error.code !== "permission-denied") {
-          console.error("Meal listener error:", error);
-        }
-        setIsLoading(false);
-      }
+      (error) => console.error("Meal listener error:", error)
     );
 
-    // Cleanup runs instantly when auth changes
-    return () => {
-      unsubscribe();
-    };
-  }, [auth.currentUser, selectedDate]);
+    return () => unsubscribe();
+  }, [selectedDate, auth.currentUser]);
 
   /* ===================== ACTIONS ===================== */
+  // (All actions below remain exactly the same as before)
 
   const changeDate = (date: string) => {
     setSelectedDate(date);
-    setIsLoading(true);
   };
 
   const updateMeal = async (mealType: string, food: FoodItem) => {
@@ -249,10 +271,6 @@ export const MealPlanProvider = ({ children }: { children: ReactNode }) => {
     await updateMeal(mealId, food);
   };
 
-  /**
-   * SAVES DIET INFO (Create Once, Never Update)
-   * Uses Automatic ID generation.
-   */
   const saveDietInfo = async (info: DietInfo) => {
     if (!auth.currentUser) return;
 
@@ -260,30 +278,19 @@ export const MealPlanProvider = ({ children }: { children: ReactNode }) => {
     const dietCollectionRef = collection(db, "users", uid, "dietinfo");
 
     try {
-      // 1. Check if a profile ALREADY exists
       const q = query(dietCollectionRef, limit(1));
       const snapshot = await getDocs(q);
 
       if (!snapshot.empty) {
-        // === SCENARIO: PROFILE EXISTS ===
-        // We strictly refuse to update it, as per your requirement.
         console.log("Profile already exists. Updates are not allowed.");
-
-        // We still update local state so the UI reflects the (attempted) change for this session
-        setDietInfo(info);
         return;
       }
 
-      // === SCENARIO: NEW USER (First Time Setup) ===
-      // No document found, so we generate a NEW Automatic ID
       await addDoc(dietCollectionRef, {
         ...info,
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
       });
-
-      // 2. Update local state immediately
-      setDietInfo(info);
     } catch (error) {
       console.error("Error saving diet info:", error);
       throw error;
