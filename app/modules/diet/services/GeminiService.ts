@@ -10,7 +10,7 @@ interface PersonalInfo {
   goal: string;
   dietaryRestrictions: string[];
   allergies: string[];
-  targetCalories: string; // Calculated automatically based on user data
+  targetCalories: string;
 }
 
 interface FoodItem {
@@ -21,6 +21,9 @@ interface FoodItem {
   carbs: number;
   fat: number;
   category: string;
+  // NEW FIELDS
+  ingredients?: string[];
+  instructions?: string[];
 }
 
 class GeminiService {
@@ -40,7 +43,7 @@ class GeminiService {
 
     this.apiKey = apiKey.trim();
     this.genAI = new GoogleGenerativeAI(this.apiKey);
-    // Use gemini-pro model which is more stable and available
+    // Use gemini-1.5-flash for faster, cheaper inference, or pro for better quality
     this.model = this.genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
   }
 
@@ -146,6 +149,8 @@ REQUIREMENTS:
 6. Make meals realistic and easy to prepare
 7. Include nutritional information for each meal
 8. Focus only on ${mealDescription} - do not mix with other meal types
+9. Provide a list of main ingredients
+10. Provide concise step-by-step cooking instructions (3-5 steps)
 
 RESPONSE FORMAT:
 Return a JSON array with exactly 5 objects, each containing:
@@ -156,7 +161,9 @@ Return a JSON array with exactly 5 objects, each containing:
   "protein": number,
   "carbs": number,
   "fat": number,
-  "category": "${mealType}"
+  "category": "${mealType}",
+  "ingredients": ["string", "string", "string"],
+  "instructions": ["Step 1...", "Step 2...", "Step 3..."]
 }
 
 Example for breakfast:
@@ -168,20 +175,9 @@ Example for breakfast:
     "protein": 18,
     "carbs": 25,
     "fat": 12,
-    "category": "breakfast"
-  }
-]
-
-Example for lunch:
-[
-  {
-    "id": "lunch_1",
-    "name": "Grilled Chicken Salad",
-    "calories": 350,
-    "protein": 25,
-    "carbs": 15,
-    "fat": 18,
-    "category": "lunch"
+    "category": "breakfast",
+    "ingredients": ["1 cup Greek Yogurt", "1/2 cup Mixed Berries", "1 tbsp Almonds", "1 tsp Honey"],
+    "instructions": ["Scoop yogurt into a bowl.", "Wash berries and top the yogurt.", "Sprinkle chopped almonds.", "Drizzle with honey and serve."]
   }
 ]
 
@@ -210,7 +206,7 @@ Only return the JSON array, no additional text.`;
 
   private parseAIResponse(response: string): FoodItem[] {
     try {
-      // Extract JSON from the response
+      // Extract JSON from the response using regex to find the array brackets
       const jsonMatch = response.match(/\[[\s\S]*\]/);
       if (jsonMatch) {
         const parsed = JSON.parse(jsonMatch[0]);
@@ -222,6 +218,10 @@ Only return the JSON array, no additional text.`;
           carbs: parseInt(item.carbs) || 0,
           fat: parseInt(item.fat) || 0,
           category: item.category || "general",
+          ingredients: Array.isArray(item.ingredients) ? item.ingredients : [],
+          instructions: Array.isArray(item.instructions)
+            ? item.instructions
+            : ["No instructions provided."],
         }));
       }
       throw new Error("No valid JSON found in response");
@@ -240,6 +240,17 @@ Only return the JSON array, no additional text.`;
           protein: 8,
           carbs: 45,
           fat: 6,
+          ingredients: [
+            "1/2 cup Oats",
+            "1 cup Water/Milk",
+            "1/4 cup Berries",
+            "1 tbsp Almonds",
+          ],
+          instructions: [
+            "Boil water or milk.",
+            "Add oats and cook for 5-7 mins.",
+            "Top with berries and almonds.",
+          ],
         },
         {
           name: "Greek Yogurt with Honey and Granola",
@@ -247,27 +258,12 @@ Only return the JSON array, no additional text.`;
           protein: 15,
           carbs: 20,
           fat: 8,
-        },
-        {
-          name: "Whole Grain Toast with Avocado and Eggs",
-          calories: 320,
-          protein: 10,
-          carbs: 35,
-          fat: 18,
-        },
-        {
-          name: "Smoothie Bowl with Banana and Berries",
-          calories: 250,
-          protein: 12,
-          carbs: 30,
-          fat: 8,
-        },
-        {
-          name: "Scrambled Eggs with Spinach and Toast",
-          calories: 220,
-          protein: 18,
-          carbs: 5,
-          fat: 12,
+          ingredients: ["1 cup Greek Yogurt", "2 tbsp Granola", "1 tsp Honey"],
+          instructions: [
+            "Place yogurt in a bowl.",
+            "Top with granola.",
+            "Drizzle with honey.",
+          ],
         },
       ],
       lunch: [
@@ -277,6 +273,17 @@ Only return the JSON array, no additional text.`;
           protein: 25,
           carbs: 15,
           fat: 18,
+          ingredients: [
+            "1 Chicken Breast",
+            "2 cups Mixed Greens",
+            "1 tbsp Olive Oil",
+            "Lemon Juice",
+          ],
+          instructions: [
+            "Grill chicken breast until cooked.",
+            "Toss greens with olive oil and lemon.",
+            "Slice chicken and place on top.",
+          ],
         },
         {
           name: "Quinoa Bowl with Roasted Vegetables",
@@ -284,27 +291,16 @@ Only return the JSON array, no additional text.`;
           protein: 12,
           carbs: 45,
           fat: 14,
-        },
-        {
-          name: "Turkey Sandwich on Whole Grain Bread",
-          calories: 320,
-          protein: 20,
-          carbs: 35,
-          fat: 12,
-        },
-        {
-          name: "Vegetable Soup with Grilled Cheese",
-          calories: 200,
-          protein: 8,
-          carbs: 25,
-          fat: 8,
-        },
-        {
-          name: "Tuna Salad with Crackers",
-          calories: 280,
-          protein: 22,
-          carbs: 10,
-          fat: 16,
+          ingredients: [
+            "1 cup Cooked Quinoa",
+            "1 cup Roasted Veggies",
+            "1 tbsp Tahini",
+          ],
+          instructions: [
+            "Cook quinoa according to package.",
+            "Roast seasonal veggies.",
+            "Combine in a bowl and drizzle tahini.",
+          ],
         },
       ],
       dinner: [
@@ -314,6 +310,18 @@ Only return the JSON array, no additional text.`;
           protein: 28,
           carbs: 20,
           fat: 22,
+          ingredients: [
+            "1 Salmon Fillet",
+            "1 cup Broccoli",
+            "1 tbsp Olive Oil",
+            "Garlic",
+          ],
+          instructions: [
+            "Preheat oven to 400°F (200°C).",
+            "Place salmon and broccoli on a baking sheet.",
+            "Drizzle with oil and garlic.",
+            "Bake for 15-20 mins.",
+          ],
         },
         {
           name: "Lean Beef Stir Fry with Brown Rice",
@@ -321,27 +329,18 @@ Only return the JSON array, no additional text.`;
           protein: 25,
           carbs: 25,
           fat: 18,
-        },
-        {
-          name: "Vegetarian Pasta with Marinara Sauce",
-          calories: 350,
-          protein: 12,
-          carbs: 45,
-          fat: 12,
-        },
-        {
-          name: "Chicken Breast with Quinoa and Broccoli",
-          calories: 400,
-          protein: 30,
-          carbs: 35,
-          fat: 14,
-        },
-        {
-          name: "Tofu Curry with Basmati Rice",
-          calories: 320,
-          protein: 15,
-          carbs: 30,
-          fat: 16,
+          ingredients: [
+            "4oz Lean Beef Strips",
+            "1 cup Mixed Veggies",
+            "1/2 cup Brown Rice",
+            "Soy Sauce",
+          ],
+          instructions: [
+            "Cook brown rice.",
+            "Stir fry beef in a hot pan.",
+            "Add veggies and soy sauce.",
+            "Serve over rice.",
+          ],
         },
       ],
       snacks: [
@@ -351,6 +350,8 @@ Only return the JSON array, no additional text.`;
           protein: 4,
           carbs: 20,
           fat: 10,
+          ingredients: ["1 Apple", "1 tbsp Almond Butter"],
+          instructions: ["Slice the apple.", "Dip in almond butter."],
         },
         {
           name: "Hummus with Carrot and Celery Sticks",
@@ -358,27 +359,8 @@ Only return the JSON array, no additional text.`;
           protein: 6,
           carbs: 18,
           fat: 8,
-        },
-        {
-          name: "Greek Yogurt with Mixed Berries",
-          calories: 120,
-          protein: 12,
-          carbs: 8,
-          fat: 4,
-        },
-        {
-          name: "Mixed Nuts and Dried Cranberries",
-          calories: 200,
-          protein: 6,
-          carbs: 8,
-          fat: 18,
-        },
-        {
-          name: "Banana with Peanut Butter",
-          calories: 220,
-          protein: 6,
-          carbs: 25,
-          fat: 12,
+          ingredients: ["2 tbsp Hummus", "1 Carrot", "1 Stalk Celery"],
+          instructions: ["Cut veggies into sticks.", "Serve with hummus."],
         },
       ],
     };
@@ -395,6 +377,8 @@ Only return the JSON array, no additional text.`;
       carbs: meal.carbs,
       fat: meal.fat,
       category: mealType,
+      ingredients: meal.ingredients,
+      instructions: meal.instructions,
     }));
   }
 
