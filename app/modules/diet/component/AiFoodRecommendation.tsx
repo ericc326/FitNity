@@ -126,7 +126,7 @@ const AIFoodRecommendation: React.FC<AIFoodRecommendationProps> = ({
 
   // --- UPDATED FOOD CARD COMPONENT ---
   const FoodCard = ({ food }: { food: FoodItem }) => {
-    const isViewOnly = !selectedMealType;
+    // We remove the isViewOnly check so the button ALWAYS shows
 
     return (
       <View style={styles.foodCard}>
@@ -138,17 +138,16 @@ const AIFoodRecommendation: React.FC<AIFoodRecommendationProps> = ({
 
           {/* ACTION BUTTONS ROW */}
           <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
-            {/* 1. RECIPE BOOK BUTTON (Always Visible) */}
+            {/* 1. RECIPE BOOK BUTTON */}
             <TouchableOpacity onPress={() => handleOpenRecipe(food)}>
               <Ionicons name="book-outline" size={24} color="#2196F3" />
             </TouchableOpacity>
 
-            {/* 2. ADD BUTTON (Only visible if adding to a meal) */}
-            {!isViewOnly && (
-              <TouchableOpacity onPress={() => handleSelectFood(food)}>
-                <Ionicons name="add-circle" size={32} color="#4CAF50" />
-              </TouchableOpacity>
-            )}
+            {/* 2. ADD BUTTON - ALWAYS VISIBLE NOW */}
+            {/* We removed the {!isViewOnly && } check here */}
+            <TouchableOpacity onPress={() => handleSelectFood(food)}>
+              <Ionicons name="add-circle" size={32} color="#4CAF50" />
+            </TouchableOpacity>
           </View>
         </View>
 
