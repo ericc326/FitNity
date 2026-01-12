@@ -12,13 +12,14 @@ import {
   Dimensions,
   ActivityIndicator,
   SafeAreaView,
+  Modal,
 } from "react-native";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { useNavigation } from "@react-navigation/native";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { WorkoutStackParamList } from "../navigation/WorkoutNavigator";
-import { collection, getDocs, query, where, orderBy } from "firebase/firestore";
-import { db, auth } from "../../../../firebaseConfig"; // Added auth to get current user
+import { collection, getDocs, query, orderBy } from "firebase/firestore";
+import { db, auth } from "../../../../firebaseConfig";
 import { LineChart } from "react-native-chart-kit";
 
 const { width } = Dimensions.get("window");
@@ -55,77 +56,70 @@ const WorkoutScreen = () => {
   const [selectedExercise, setSelectedExercise] = useState<Exercise | null>(
     null
   );
+
+  // Filter States (Matching SelectExercise Logic)
+  const [isFilterVisible, setIsFilterVisible] = useState(false);
   const [selectedBodyPart, setSelectedBodyPart] = useState<string>("All");
+  const [selectedEquipment, setSelectedEquipment] = useState<string>("All");
+  const [equipments, setEquipments] = useState<string[]>([]);
   const [bodyParts, setBodyParts] = useState<string[]>([]);
+
   const [dynamicProgress, setDynamicProgress] = useState<ProgressItem[]>([]);
   const [progressLoading, setProgressLoading] = useState(false);
 
-  const fetchExercisesFromFirestore = async (bodyPart: string = "All") => {
+  // Fetch Exercises and dynamically build filter lists
+  const fetchInitialData = async () => {
     setLoading(true);
     try {
       const exercisesRef = collection(db, "exercises");
-      let q;
+      const snapshot = await getDocs(exercisesRef);
 
-      if (bodyPart && bodyPart !== "All") {
-        q = query(exercisesRef, where("bodyParts", "array-contains", bodyPart));
-      } else {
-        q = query(exercisesRef);
-      }
-
-      const snapshot = await getDocs(q);
-      const allExercises: any[] = snapshot.docs.map((doc) => ({
+      const allExercises: Exercise[] = snapshot.docs.map((doc) => ({
         ...(doc.data() as any),
         exerciseId: doc.id,
       }));
 
+      const partsSet = new Set<string>(["All"]);
+      const equipSet = new Set<string>(["All"]);
+
+      allExercises.forEach((ex) => {
+        if (Array.isArray(ex.bodyParts))
+          ex.bodyParts.forEach((p) => partsSet.add(p));
+        if (Array.isArray(ex.equipments))
+          ex.equipments.forEach((e) => equipSet.add(e));
+      });
+
       setExercises(allExercises);
+      setBodyParts(Array.from(partsSet));
+      setEquipments(Array.from(equipSet));
     } catch (error) {
-      console.error("Error fetching exercises from Firestore:", error);
-      setExercises([]);
+      console.error("Error fetching exercises:", error);
     } finally {
       setLoading(false);
     }
   };
 
-  const fetchBodyPartsFromFirestore = async () => {
-    try {
-      const exercisesRef = collection(db, "exercises");
-      const snapshot = await getDocs(exercisesRef);
-
-      const partsSet = new Set<string>();
-
-      snapshot.forEach((doc) => {
-        const data = doc.data();
-        if (Array.isArray(data.bodyParts)) {
-          data.bodyParts.forEach((part: string) => partsSet.add(part));
-        }
-      });
-
-      setBodyParts(["All", ...Array.from(partsSet)]);
-    } catch (error) {
-      console.error("Error fetching body parts:", error);
-    }
-  };
-
   useEffect(() => {
-    fetchExercisesFromFirestore();
-    fetchBodyPartsFromFirestore();
+    fetchInitialData();
   }, []);
 
-  const handleBodyPartPress = (part: string) => {
-    setSelectedBodyPart(part);
-    fetchExercisesFromFirestore(part);
-  };
+  useEffect(() => {
+    if (activeTab === "progress") {
+      fetchProgressFromFirebase();
+    }
+  }, [activeTab]);
 
+  // Combined Filtering Logic
   const filteredExercises = exercises.filter((item: Exercise) => {
     const matchesSearch = item.name
       .toLowerCase()
       .includes(searchQuery.toLowerCase());
-
     const matchesBodyPart =
       selectedBodyPart === "All" || item.bodyParts?.includes(selectedBodyPart);
-
-    return matchesSearch && matchesBodyPart;
+    const matchesEquipment =
+      selectedEquipment === "All" ||
+      item.equipments?.includes(selectedEquipment);
+    return matchesSearch && matchesBodyPart && matchesEquipment;
   });
 
   const calculateGrowth = (start: number, current: number) => {
@@ -137,24 +131,17 @@ const WorkoutScreen = () => {
   const fetchProgressFromFirebase = async () => {
     if (!auth.currentUser) return;
     setProgressLoading(true);
-
     try {
-      // Query the schedules collection as shown in your edited-image.png
       const q = query(
         collection(db, "users", auth.currentUser.uid, "schedules"),
         orderBy("scheduledAt", "asc")
       );
-
       const snapshot = await getDocs(q);
-
       if (snapshot.empty) {
         setDynamicProgress([]);
         return;
       }
-
       const allSchedules = snapshot.docs.map((doc) => doc.data());
-
-      // Group by workout name to find progress over time
       const exerciseGroups: { [key: string]: any[] } = {};
       allSchedules.forEach((item) => {
         const title = item.selectedWorkoutName || "Unknown Exercise";
@@ -167,34 +154,22 @@ const WorkoutScreen = () => {
           const logs = exerciseGroups[title];
           const firstEntry = logs[0];
           const latestEntry = logs[logs.length - 1];
-
           return {
             id: index.toString(),
             exercise: title,
-            // FR-015: Pulling weight if you add it, otherwise defaulting to Bodyweight
             weight: latestEntry.weightLifted || "Bodyweight",
-            // FR-015: Using the field names from your screenshot
             startingBest: firstEntry.customReps || 0,
             currentBest: latestEntry.customReps || 0,
           };
         }
       );
-
       setDynamicProgress(progressItems);
     } catch (error) {
-      console.error("Error fetching schedule progress:", error);
+      console.error("Error fetching progress:", error);
     } finally {
       setProgressLoading(false);
     }
   };
-
-  useEffect(() => {
-    fetchExercisesFromFirestore();
-    fetchBodyPartsFromFirestore();
-    if (activeTab === "progress") {
-      fetchProgressFromFirebase();
-    }
-  }, [activeTab]);
 
   const renderExerciseItem = ({ item }: { item: Exercise }) => (
     <TouchableOpacity
@@ -220,96 +195,22 @@ const WorkoutScreen = () => {
 
       <View style={styles.textContainer}>
         <Text style={styles.exerciseName}>{item.name}</Text>
+        {/* UPDATED: Now shows Body Parts and Equipment exactly like SelectExercise */}
         <Text style={styles.exerciseMeta}>
-          {(item.bodyParts || []).join(", ") || "Unknown part"}
+          {item.bodyParts?.join(", ") || "Body"} |{" "}
+          {item.equipments?.join(", ") || "No Equipment"}
         </Text>
       </View>
     </TouchableOpacity>
   );
-
-  const renderProgressItem = ({ item }: { item: ProgressItem }) => (
-    <View style={styles.progressRow}>
-      <Text style={styles.cell}>{item.exercise}</Text>
-      <Text style={styles.cell}>{item.weight}</Text>
-      <Text style={styles.cell}>{item.startingBest}</Text>
-      <Text style={styles.cell}>{item.currentBest}</Text>
-      <Text style={[styles.cell, styles.growthCell]}>
-        {calculateGrowth(item.startingBest, item.currentBest)}
-      </Text>
-    </View>
-  );
-
-  // Exercise Detail View
-  if (selectedExercise) {
-    return (
-      <SafeAreaView style={{ flex: 1, backgroundColor: "#262135" }}>
-        <ScrollView>
-          <TouchableOpacity
-            style={styles.backButton}
-            onPress={() => setSelectedExercise(null)}
-          >
-            <MaterialCommunityIcons name="arrow-left" size={24} color="white" />
-            <Text style={styles.backText}>Back to Exercises</Text>
-          </TouchableOpacity>
-
-          <Text style={styles.exerciseTitle}>{selectedExercise.name}</Text>
-
-          {selectedExercise.gifUrl && (
-            <View style={styles.videoContainer}>
-              <Image
-                source={{ uri: selectedExercise.gifUrl }}
-                style={{ width: "100%", height: 250, borderRadius: 10 }}
-              />
-            </View>
-          )}
-
-          <View style={{ marginHorizontal: 20, marginTop: 10 }}>
-            <Text style={styles.sectionTitle}>🎯 Target Muscles</Text>
-            <Text style={styles.descriptionText}>
-              {(selectedExercise.targetMuscles || []).join(", ") ||
-                "No details available"}
-            </Text>
-
-            <Text style={styles.sectionTitle}>💪 Body Parts</Text>
-            <Text style={styles.descriptionText}>
-              {(selectedExercise.bodyParts || []).join(", ") ||
-                "No details available"}
-            </Text>
-
-            <Text style={styles.sectionTitle}>🏋️ Equipment</Text>
-            <Text style={styles.descriptionText}>
-              {(selectedExercise.equipments || []).join(", ") ||
-                "No details available"}
-            </Text>
-
-            <Text style={styles.sectionTitle}>📋 Instructions</Text>
-            {selectedExercise.instructions &&
-            selectedExercise.instructions.length > 0 ? (
-              selectedExercise.instructions.map((step, index) => (
-                <Text
-                  key={index}
-                  style={[styles.descriptionText, { marginBottom: 5 }]}
-                >
-                  {step}
-                </Text>
-              ))
-            ) : (
-              <Text style={styles.descriptionText}>
-                No instructions available.
-              </Text>
-            )}
-            {/* Removed per-exercise AI button — AI Coach is global from main screen */}
-          </View>
-        </ScrollView>
-      </SafeAreaView>
-    );
-  }
-
+  /* ===================== PROGRESS CHART LOGIC ===================== */
   const renderProgressChart = () => {
+    // Only show if we have data to display
     if (dynamicProgress.length === 0) return null;
 
     const data = {
-      labels: dynamicProgress.map((item) => item.exercise.substring(0, 6)), // Shortened names for X-axis
+      // Shorten exercise names for the X-axis so they don't overlap
+      labels: dynamicProgress.map((item) => item.exercise.substring(0, 6)),
       datasets: [
         {
           data: dynamicProgress.map((item) => item.startingBest),
@@ -342,12 +243,75 @@ const WorkoutScreen = () => {
             style: { borderRadius: 16 },
             propsForDots: { r: "6", strokeWidth: "2", stroke: "#5A3BFF" },
           }}
-          bezier // Makes the line curved
+          bezier // Smooth curved lines for professional UX
           style={{ marginVertical: 8, borderRadius: 16 }}
         />
       </View>
     );
   };
+
+  const renderProgressItem = ({ item }: { item: ProgressItem }) => (
+    <View style={styles.progressRow}>
+      <Text style={[styles.cell, { flex: 1.2 }]}>{item.exercise}</Text>
+      <Text style={styles.cell}>{item.weight}</Text>
+      <Text style={styles.cell}>{item.startingBest}</Text>
+      <Text style={styles.cell}>{item.currentBest}</Text>
+      <Text style={[styles.cell, styles.growthCell]}>
+        {calculateGrowth(item.startingBest, item.currentBest)}
+      </Text>
+    </View>
+  );
+
+  if (selectedExercise) {
+    return (
+      <SafeAreaView style={{ flex: 1, backgroundColor: "#262135" }}>
+        <ScrollView>
+          <TouchableOpacity
+            style={styles.backButton}
+            onPress={() => setSelectedExercise(null)}
+          >
+            <MaterialCommunityIcons name="arrow-left" size={24} color="white" />
+            <Text style={styles.backText}>Back to Library</Text>
+          </TouchableOpacity>
+          <Text style={styles.exerciseTitle}>{selectedExercise.name}</Text>
+          {selectedExercise.gifUrl && (
+            <View style={styles.videoContainer}>
+              <Image
+                source={{ uri: selectedExercise.gifUrl }}
+                style={{ width: "100%", height: 250, borderRadius: 10 }}
+              />
+            </View>
+          )}
+          <View style={{ marginHorizontal: 20, marginTop: 10 }}>
+            <Text style={styles.sectionTitle}>🎯 Target Muscles</Text>
+            <Text style={styles.descriptionText}>
+              {(selectedExercise.targetMuscles || []).join(", ") ||
+                "No details available"}
+            </Text>
+            <Text style={styles.sectionTitle}>💪 Body Parts</Text>
+            <Text style={styles.descriptionText}>
+              {(selectedExercise.bodyParts || []).join(", ") ||
+                "No details available"}
+            </Text>
+            <Text style={styles.sectionTitle}>🏋️ Equipment</Text>
+            <Text style={styles.descriptionText}>
+              {(selectedExercise.equipments || []).join(", ") ||
+                "No details available"}
+            </Text>
+            <Text style={styles.sectionTitle}>📋 Instructions</Text>
+            {(selectedExercise.instructions || []).map((step, index) => (
+              <Text
+                key={index}
+                style={[styles.descriptionText, { marginBottom: 5 }]}
+              >
+                {step}
+              </Text>
+            ))}
+          </View>
+        </ScrollView>
+      </SafeAreaView>
+    );
+  }
 
   return (
     <View style={styles.container}>
@@ -373,64 +337,63 @@ const WorkoutScreen = () => {
         </TouchableOpacity>
       </View>
 
-      {/* Exercise Tab */}
       {activeTab === "exercise" ? (
         <>
-          {/* Search + Body Part Filter + Global AI Coach button */}
-          <View style={{ marginHorizontal: 20, marginBottom: 10 }}>
+          {/* SEARCH & FILTER HEADER */}
+          <View style={styles.headerBlock}>
             <View style={styles.searchRow}>
               <View style={styles.searchContainer}>
                 <MaterialCommunityIcons
                   name="magnify"
                   size={24}
-                  color="#888"
+                  color="#8E8E9E"
                   style={styles.searchIcon}
                 />
                 <TextInput
                   style={styles.searchInput}
                   placeholder="Search exercises..."
-                  placeholderTextColor="#888"
+                  placeholderTextColor="#8E8E9E"
                   value={searchQuery}
                   onChangeText={setSearchQuery}
                 />
               </View>
 
-              {/* Global AI Coach button */}
+              {/* FILTER BUTTON (Identical to SelectExercise) */}
+              <TouchableOpacity
+                style={[
+                  styles.filterIconButton,
+                  (selectedBodyPart !== "All" || selectedEquipment !== "All") &&
+                    styles.activeFilterIcon,
+                ]}
+                onPress={() => setIsFilterVisible(true)}
+              >
+                <MaterialCommunityIcons
+                  name="filter-variant"
+                  size={26}
+                  color="white"
+                />
+              </TouchableOpacity>
+
+              {/* AI Coach Button */}
               <TouchableOpacity
                 style={styles.aiCoachMainButton}
                 onPress={() => navigation.navigate("AiCoach")}
               >
                 <MaterialCommunityIcons name="robot" size={18} color="white" />
-                <Text style={styles.aiCoachMainText}>AI Coach</Text>
+                <Text style={styles.aiCoachMainText}>Coach</Text>
               </TouchableOpacity>
             </View>
 
-            {/* Body Part Filter */}
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              style={styles.filterContainer}
-            >
-              {bodyParts.map((part) => (
-                <TouchableOpacity
-                  key={part}
-                  style={[
-                    styles.filterButton,
-                    selectedBodyPart === part && styles.filterButtonActive,
-                  ]}
-                  onPress={() => handleBodyPartPress(part)}
-                >
-                  <Text
-                    style={{
-                      color: selectedBodyPart === part ? "white" : "#aaa",
-                      fontWeight: "bold",
-                    }}
-                  >
-                    {part}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </ScrollView>
+            {/* Active Filters Display */}
+            {(selectedBodyPart !== "All" || selectedEquipment !== "All") && (
+              <Text style={styles.activeFiltersText}>
+                Active: {selectedBodyPart !== "All" ? selectedBodyPart : ""}
+                {selectedBodyPart !== "All" && selectedEquipment !== "All"
+                  ? " + "
+                  : ""}
+                {selectedEquipment !== "All" ? selectedEquipment : ""}
+              </Text>
+            )}
           </View>
 
           {loading ? (
@@ -439,68 +402,132 @@ const WorkoutScreen = () => {
               color="#5A3BFF"
               style={{ flex: 1 }}
             />
-          ) : filteredExercises.length > 0 ? (
+          ) : (
             <FlatList
               data={filteredExercises}
               renderItem={renderExerciseItem}
               keyExtractor={(item) => item.exerciseId || item.name}
               contentContainerStyle={styles.exerciseList}
+              ListEmptyComponent={
+                <Text style={styles.emptyStateText}>
+                  No exercises found matching filters.
+                </Text>
+              }
             />
-          ) : (
-            <Text style={styles.emptyStateText}>No exercises found.</Text>
           )}
         </>
       ) : (
         <ScrollView>
           {renderProgressChart()}
           <View style={styles.progressSection}>
-            <View style={styles.progressSection}>
-              <View
-                style={{
-                  flexDirection: "row",
-                  justifyContent: "space-between",
-                  paddingRight: 20,
-                }}
-              >
-                <Text style={styles.muscleGroupTitle}>Your Progress</Text>
-                {progressLoading && <ActivityIndicator color="#5A3BFF" />}
+            <View
+              style={{
+                flexDirection: "row",
+                justifyContent: "space-between",
+                paddingRight: 20,
+              }}
+            >
+              <Text style={styles.muscleGroupTitle}>Your Progress</Text>
+              {progressLoading && <ActivityIndicator color="#5A3BFF" />}
+            </View>
+            <View style={styles.progressTable}>
+              <View style={styles.progressHeaderRow}>
+                <Text style={[styles.headerCell, { flex: 1.2 }]}>Exercise</Text>
+                <Text style={styles.headerCell}>Weight</Text>
+                <Text style={styles.headerCell}>Start</Text>
+                <Text style={styles.headerCell}>Current</Text>
+                <Text style={styles.headerCell}>Growth</Text>
               </View>
-
-              <View style={styles.progressTable}>
-                <View style={styles.progressHeaderRow}>
-                  <Text style={[styles.headerCell, { flex: 1.2 }]}>
-                    Exercise
-                  </Text>
-                  <Text style={styles.headerCell}>Weight</Text>
-                  <Text style={styles.headerCell}>Start</Text>
-                  <Text style={styles.headerCell}>Current</Text>
-                  <Text style={styles.headerCell}>Growth</Text>
-                </View>
-
-                {dynamicProgress.length > 0 ? (
-                  dynamicProgress.map((item) => (
-                    <View key={item.id}>{renderProgressItem({ item })}</View>
-                  ))
-                ) : (
-                  <Text style={styles.emptyStateText}>
-                    No workout history found yet.
-                  </Text>
-                )}
-              </View>
+              {dynamicProgress.length > 0 ? (
+                dynamicProgress.map((item) => (
+                  <View key={item.id}>{renderProgressItem({ item })}</View>
+                ))
+              ) : (
+                <Text style={styles.emptyStateText}>
+                  No workout history found yet.
+                </Text>
+              )}
             </View>
           </View>
         </ScrollView>
       )}
+
+      {/* FILTER MODAL (Identical to SelectExercise) */}
+      <Modal visible={isFilterVisible} animationType="slide" transparent={true}>
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Refine Results</Text>
+              <TouchableOpacity onPress={() => setIsFilterVisible(false)}>
+                <MaterialCommunityIcons name="close" size={24} color="white" />
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView showsVerticalScrollIndicator={false}>
+              <Text style={styles.filterLabel}>Target Muscle Group</Text>
+              <View style={styles.chipContainer}>
+                {bodyParts.map((part) => (
+                  <TouchableOpacity
+                    key={part}
+                    style={[
+                      styles.chip,
+                      selectedBodyPart === part && styles.activeChip,
+                    ]}
+                    onPress={() => setSelectedBodyPart(part)}
+                  >
+                    <Text
+                      style={[
+                        styles.chipText,
+                        selectedBodyPart === part && styles.activeChipText,
+                      ]}
+                    >
+                      {part}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+
+              <Text style={[styles.filterLabel, { marginTop: 20 }]}>
+                Equipment Needed
+              </Text>
+              <View style={styles.chipContainer}>
+                {equipments.map((eq) => (
+                  <TouchableOpacity
+                    key={eq}
+                    style={[
+                      styles.chip,
+                      selectedEquipment === eq && styles.activeChip,
+                    ]}
+                    onPress={() => setSelectedEquipment(eq)}
+                  >
+                    <Text
+                      style={[
+                        styles.chipText,
+                        selectedEquipment === eq && styles.activeChipText,
+                      ]}
+                    >
+                      {eq}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </ScrollView>
+
+            <TouchableOpacity
+              style={styles.applyButton}
+              onPress={() => setIsFilterVisible(false)}
+            >
+              <Text style={styles.applyButtonText}>Apply Filters</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 };
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: "#262135",
-    paddingTop: 80,
-  },
+  container: { flex: 1, backgroundColor: "#262135", paddingTop: 60 },
   tabContainer: {
     flexDirection: "row",
     marginHorizontal: 20,
@@ -509,72 +536,49 @@ const styles = StyleSheet.create({
     overflow: "hidden",
     backgroundColor: "#2a2a3a",
   },
-  tabButton: {
-    flex: 1,
-    paddingVertical: 15,
-    alignItems: "center",
-  },
-  activeTab: {
-    backgroundColor: "#5A3BFF",
-  },
-  tabText: {
-    color: "white",
-    fontWeight: "bold",
-    fontSize: 16,
-  },
-  searchRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-  },
+  tabButton: { flex: 1, paddingVertical: 15, alignItems: "center" },
+  activeTab: { backgroundColor: "#5A3BFF" },
+  tabText: { color: "white", fontWeight: "bold", fontSize: 16 },
+  headerBlock: { marginHorizontal: 20, marginBottom: 15 },
+  searchRow: { flexDirection: "row", alignItems: "center", gap: 10 },
   searchContainer: {
     flex: 1,
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "#2a2a3a",
-    borderRadius: 10,
+    backgroundColor: "#1E1E2D",
+    borderRadius: 12,
     paddingHorizontal: 12,
-    marginRight: 10,
-    height: 48,
+    height: 50,
   },
-  searchIcon: {
-    marginRight: 10,
+  searchIcon: { marginRight: 8 },
+  searchInput: { flex: 1, color: "white", fontSize: 16 },
+  filterIconButton: {
+    backgroundColor: "#1E1E2D",
+    padding: 10,
+    borderRadius: 12,
   },
-  searchInput: {
-    flex: 1,
-    color: "white",
+  activeFilterIcon: { backgroundColor: "#5A3BFF" },
+  activeFiltersText: {
+    color: "#5A3BFF",
+    fontSize: 12,
+    marginTop: 8,
+    fontWeight: "600",
   },
   aiCoachMainButton: {
     flexDirection: "row",
     backgroundColor: "#5A3BFF",
     paddingVertical: 10,
-    paddingHorizontal: 14,
+    paddingHorizontal: 12,
     borderRadius: 10,
     alignItems: "center",
   },
   aiCoachMainText: {
     color: "white",
-    marginLeft: 8,
+    marginLeft: 5,
     fontSize: 14,
     fontWeight: "bold",
   },
-  filterContainer: {
-    flexDirection: "row",
-    marginTop: 10,
-  },
-  filterButton: {
-    paddingVertical: 6,
-    paddingHorizontal: 12,
-    backgroundColor: "#2a2a3a",
-    borderRadius: 20,
-    marginRight: 10,
-  },
-  filterButtonActive: {
-    backgroundColor: "#5A3BFF",
-  },
-  exerciseList: {
-    paddingHorizontal: 20,
-  },
+  exerciseList: { paddingHorizontal: 20, paddingBottom: 20 },
   exerciseItem: {
     flexDirection: "row",
     alignItems: "center",
@@ -590,30 +594,18 @@ const styles = StyleSheet.create({
     overflow: "hidden",
     marginRight: 15,
   },
-  exerciseImage: {
-    width: "100%",
-    height: "100%",
-  },
-  textContainer: {
-    flex: 1,
-  },
-  exerciseName: {
+  exerciseImage: { width: "100%", height: "100%" },
+  textContainer: { flex: 1 },
+  exerciseName: { color: "white", fontSize: 18, fontWeight: "bold" },
+  exerciseMeta: { color: "#aaa", fontSize: 12, marginTop: 2 },
+  backButton: { flexDirection: "row", alignItems: "center", padding: 20 },
+  backText: { color: "white", marginLeft: 10, fontSize: 16 },
+  exerciseTitle: {
     color: "white",
-    fontSize: 18,
+    fontSize: 24,
     fontWeight: "bold",
-  },
-  exerciseMeta: {
-    color: "#aaa",
-  },
-  backButton: {
-    flexDirection: "row",
-    alignItems: "center",
-    padding: 20,
-  },
-  backText: {
-    color: "white",
-    marginLeft: 10,
-    fontSize: 16,
+    marginHorizontal: 20,
+    marginBottom: 5,
   },
   videoContainer: {
     marginHorizontal: 20,
@@ -621,13 +613,6 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     overflow: "hidden",
     height: 250,
-  },
-  exerciseTitle: {
-    color: "white",
-    fontSize: 24,
-    fontWeight: "bold",
-    marginHorizontal: 20,
-    marginBottom: 5,
   },
   sectionTitle: {
     color: "white",
@@ -637,19 +622,14 @@ const styles = StyleSheet.create({
     marginTop: 20,
     marginBottom: 10,
   },
-  descriptionText: {
-    color: "#aaa",
-    marginHorizontal: 20,
-    lineHeight: 22,
-  },
+  descriptionText: { color: "#aaa", marginHorizontal: 20, lineHeight: 22 },
   emptyStateText: {
     color: "#888",
     textAlign: "center",
     fontSize: 16,
+    marginTop: 20,
   },
-  progressSection: {
-    marginBottom: 25,
-  },
+  progressSection: { marginBottom: 25 },
   muscleGroupTitle: {
     color: "white",
     fontSize: 20,
@@ -657,9 +637,7 @@ const styles = StyleSheet.create({
     marginLeft: 20,
     marginBottom: 15,
   },
-  progressTable: {
-    minWidth: width - 30,
-  },
+  progressTable: { minWidth: width - 30, paddingHorizontal: 15 },
   progressHeaderRow: {
     flexDirection: "row",
     backgroundColor: "#2a2a3a",
@@ -678,21 +656,11 @@ const styles = StyleSheet.create({
     color: "#888",
     fontWeight: "bold",
     textAlign: "center",
+    fontSize: 12,
   },
-  cell: {
-    flex: 1,
-    color: "white",
-    textAlign: "center",
-  },
-  growthCell: {
-    color: "#4CAF50",
-    fontWeight: "bold",
-  },
-  chartContainer: {
-    marginHorizontal: 20,
-    marginTop: 10,
-    alignItems: "center",
-  },
+  cell: { flex: 1, color: "white", textAlign: "center", fontSize: 12 },
+  growthCell: { color: "#4CAF50", fontWeight: "bold" },
+  chartContainer: { marginHorizontal: 20, marginTop: 10, alignItems: "center" },
   chartTitle: {
     color: "white",
     fontSize: 18,
@@ -700,6 +668,53 @@ const styles = StyleSheet.create({
     alignSelf: "flex-start",
     marginBottom: 10,
   },
+
+  /* MODAL STYLES (MATCHING SELECT EXERCISE) */
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.8)",
+    justifyContent: "flex-end",
+  },
+  modalContent: {
+    backgroundColor: "#262135",
+    borderTopLeftRadius: 25,
+    borderTopRightRadius: 25,
+    padding: 25,
+    maxHeight: "75%",
+  },
+  modalHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    marginBottom: 20,
+  },
+  modalTitle: { color: "white", fontSize: 20, fontWeight: "bold" },
+  filterLabel: {
+    color: "#8E8E9E",
+    fontSize: 12,
+    fontWeight: "bold",
+    marginBottom: 10,
+    textTransform: "uppercase",
+  },
+  chipContainer: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
+  chip: {
+    backgroundColor: "#1E1E2D",
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: "#333",
+  },
+  activeChip: { backgroundColor: "#5A3BFF", borderColor: "#5A3BFF" },
+  chipText: { color: "#aaa", fontSize: 13 },
+  activeChipText: { color: "white", fontWeight: "bold" },
+  applyButton: {
+    backgroundColor: "#5A3BFF",
+    padding: 16,
+    borderRadius: 12,
+    alignItems: "center",
+    marginTop: 25,
+  },
+  applyButtonText: { color: "white", fontWeight: "bold", fontSize: 16 },
 });
 
 export default WorkoutScreen;
