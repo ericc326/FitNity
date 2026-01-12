@@ -140,8 +140,7 @@ export const MealPlanProvider = ({ children }: { children: ReactNode }) => {
     return () => unsubscribe();
   }, [auth.currentUser]);
 
-  // 3. EFFECT: Diet Info Listener (CONTROLS LOADING STATE)
-  // FIX: Added [auth.currentUser] so it runs when user logs in
+  // 3. EFFECT: Diet Info Listener (Updated for Real-Time Fixed ID)
   useEffect(() => {
     if (!auth.currentUser) {
       setDietInfo(null);
@@ -150,23 +149,21 @@ export const MealPlanProvider = ({ children }: { children: ReactNode }) => {
     }
 
     const uid = auth.currentUser.uid;
-    const dietRef = collection(db, "users", uid, "dietinfo");
-    const q = query(dietRef, limit(1));
+    const dietDocRef = doc(db, "users", uid, "dietinfo", "currentPlan");
 
     const unsubscribe = onSnapshot(
-      q,
+      dietDocRef,
       (snapshot) => {
-        if (!snapshot.empty) {
-          setDietInfo(snapshot.docs[0].data() as DietInfo);
+        if (snapshot.exists()) {
+          setDietInfo(snapshot.data() as DietInfo);
         } else {
-          setDietInfo(null); // New user (empty diet info)
+          setDietInfo(null);
         }
-        // CRITICAL: This turns off the loading screen once we know the diet status
         setIsLoading(false);
       },
       (error) => {
         console.error("Diet listener error:", error);
-        setIsLoading(false); // Ensure we don't get stuck on error
+        setIsLoading(false);
       }
     );
 
@@ -271,26 +268,23 @@ export const MealPlanProvider = ({ children }: { children: ReactNode }) => {
     await updateMeal(mealId, food);
   };
 
+  // Inside MealPlanProvider actions
   const saveDietInfo = async (info: DietInfo) => {
     if (!auth.currentUser) return;
 
     const uid = auth.currentUser.uid;
-    const dietCollectionRef = collection(db, "users", uid, "dietinfo");
+    // Use a fixed document ID "currentPlan" to ensure we update the SAME record
+    const dietDocRef = doc(db, "users", uid, "dietinfo", "currentPlan");
 
     try {
-      const q = query(dietCollectionRef, limit(1));
-      const snapshot = await getDocs(q);
-
-      if (!snapshot.empty) {
-        console.log("Profile already exists. Updates are not allowed.");
-        return;
-      }
-
-      await addDoc(dietCollectionRef, {
-        ...info,
-        createdAt: serverTimestamp(),
-        updatedAt: serverTimestamp(),
-      });
+      await setDoc(
+        dietDocRef,
+        {
+          ...info,
+          updatedAt: serverTimestamp(),
+        },
+        { merge: true }
+      ); // Merge ensures we don't overwrite unrelated fields
     } catch (error) {
       console.error("Error saving diet info:", error);
       throw error;

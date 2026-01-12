@@ -101,12 +101,20 @@ const PersonalInfoModal: React.FC<PersonalInfoModalProps> = ({
 
     const calculatedCalories = calculateTargetCalories();
 
+    // Standard Balanced Ratio: 30% Protein, 40% Carbs, 30% Fat
+    const targetProtein = Math.round((calculatedCalories * 0.3) / 4); // 4 kcal per gram
+    const targetCarbs = Math.round((calculatedCalories * 0.4) / 4); // 4 kcal per gram
+    const targetFat = Math.round((calculatedCalories * 0.3) / 9);
+
     // Data specifically for the 'dietinfo' subcollection
     const dietInfoData = {
       dietaryRestrictions: personalInfo.dietaryRestrictions,
       allergies: personalInfo.allergies,
       goal: personalInfo.goal,
       targetCalories: calculatedCalories.toString(),
+      targetProtein: targetProtein.toString(),
+      targetCarbs: targetCarbs.toString(),
+      targetFat: targetFat.toString(),
       updatedAt: new Date().toISOString(),
     };
 

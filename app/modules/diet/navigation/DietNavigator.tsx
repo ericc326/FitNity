@@ -1,7 +1,6 @@
 import React from "react";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import DietScreen from "../screens/DietScreen";
-import MealRecipesScreen from "../screens/MealRecipesScreen";
 import AiMealPlanner from "../screens/AiMealPlanner";
 import RecipeDetailScreen from "../screens/RecipeDetailScreen";
 import RecipeList, { Recipe } from "../screens/RecipeList";
@@ -44,18 +43,6 @@ const DietNavigator: React.FC = () => {
       }}
     >
       <DietStack.Screen name="DietHome" component={DietScreen} />
-
-      <DietStack.Screen
-        name="MealRecipes"
-        component={MealRecipesScreen}
-        options={{
-          headerShown: true,
-          headerStyle: { backgroundColor: "#262135" },
-          headerTintColor: "#fff",
-          title: "Meal Recipes",
-          headerBackTitle: "Back",
-        }}
-      />
 
       <DietStack.Screen
         name="AiMealPlanner"

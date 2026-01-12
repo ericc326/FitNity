@@ -60,6 +60,9 @@ const MealsScreen = () => {
     changeDate,
   } = useMealPlan();
 
+  // Define available meal types for selection
+  const mealTypes = ["breakfast", "lunch", "dinner", "snacks"];
+
   // This automatically becomes true if dietInfo exists and has calories
   const hasCompletedSetup = !!(dietInfo && dietInfo.targetCalories);
 
@@ -77,9 +80,10 @@ const MealsScreen = () => {
 
   const handleSelectFood = (food: any) => {
     if (selectedMealId) {
+      // This immediately saves it to Firebase and updates the UI
       updateMeal(selectedMealId, food);
     }
-    setShowAIRecommendations(false);
+    setShowAIRecommendations(false); // Closes the modal
     setSelectedMealId(null);
   };
 
@@ -103,44 +107,49 @@ const MealsScreen = () => {
       return;
     }
 
+    // Default to breakfast if somehow null, though UI prevents this
+    const targetMealId = selectedMealId || "breakfast";
+
     const calories = parseInt(customMealData.calories) || 0;
     const protein = parseInt(customMealData.protein) || 0;
     const carbs = parseInt(customMealData.carbs) || 0;
     const fat = parseInt(customMealData.fat) || 0;
 
-    if (selectedMealId) {
-      addCustomMeal(
-        selectedMealId,
-        customMealData.name,
-        calories,
-        protein,
-        carbs,
-        fat
-      );
-      setShowCustomMealModal(false);
-      setSelectedMealId(null);
-      setCustomMealData({
-        name: "",
-        calories: "",
-        protein: "",
-        carbs: "",
-        fat: "",
-      });
-    }
+    addCustomMeal(
+      targetMealId,
+      customMealData.name,
+      calories,
+      protein,
+      carbs,
+      fat
+    );
+
+    setShowCustomMealModal(false);
+    setSelectedMealId(null);
+    setCustomMealData({
+      name: "",
+      calories: "",
+      protein: "",
+      carbs: "",
+      fat: "",
+    });
   };
 
   const fetchRecommendedMeals = async () => {
     if (!hasCompletedSetup) return;
-    // Gatekeeper: If we already have data or no API key, don't call
+    // Don't fetch if we already have data
     if (recommendedMeals.length > 0 || !SPOONACULAR_API_KEY) return;
 
     setLoadingRecipes(true);
     try {
       const target = dietInfo ? parseInt(dietInfo.targetCalories) : 2000;
+      // Ensure at least 300 calories remain so we don't get tiny snacks
       const remainingCalories = Math.max(target - totalNutrition.calories, 300);
       const maxCalories = Math.round(remainingCalories / 2);
 
-      const url = `https://api.spoonacular.com/recipes/complexSearch?apiKey=${SPOONACULAR_API_KEY}&number=6&minProtein=20&maxCalories=${maxCalories}&addRecipeNutrition=true`;
+      // --- CRITICAL UPDATE HERE ---
+      // Added: &addRecipeInformation=true &fillIngredients=true &instructionsRequired=true
+      const url = `https://api.spoonacular.com/recipes/complexSearch?apiKey=${SPOONACULAR_API_KEY}&number=6&minProtein=20&maxCalories=${maxCalories}&addRecipeInformation=true&fillIngredients=true&instructionsRequired=true`;
 
       const res = await fetch(url);
       const data = await res.json();
@@ -158,6 +167,46 @@ const MealsScreen = () => {
     }
   }, [isLoading, dietInfo, totalNutrition.calories]);
 
+  const handleQuickAddRecipe = (recipe: any) => {
+    // 1. Extract nutrients from the recipe data
+    const nutrients = recipe.nutrition?.nutrients || [];
+    const calories = Math.round(
+      nutrients.find((n: any) => n.name === "Calories")?.amount || 0
+    );
+    const protein = Math.round(
+      nutrients.find((n: any) => n.name === "Protein")?.amount || 0
+    );
+    const carbs = Math.round(
+      nutrients.find((n: any) => n.name === "Carbohydrates")?.amount || 0
+    );
+    const fat = Math.round(
+      nutrients.find((n: any) => n.name === "Fat")?.amount || 0
+    );
+
+    const foodData = {
+      id: `recipe-${recipe.id}`,
+      name: recipe.title,
+      calories,
+      protein,
+      carbs,
+      fat,
+      category: "recommendation",
+    };
+
+    // 2. Alert the user to choose which meal slot to add it to
+    Alert.alert(
+      "Add to Log",
+      `Which meal slot would you like to add "${recipe.title}" to?`,
+      [
+        { text: "Cancel", style: "cancel" },
+        { text: "Breakfast", onPress: () => updateMeal("breakfast", foodData) },
+        { text: "Lunch", onPress: () => updateMeal("lunch", foodData) },
+        { text: "Dinner", onPress: () => updateMeal("dinner", foodData) },
+        { text: "Snacks", onPress: () => updateMeal("snacks", foodData) },
+      ]
+    );
+  };
+
   const handleAIRecommendations = () => {
     // If setup is not complete, we might still want to show the modal
     // to let the AI help set them up, or redirect them.
@@ -165,6 +214,7 @@ const MealsScreen = () => {
     if (!hasCompletedSetup) {
       // You can either open the AI to help them setup, or navigate to a setup screen.
       // For now, I'll keep your original logic which opens the modal:
+      setSelectedMealId(null);
       setShowAIRecommendations(true);
       return;
     }
@@ -377,7 +427,7 @@ const MealsScreen = () => {
           {loadingRecipes ? (
             <ActivityIndicator color="#fff" />
           ) : (
-            recommendedMeals.map((recipe) => {
+            recommendedMeals.map((recipe, index) => {
               const nutrients = recipe.nutrition?.nutrients || [];
               const calories =
                 nutrients.find((n: any) => n.name === "Calories")?.amount || 0;
@@ -386,7 +436,7 @@ const MealsScreen = () => {
 
               return (
                 <TouchableOpacity
-                  key={recipe.id}
+                  key={`${recipe.id}-${index}`}
                   style={styles.recipeCard}
                   onPress={() =>
                     navigation.navigate("RecipeDetail", {
@@ -463,8 +513,8 @@ const MealsScreen = () => {
             <Text style={styles.sectionTitle}>Today's Meals</Text>
           </View>
 
-          {meals.map((meal) => (
-            <MealItem key={meal.id} meal={meal} />
+          {meals.map((meal, index) => (
+            <MealItem key={`${meal.id}-${index}`} meal={meal} />
           ))}
 
           {/* Bottom Action Buttons */}
@@ -482,7 +532,7 @@ const MealsScreen = () => {
             <TouchableOpacity
               style={styles.mealActionButtonFull}
               onPress={() => {
-                setSelectedMealId("breakfast");
+                setSelectedMealId("breakfast"); // Default value
                 setShowCustomMealModal(true);
               }}
             >
@@ -521,6 +571,32 @@ const MealsScreen = () => {
           </View>
 
           <ScrollView style={styles.modalContent}>
+            {/* NEW: Meal Type Selector */}
+            <View style={styles.inputGroup}>
+              <Text style={styles.inputLabel}>Select Meal Time</Text>
+              <View style={styles.mealTypeContainer}>
+                {mealTypes.map((type) => (
+                  <TouchableOpacity
+                    key={type}
+                    style={[
+                      styles.mealTypeChip,
+                      selectedMealId === type && styles.selectedMealTypeChip,
+                    ]}
+                    onPress={() => setSelectedMealId(type)}
+                  >
+                    <Text
+                      style={[
+                        styles.mealTypeText,
+                        selectedMealId === type && styles.selectedMealTypeText,
+                      ]}
+                    >
+                      {type.charAt(0).toUpperCase() + type.slice(1)}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </View>
+
             <View style={styles.inputGroup}>
               <Text style={styles.inputLabel}>Meal Name</Text>
               <TextInput
@@ -1062,5 +1138,30 @@ const styles = StyleSheet.create({
     color: "#007AFF",
     fontWeight: "bold",
     fontSize: 16,
+  },
+  // NEW STYLES for Meal Selector
+  mealTypeContainer: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+  },
+  mealTypeChip: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: "#4CAF50",
+    backgroundColor: "white",
+  },
+  selectedMealTypeChip: {
+    backgroundColor: "#4CAF50",
+  },
+  mealTypeText: {
+    color: "#4CAF50",
+    fontSize: 14,
+    fontWeight: "600",
+  },
+  selectedMealTypeText: {
+    color: "white",
   },
 });
