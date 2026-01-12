@@ -18,6 +18,7 @@ import {
   addDoc,
   serverTimestamp,
   query,
+  where,
   orderBy,
   getDocs,
   limit,
@@ -136,12 +137,17 @@ Never give medical diagnoses; recommend consulting a healthcare professional for
     try {
       // Read latest 10 schedules created by this user (created via CreateSchedule)
       const schedulesRef = collection(db, `users/${uid}/schedules`);
-      const q = query(schedulesRef, orderBy("scheduledAt", "desc"), limit(10));
+      const q = query(
+        schedulesRef,
+        where("completed", "==", true),
+        orderBy("scheduledAt", "desc"),
+        limit(10)
+      );
       const snap = await getDocs(q);
 
       if (snap.empty) {
         return {
-          summary: "No recent schedules found.",
+          summary: "No completed schedules found.",
           recommendation:
             "No schedule history — general recovery: light stretching, hydrate (300-500ml), 24h rest.",
           meta: null,
@@ -200,7 +206,7 @@ Never give medical diagnoses; recommend consulting a healthcare professional for
         recommendation += " Rest intervals appear moderate.";
       }
 
-      const summary = `Analyzed ${totalCount} recent sessions. Workouts (latest first): ${workoutNames.join(
+      const summary = `Analyzed ${totalCount} completed sessions. Workouts (latest first): ${workoutNames.join(
         ", "
       )}. Avg volume (sets×reps): ${avgVolume}. Avg rest: ${avgRest}s.`;
 
@@ -259,7 +265,7 @@ Never give medical diagnoses; recommend consulting a healthcare professional for
       // Build a header with the recent exercise names (always shown if available)
       const workoutLine =
         hasWorkouts && analysis.meta?.workoutNames?.length
-          ? `Recent exercises (latest first): ${analysis.meta.workoutNames.join(", ")}`
+          ? `Completed workouts (latest first): ${analysis.meta.workoutNames.join(", ")}`
           : "";
 
       let finalText = analysis.recommendation;
@@ -285,7 +291,7 @@ Never give medical diagnoses; recommend consulting a healthcare professional for
       // Prepend the workout list line so names are always visible
       const combinedMessage = hasWorkouts
         ? `${workoutLine}\n\n${finalText}`
-        : `No Workout Found.\n\nGeneral recovery: ${finalText}`;
+        : `No Completed Workouts Found.\n\nGeneral recovery: ${finalText}`;
 
       setMessages((prev) => {
         const copy = [...prev];
