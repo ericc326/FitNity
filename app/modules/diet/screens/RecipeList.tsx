@@ -10,6 +10,7 @@ import {
 } from "react-native";
 import { NativeStackScreenProps } from "@react-navigation/native-stack";
 import { DietStackParamList } from "../navigation/DietNavigator";
+import { SPOONACULAR_API_KEY } from "@env";
 
 // Recipe & Nutrient types
 export interface Recipe {
@@ -31,12 +32,8 @@ const RecipeList = ({ navigation }: Props) => {
     const fetchAllRecipes = async () => {
       setLoading(true);
       try {
-        const res = await fetch(
-          `https://api.spoonacular.com/recipes/complexSearch?` +
-            `apiKey=${process.env.SPOONACULAR_API_KEY}` +
-            `&number=50` + // Fetch more recipes for the library
-            `&addRecipeNutrition=true`
-        );
+        const url = `https://api.spoonacular.com/recipes/complexSearch?apiKey=${SPOONACULAR_API_KEY}&number=50&addRecipeNutrition=true`;
+        const res = await fetch(url);
         const data = await res.json();
         setRecipes(data.results || []);
       } catch (error) {
