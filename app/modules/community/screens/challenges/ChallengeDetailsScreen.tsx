@@ -509,8 +509,17 @@ const ChallengeDetailsScreen = ({ route, navigation }: Props) => {
       // Immediately set join date to now so local checks work instantly
       setParticipantJoinDate(new Date());
 
+      const updatedChallengeDoc = await getDoc(challengeRef);
+      if (updatedChallengeDoc.exists()) {
+        const updatedChallenge = {
+          id: updatedChallengeDoc.id,
+          ...updatedChallengeDoc.data(),
+        };
+        setCurrentChallenge(updatedChallenge);
+        // Now fetch participants with the updated challenge data
+        await fetchParticipants(updatedChallenge);
+      }
       Alert.alert("Success", "You have joined the challenge!");
-      fetchParticipants();
     } catch (error: any) {
       Alert.alert("Error", error.message);
     } finally {
