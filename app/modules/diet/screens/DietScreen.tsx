@@ -42,6 +42,8 @@ const MealsScreen = () => {
   const [recommendedMeals, setRecommendedMeals] = useState<any[]>([]);
   const [loadingRecipes, setLoadingRecipes] = useState(false);
   const [showDisclaimer, setShowDisclaimer] = useState(true);
+  const [isSelectionVisible, setSelectionVisible] = useState(false);
+  const [pendingFood, setPendingFood] = useState<any>(null);
 
   const navigation = useNavigation<DietScreenNavigationProp>();
   type DietScreenNavigationProp = NativeStackNavigationProp<
@@ -79,12 +81,16 @@ const MealsScreen = () => {
   }, []);
 
   const handleSelectFood = (food: any) => {
+    // Case 1: We already know the meal (User clicked specific + button)
     if (selectedMealId) {
-      // This immediately saves it to Firebase and updates the UI
       updateMeal(selectedMealId, food);
+      setShowAIRecommendations(false);
+      setSelectedMealId(null);
+      return;
     }
-    setShowAIRecommendations(false); // Closes the modal
-    setSelectedMealId(null);
+    // 2. If we DON'T know the meal (User clicked Bulb), show the selector
+    setPendingFood(food);
+    setSelectionVisible(true); // Open the "Dropdown" list
   };
 
   const handleRemoveMeal = (mealId: string) => {
@@ -137,23 +143,27 @@ const MealsScreen = () => {
 
   const fetchRecommendedMeals = async () => {
     if (!hasCompletedSetup) return;
-    // Don't fetch if we already have data
     if (recommendedMeals.length > 0 || !SPOONACULAR_API_KEY) return;
 
     setLoadingRecipes(true);
     try {
       const target = dietInfo ? parseInt(dietInfo.targetCalories) : 2000;
-      // Ensure at least 300 calories remain so we don't get tiny snacks
-      const remainingCalories = Math.max(target - totalNutrition.calories, 300);
-      const maxCalories = Math.round(remainingCalories / 2);
 
-      // --- CRITICAL UPDATE HERE ---
-      // Added: &addRecipeInformation=true &fillIngredients=true &instructionsRequired=true
-      const url = `https://api.spoonacular.com/recipes/complexSearch?apiKey=${SPOONACULAR_API_KEY}&number=6&minProtein=20&maxCalories=${maxCalories}&addRecipeInformation=true&fillIngredients=true&instructionsRequired=true`;
+      const remainingCalories = Math.max(target - totalNutrition.calories, 600);
+      const maxCalories = remainingCalories;
+      const url = `https://api.spoonacular.com/recipes/complexSearch?apiKey=${SPOONACULAR_API_KEY}&number=6&minProtein=10&maxCalories=${maxCalories}&addRecipeInformation=true&fillIngredients=true&instructionsRequired=true`;
+
+      // Debugging: Log URL to check if API Key is loading correctly
+      console.log("Fetching URL:", url);
 
       const res = await fetch(url);
       const data = await res.json();
-      setRecommendedMeals(data.results || []);
+
+      if (data.results && data.results.length > 0) {
+        setRecommendedMeals(data.results);
+      } else {
+        console.log("No recipes found with these strict filters.");
+      }
     } catch (error) {
       console.error("Spoonacular error:", error);
     } finally {
@@ -404,62 +414,69 @@ const MealsScreen = () => {
         </View>
 
         {/* Recommended For You Section */}
-        <View style={styles.sectionHeader}>
-          <Text style={styles.sectionTitle}>Recommended For You</Text>
-          <TouchableOpacity
-            style={styles.viewMoreButton}
-            onPress={() =>
-              navigation.navigate("RecipeList", {
-                recipes: recommendedMeals,
-                loading: false,
-              })
-            }
-          >
-            <Text style={styles.viewMoreText}>View more</Text>
-          </TouchableOpacity>
-        </View>
+        {hasCompletedSetup && (
+          <>
+            <View style={styles.sectionHeader}>
+              <Text style={styles.sectionTitle}>Recommended For You</Text>
+              <TouchableOpacity
+                style={styles.viewMoreButton}
+                onPress={() =>
+                  navigation.navigate("RecipeList", {
+                    recipes: recommendedMeals,
+                    loading: false,
+                  })
+                }
+              >
+                <Text style={styles.viewMoreText}>View more</Text>
+              </TouchableOpacity>
+            </View>
 
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          style={{ paddingLeft: 20 }}
-        >
-          {loadingRecipes ? (
-            <ActivityIndicator color="#fff" />
-          ) : (
-            recommendedMeals.map((recipe, index) => {
-              const nutrients = recipe.nutrition?.nutrients || [];
-              const calories =
-                nutrients.find((n: any) => n.name === "Calories")?.amount || 0;
-              const protein =
-                nutrients.find((n: any) => n.name === "Protein")?.amount || 0;
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              style={{ paddingLeft: 20 }}
+            >
+              {loadingRecipes ? (
+                <ActivityIndicator color="#fff" />
+              ) : (
+                recommendedMeals.map((recipe, index) => {
+                  const nutrients = recipe.nutrition?.nutrients || [];
+                  const calories =
+                    nutrients.find((n: any) => n.name === "Calories")?.amount ||
+                    0;
+                  const protein =
+                    nutrients.find((n: any) => n.name === "Protein")?.amount ||
+                    0;
 
-              return (
-                <TouchableOpacity
-                  key={`${recipe.id}-${index}`}
-                  style={styles.recipeCard}
-                  onPress={() =>
-                    navigation.navigate("RecipeDetail", {
-                      recipe,
-                    })
-                  }
-                >
-                  <Image
-                    source={{ uri: recipe.image }}
-                    style={styles.recipeImage}
-                    resizeMode="cover"
-                  />
-                  <Text style={styles.recipeTitle} numberOfLines={2}>
-                    {recipe.title}
-                  </Text>
-                  <Text style={{ fontSize: 12, color: "#666" }}>
-                    {Math.round(calories)} kcal · {Math.round(protein)}g protein
-                  </Text>
-                </TouchableOpacity>
-              );
-            })
-          )}
-        </ScrollView>
+                  return (
+                    <TouchableOpacity
+                      key={`${recipe.id}-${index}`}
+                      style={styles.recipeCard}
+                      onPress={() =>
+                        navigation.navigate("RecipeDetail", {
+                          recipe,
+                        })
+                      }
+                    >
+                      <Image
+                        source={{ uri: recipe.image }}
+                        style={styles.recipeImage}
+                        resizeMode="cover"
+                      />
+                      <Text style={styles.recipeTitle} numberOfLines={2}>
+                        {recipe.title}
+                      </Text>
+                      <Text style={{ fontSize: 12, color: "#666" }}>
+                        {Math.round(calories)} kcal · {Math.round(protein)}g
+                        protein
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })
+              )}
+            </ScrollView>
+          </>
+        )}
 
         {/* My Meals Header */}
         <View style={styles.myMealsHeader}>
@@ -729,6 +746,54 @@ const MealsScreen = () => {
             }}
           />
         ))}
+      <Modal
+        visible={isSelectionVisible}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setSelectionVisible(false)}
+      >
+        <TouchableOpacity
+          style={styles.menuOverlay}
+          activeOpacity={1}
+          onPress={() => setSelectionVisible(false)}
+        >
+          <View style={styles.menuContainer}>
+            <Text style={styles.menuTitle}>Add to...</Text>
+
+            {["breakfast", "lunch", "dinner", "snacks"].map((mealType) => (
+              <TouchableOpacity
+                key={mealType}
+                style={styles.menuOption}
+                onPress={() => {
+                  if (pendingFood) {
+                    updateMeal(mealType, pendingFood);
+                    setPendingFood(null);
+                    setSelectionVisible(false);
+                  }
+                }}
+              >
+                <Ionicons
+                  name={
+                    mealType === "breakfast"
+                      ? "sunny-outline"
+                      : mealType === "lunch"
+                        ? "restaurant-outline"
+                        : mealType === "dinner"
+                          ? "moon-outline"
+                          : "cafe-outline"
+                  }
+                  size={20}
+                  color="#4CAF50"
+                  style={{ marginRight: 10 }}
+                />
+                <Text style={styles.menuOptionText}>
+                  {mealType.charAt(0).toUpperCase() + mealType.slice(1)}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        </TouchableOpacity>
+      </Modal>
     </SafeAreaView>
   );
 };
@@ -1163,5 +1228,44 @@ const styles = StyleSheet.create({
   },
   selectedMealTypeText: {
     color: "white",
+  },
+  menuOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.5)",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  menuContainer: {
+    width: "70%",
+    backgroundColor: "white",
+    borderRadius: 15,
+    paddingVertical: 10,
+    elevation: 5,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+  },
+  menuTitle: {
+    fontSize: 16,
+    fontWeight: "bold",
+    color: "#333",
+    textAlign: "center",
+    marginBottom: 10,
+    paddingBottom: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: "#eee",
+  },
+  menuOption: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingVertical: 12,
+    paddingHorizontal: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: "#f9f9f9",
+  },
+  menuOptionText: {
+    fontSize: 16,
+    color: "#333",
   },
 });

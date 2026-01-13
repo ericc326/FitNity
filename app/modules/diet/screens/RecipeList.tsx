@@ -32,8 +32,9 @@ const RecipeList = ({ navigation }: Props) => {
     const fetchAllRecipes = async () => {
       setLoading(true);
       try {
-        const url = `https://api.spoonacular.com/recipes/complexSearch?apiKey=${SPOONACULAR_API_KEY}&number=50&addRecipeNutrition=true`;
-        const res = await fetch(url);
+        const res = await fetch(
+          `https://api.spoonacular.com/recipes/complexSearch?apiKey=${SPOONACULAR_API_KEY}&number=50&minProtein=10&addRecipeInformation=true&fillIngredients=true&instructionsRequired=true`
+        );
         const data = await res.json();
         setRecipes(data.results || []);
       } catch (error) {
