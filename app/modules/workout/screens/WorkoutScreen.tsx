@@ -265,7 +265,8 @@ const WorkoutScreen = () => {
   if (selectedExercise) {
     return (
       <SafeAreaView style={{ flex: 1, backgroundColor: "#262135" }}>
-        <ScrollView>
+        <ScrollView contentContainerStyle={{ paddingBottom: 40 }}>
+          {/* Back Button */}
           <TouchableOpacity
             style={styles.backButton}
             onPress={() => setSelectedExercise(null)}
@@ -273,39 +274,62 @@ const WorkoutScreen = () => {
             <MaterialCommunityIcons name="arrow-left" size={24} color="white" />
             <Text style={styles.backText}>Back to Library</Text>
           </TouchableOpacity>
+
+          {/* Title */}
           <Text style={styles.exerciseTitle}>{selectedExercise.name}</Text>
+
+          {/* GIF / Image */}
           {selectedExercise.gifUrl && (
             <View style={styles.videoContainer}>
               <Image
                 source={{ uri: selectedExercise.gifUrl }}
-                style={{ width: "100%", height: 250, borderRadius: 10 }}
+                style={{ width: "100%", height: 250, borderRadius: 16 }}
               />
             </View>
           )}
-          <View style={{ marginHorizontal: 20, marginTop: 10 }}>
-            <Text style={styles.sectionTitle}>🎯 Target Muscles</Text>
-            <Text style={styles.descriptionText}>
-              {(selectedExercise.targetMuscles || []).join(", ") ||
-                "No details available"}
-            </Text>
-            <Text style={styles.sectionTitle}>💪 Body Parts</Text>
-            <Text style={styles.descriptionText}>
-              {(selectedExercise.bodyParts || []).join(", ") ||
-                "No details available"}
-            </Text>
-            <Text style={styles.sectionTitle}>🏋️ Equipment</Text>
-            <Text style={styles.descriptionText}>
-              {(selectedExercise.equipments || []).join(", ") ||
-                "No details available"}
-            </Text>
-            <Text style={styles.sectionTitle}>📋 Instructions</Text>
-            {(selectedExercise.instructions || []).map((step, index) => (
-              <Text
-                key={index}
-                style={[styles.descriptionText, { marginBottom: 5 }]}
-              >
-                {step}
+
+          {/* META INFO ROW (Chips instead of vertical list) */}
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            style={{ marginHorizontal: 20, marginBottom: 20 }}
+          >
+            <View style={styles.metaBadge}>
+              <Text style={styles.metaLabel}>Target:</Text>
+              <Text style={styles.metaValue}>
+                {(selectedExercise.targetMuscles || [])[0] || "General"}
               </Text>
+            </View>
+            <View style={styles.metaBadge}>
+              <Text style={styles.metaLabel}>Equip:</Text>
+              <Text style={styles.metaValue}>
+                {(selectedExercise.equipments || [])[0] || "None"}
+              </Text>
+            </View>
+            <View style={styles.metaBadge}>
+              <Text style={styles.metaLabel}>Body:</Text>
+              <Text style={styles.metaValue}>
+                {(selectedExercise.bodyParts || [])[0] || "Full"}
+              </Text>
+            </View>
+          </ScrollView>
+
+          {/* IMPROVED INSTRUCTIONS SECTION */}
+          <View style={styles.instructionsContainer}>
+            <Text style={styles.sectionTitle}>How to Perform</Text>
+
+            {(selectedExercise.instructions || []).map((step, index) => (
+              <View key={index} style={styles.instructionRow}>
+                {/* Step Number Circle */}
+                <View style={styles.stepCircle}>
+                  <Text style={styles.stepNumber}>{index + 1}</Text>
+                </View>
+
+                {/* Step Text */}
+                <View style={styles.stepContent}>
+                  <Text style={styles.instructionText}>{step}</Text>
+                </View>
+              </View>
             ))}
           </View>
         </ScrollView>
@@ -715,6 +739,66 @@ const styles = StyleSheet.create({
     marginTop: 25,
   },
   applyButtonText: { color: "white", fontWeight: "bold", fontSize: 16 },
+
+  metaBadge: {
+    flexDirection: "row",
+    backgroundColor: "#35354a", // Lighter than background
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 8,
+    marginRight: 10,
+    alignItems: "center",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.1)",
+  },
+  metaLabel: {
+    color: "#8E8E9E",
+    fontSize: 12,
+    fontWeight: "600",
+    marginRight: 4,
+    textTransform: "uppercase",
+  },
+  metaValue: {
+    color: "white",
+    fontSize: 13,
+    fontWeight: "bold",
+    textTransform: "capitalize",
+  },
+  instructionsContainer: {
+    backgroundColor: "#1E1E2D", // Card background for instructions
+    borderTopLeftRadius: 30,
+    borderTopRightRadius: 30,
+    padding: 25,
+    marginTop: 10,
+    minHeight: 400, // Ensure it fills bottom
+  },
+  instructionRow: {
+    flexDirection: "row",
+    marginBottom: 20,
+  },
+  stepCircle: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: "#5A3BFF",
+    justifyContent: "center",
+    alignItems: "center",
+    marginRight: 15,
+    marginTop: 2, // Align with top of text
+  },
+  stepNumber: {
+    color: "white",
+    fontWeight: "bold",
+    fontSize: 14,
+  },
+  stepContent: {
+    flex: 1,
+  },
+  instructionText: {
+    color: "#E0E0E0", // Brighter text for readability
+    fontSize: 15,
+    lineHeight: 24, // Better spacing between lines
+  },
 });
 
 export default WorkoutScreen;

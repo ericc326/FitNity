@@ -1,7 +1,7 @@
 import React from "react";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import DietScreen from "../screens/DietScreen";
-import AiMealPlanner from "../screens/AiMealPlanner";
+import AiMealPlanner from "../screens/AiFoodScanner";
 import RecipeDetailScreen from "../screens/RecipeDetailScreen";
 import RecipeList, { Recipe } from "../screens/RecipeList";
 

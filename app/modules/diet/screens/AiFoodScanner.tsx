@@ -8,6 +8,7 @@ import {
   ActivityIndicator,
   ScrollView,
   StyleSheet,
+  Alert,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import * as ImagePicker from "expo-image-picker";
@@ -15,8 +16,11 @@ import Markdown, { MarkdownIt } from "react-native-markdown-display";
 import { AnimatedCircularProgress } from "react-native-circular-progress";
 import { Ionicons } from "@expo/vector-icons";
 import { OPENAI_API_KEY } from "@env";
+import { useNavigation } from "@react-navigation/native";
+import { useMealPlan } from "../component/MealPlanContext";
 
 type NutritionData = {
+  FoodName: string;
   Calories: number;
   Protein: number;
   Carbohydrates: number;
@@ -40,11 +44,19 @@ const markdownStyles = {
 };
 
 export default function AiMealPlanner() {
+  // FIXED: Initialize Navigation
+  const navigation = useNavigation();
+  // FIXED: Import Context
+  const { updateMeal } = useMealPlan();
+
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
   const [base64Image, setBase64Image] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<string>("");
   const [jsonData, setJsonData] = useState<NutritionData | null>(null);
+
+  // FIXED: State for the popup modal
+  const [showMealSelector, setShowMealSelector] = useState(false);
 
   const pickImage = async () => {
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
@@ -61,11 +73,40 @@ export default function AiMealPlanner() {
 
     if (!img.canceled) {
       const asset = img.assets[0];
-
       setSelectedImage(asset.uri);
 
       if (!asset.base64) {
         alert("Cannot read base64 from this image. Try a smaller image.");
+        setBase64Image(null);
+        return;
+      }
+
+      setBase64Image(asset.base64);
+      setResult("");
+      setJsonData(null);
+    }
+  };
+
+  const takePhoto = async () => {
+    const { status } = await ImagePicker.requestCameraPermissionsAsync();
+    if (status !== "granted") {
+      alert("Permission required to access the camera.");
+      return;
+    }
+
+    const img = await ImagePicker.launchCameraAsync({
+      allowsEditing: true,
+      aspect: [4, 3],
+      quality: 0.3,
+      base64: true,
+    });
+
+    if (!img.canceled) {
+      const asset = img.assets[0];
+      setSelectedImage(asset.uri);
+
+      if (!asset.base64) {
+        alert("Cannot read base64. Try again.");
         setBase64Image(null);
         return;
       }
@@ -100,11 +141,11 @@ export default function AiMealPlanner() {
     try {
       setLoading(true);
 
-      // 1. We define the prompt directly here (copied from your server.js)
       const prompt = `You are a professional nutritionist AI. 
     Analyze the food in the given image and return the result in two parts:
     
     1: JSON object of Nutrition Breakdowns with the following fields:  
+       - FoodName (short, concise name of the food, e.g., "Chicken Rice") <--- Add this
        - Calories (kcal)  
        - Protein (g)  
        - Carbohydrates (g)  
@@ -115,23 +156,22 @@ export default function AiMealPlanner() {
       Make sure the JSON is valid and can be parsed.
     
     2: Markdown text provides a structured report with the following sections:
-        1. Health Advice  
-        2. Alternative Suggestions  
-        3. Summary 
+       1. Health Advice  
+       2. Alternative Suggestions  
+       3. Summary 
     
     Format the answer in clear markdown.`;
 
-      // 2. Direct fetch to OpenAI (Bypassing localhost)
       const response = await fetch(
         "https://api.openai.com/v1/chat/completions",
         {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
-            Authorization: `Bearer ${OPENAI_API_KEY}`, // OR put your key string here "sk-..."
+            Authorization: `Bearer ${OPENAI_API_KEY}`,
           },
           body: JSON.stringify({
-            model: "gpt-4o-mini", // Use gpt-4o-mini for speed/cost
+            model: "gpt-4o-mini",
             messages: [
               {
                 role: "user",
@@ -151,7 +191,6 @@ export default function AiMealPlanner() {
 
       const data = await response.json();
 
-      // 3. Error Handling
       if (data.error) {
         console.error("OpenAI Error:", data.error.message);
         setResult("Error: " + data.error.message);
@@ -159,17 +198,14 @@ export default function AiMealPlanner() {
         return;
       }
 
-      // 4. Extract the content directly
       const content = data.choices[0].message.content;
 
-      // 5. Parse Logic (Same as before, adapted for direct content)
       const jsonMatch = content.match(/```json([\s\S]*?)```/);
       let resJson: NutritionData | null = null;
 
       if (jsonMatch) {
         let rawJson = jsonMatch[1].trim();
-        rawJson = rawJson.replace(/\/\/.*$/gm, ""); // Remove comments
-
+        rawJson = rawJson.replace(/\/\/.*$/gm, "");
         try {
           resJson = JSON.parse(rawJson);
           const normalized = normalizeJsonData(resJson);
@@ -179,16 +215,40 @@ export default function AiMealPlanner() {
         }
       }
 
-      const markdown = content.replace(/```json[\s\S]*?```/, "").trim();
-      setResult(markdown);
+      // Cleanup text logic
+      let cleanText = content.replace(/```json[\s\S]*?```/, "");
+      cleanText = cleanText.replace(
+        /1\.?\s*Nutrition\s*Breakdown\s*JSON/gi,
+        ""
+      );
+      cleanText = cleanText.replace(/2\.?\s*Structured\s*Report/gi, "");
+      setResult(cleanText.trim());
     } catch (err) {
       console.error("Network Error:", err);
-      setResult(
-        "Error analyzing image. Please check your internet connection."
-      );
+      setResult("Error analyzing image.");
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleAddToLog = (mealType: string) => {
+    if (!jsonData) return;
+
+    // 1. Convert AI data to your App's food format
+    const foodItem = {
+      id: Date.now().toString(),
+      name: jsonData.FoodName || "Scanned Meal",
+      calories: Number(jsonData.Calories) || 0,
+      protein: Number(jsonData.Protein) || 0,
+      carbs: Number(jsonData.Carbohydrates) || 0,
+      fat: Number(jsonData.Fat) || 0,
+      category: "scanned",
+    };
+
+    updateMeal(mealType, foodItem);
+    setShowMealSelector(false);
+    Alert.alert("Success", `${foodItem.name} added to ${mealType}!`); // Updated alert too
+    navigation.goBack();
   };
 
   return (
@@ -206,33 +266,42 @@ export default function AiMealPlanner() {
           <View style={styles.imageWrapper}>
             <Image
               source={{ uri: selectedImage }}
-              style={styles.image as ImageStyle} // ← here
+              style={styles.image as ImageStyle}
             />
           </View>
         )}
 
-        {/* Buttons */}
-        <View style={styles.buttonRow}>
-          <TouchableOpacity style={styles.pickButton} onPress={pickImage}>
-            <Ionicons name="image-outline" size={20} color="#fff" />
-            <Text style={styles.buttonText}>Select Image</Text>
-          </TouchableOpacity>
+        {/* Buttons Row */}
+        <View style={styles.actionSection}>
+          <View style={styles.inputRow}>
+            <TouchableOpacity style={styles.mediaButton} onPress={pickImage}>
+              <Ionicons name="images-outline" size={24} color="#fff" />
+              <Text style={styles.mediaButtonText}>Gallery</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity style={styles.mediaButton} onPress={takePhoto}>
+              <Ionicons name="camera-outline" size={24} color="#fff" />
+              <Text style={styles.mediaButtonText}>Camera</Text>
+            </TouchableOpacity>
+          </View>
 
           <TouchableOpacity
             style={[
               styles.analyzeButton,
-              { backgroundColor: base64Image ? "#22C55E" : "#94A3B8" },
+              { backgroundColor: base64Image ? "#22C55E" : "#3C3952" },
+              (!base64Image || loading) && { opacity: 0.5 },
             ]}
             disabled={!base64Image || loading}
             onPress={analyzeFoodDirectly}
           >
             <Ionicons
-              name={loading ? "hourglass-outline" : "analytics-outline"}
-              size={20}
+              name={loading ? "hourglass-outline" : "sparkles"}
+              size={24}
               color="#fff"
+              style={{ marginRight: 10 }}
             />
-            <Text style={styles.buttonText}>
-              {loading ? "Analyzing..." : "AI Analyze"}
+            <Text style={styles.analyzeButtonText}>
+              {loading ? "Analyzing..." : "Analyze Food"}
             </Text>
           </TouchableOpacity>
         </View>
@@ -297,7 +366,7 @@ export default function AiMealPlanner() {
           </View>
         )}
 
-        {/* Markdown */}
+        {/* Markdown Report */}
         {result !== "" && (
           <View style={styles.markdownCard}>
             <Markdown
@@ -312,7 +381,47 @@ export default function AiMealPlanner() {
             </Markdown>
           </View>
         )}
+
+        {/* Add to Log Button (Visible only after analysis) */}
+        {jsonData && (
+          <TouchableOpacity
+            style={styles.addToLogButton}
+            onPress={() => setShowMealSelector(true)}
+          >
+            <Ionicons name="add-circle" size={24} color="#fff" />
+            <Text style={styles.addToLogText}>Add to Daily Log</Text>
+          </TouchableOpacity>
+        )}
+
+        <View style={{ height: 40 }} />
       </ScrollView>
+
+      {/* --- MEAL SELECTOR MODAL --- */}
+      {showMealSelector && (
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>Select Meal Time</Text>
+            {["breakfast", "lunch", "dinner", "snacks"].map((meal) => (
+              <TouchableOpacity
+                key={meal}
+                style={styles.mealOption}
+                onPress={() => handleAddToLog(meal)}
+              >
+                <Text style={styles.mealOptionText}>
+                  {meal.charAt(0).toUpperCase() + meal.slice(1)}
+                </Text>
+                <Ionicons name="chevron-forward" size={20} color="#666" />
+              </TouchableOpacity>
+            ))}
+            <TouchableOpacity
+              style={styles.cancelButton}
+              onPress={() => setShowMealSelector(false)}
+            >
+              <Text style={styles.cancelText}>Cancel</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      )}
     </SafeAreaView>
   );
 }
@@ -322,9 +431,7 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: "#262135",
   },
-
   scroll: { paddingHorizontal: 20, paddingTop: 20 },
-
   headerContainer: { alignItems: "center", marginBottom: 20 },
   headerSubtitle: { fontSize: 14, color: "#bfb9d6", marginTop: -20 },
 
@@ -339,34 +446,68 @@ const styles = StyleSheet.create({
     borderColor: "#3C3952",
   },
 
-  /* BUTTONS */
-  buttonRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
+  /* BUTTONS & ACTIONS */
+  actionSection: {
     marginBottom: 20,
+    gap: 12,
   },
-  pickButton: {
+  inputRow: {
     flexDirection: "row",
-    backgroundColor: "#5A6DF0",
-    paddingVertical: 14,
+    gap: 12,
+  },
+  mediaButton: {
     flex: 1,
-    justifyContent: "center",
-    borderRadius: 14,
+    backgroundColor: "#5A6DF0",
+    paddingVertical: 16,
+    borderRadius: 16,
     alignItems: "center",
-    marginRight: 8,
+    justifyContent: "center",
+    flexDirection: "row",
+    gap: 8,
+  },
+  mediaButtonText: {
+    color: "#fff",
+    fontWeight: "600",
+    fontSize: 16,
   },
   analyzeButton: {
-    flexDirection: "row",
-    paddingVertical: 14,
-    flex: 1,
-    justifyContent: "center",
-    borderRadius: 14,
+    width: "100%",
+    paddingVertical: 18,
+    borderRadius: 16,
     alignItems: "center",
-    marginLeft: 8,
+    justifyContent: "center",
+    flexDirection: "row",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.1)",
   },
-  buttonText: { color: "#fff", fontWeight: "600", fontSize: 16 },
+  analyzeButtonText: {
+    color: "#fff",
+    fontWeight: "bold",
+    fontSize: 18,
+  },
+  addToLogButton: {
+    backgroundColor: "#22C55E", // Bright Green
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: 16,
+    borderRadius: 16,
+    marginTop: 10,
+    marginBottom: 40,
+    gap: 8,
+    shadowColor: "#22C55E",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 5,
+    elevation: 6,
+  },
+  addToLogText: {
+    color: "#fff",
+    fontSize: 18,
+    fontWeight: "bold",
+  },
 
-  /* MAIN CARD */
+  /* SUMMARY CARD */
   card: {
     backgroundColor: "#3C3952",
     borderRadius: 20,
@@ -379,20 +520,16 @@ const styles = StyleSheet.create({
     marginBottom: 15,
     color: "#fff",
   },
-
   scoreWrapper: { alignItems: "center", marginBottom: 20 },
   scoreText: { fontSize: 24, fontWeight: "bold", color: "#fff" },
-
   factRow: { flexDirection: "row", alignItems: "center", marginBottom: 10 },
   factText: { marginLeft: 8, fontSize: 15, color: "#ddd" },
-
   vitaminTitle: {
     marginTop: 20,
     fontWeight: "bold",
     fontSize: 16,
     color: "#fff",
   },
-
   vitaminWrapper: { flexDirection: "row", flexWrap: "wrap", marginTop: 8 },
   vitaminTag: {
     flexDirection: "row",
@@ -415,6 +552,50 @@ const styles = StyleSheet.create({
     backgroundColor: "#3C3952",
     borderRadius: 20,
     padding: 20,
-    marginBottom: 40,
+    marginBottom: 20,
+  },
+
+  /* MODAL STYLES */
+  modalOverlay: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: "rgba(0,0,0,0.6)",
+    justifyContent: "center",
+    alignItems: "center",
+    zIndex: 100,
+  },
+  modalContent: {
+    width: "80%",
+    backgroundColor: "white",
+    borderRadius: 20,
+    padding: 20,
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: "bold",
+    marginBottom: 15,
+    textAlign: "center",
+  },
+  mealOption: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    paddingVertical: 15,
+    borderBottomWidth: 1,
+    borderBottomColor: "#f0f0f0",
+  },
+  mealOptionText: {
+    fontSize: 16,
+    color: "#333",
+  },
+  cancelButton: {
+    marginTop: 15,
+    alignItems: "center",
+  },
+  cancelText: {
+    color: "#FF5722",
+    fontWeight: "bold",
   },
 });

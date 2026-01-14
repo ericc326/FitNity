@@ -11,6 +11,8 @@ import {
 import { NativeStackScreenProps } from "@react-navigation/native-stack";
 import { DietStackParamList } from "../navigation/DietNavigator";
 import { SPOONACULAR_API_KEY } from "@env";
+// Added Ionicons for better UI visualization
+import { Ionicons } from "@expo/vector-icons";
 
 // Recipe & Nutrient types
 export interface Recipe {
@@ -32,8 +34,11 @@ const RecipeList = ({ navigation }: Props) => {
     const fetchAllRecipes = async () => {
       setLoading(true);
       try {
+        // --- FIXED URL HERE ---
+        // Added: &addRecipeNutrition=true
+        // This ensures Spoonacular sends Fat and Carbs data
         const res = await fetch(
-          `https://api.spoonacular.com/recipes/complexSearch?apiKey=${SPOONACULAR_API_KEY}&number=50&minProtein=10&addRecipeInformation=true&fillIngredients=true&instructionsRequired=true`
+          `https://api.spoonacular.com/recipes/complexSearch?apiKey=${SPOONACULAR_API_KEY}&number=50&minProtein=10&addRecipeInformation=true&addRecipeNutrition=true&fillIngredients=true&instructionsRequired=true`
         );
         const data = await res.json();
         setRecipes(data.results || []);
@@ -47,6 +52,13 @@ const RecipeList = ({ navigation }: Props) => {
     fetchAllRecipes();
   }, []);
 
+  // Helper function to extract nutrients cleanly
+  const getNutrient = (nutrients: any[], name: string) => {
+    // Note: Spoonacular uses "Carbohydrates", not "Carbs"
+    const n = nutrients?.find((item: any) => item.name === name);
+    return n ? Math.round(n.amount) : 0;
+  };
+
   if (loading) {
     return (
       <View style={styles.loaderContainer}>
@@ -56,17 +68,15 @@ const RecipeList = ({ navigation }: Props) => {
   }
 
   return (
-    <ScrollView style={styles.container}>
+    <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
       {recipes.map((recipe) => {
         const nutrients = recipe.nutrition?.nutrients || [];
-        const calories =
-          nutrients.find(
-            (n: { name: string; amount: number }) => n.name === "Calories"
-          )?.amount || 0;
-        const protein =
-          nutrients.find(
-            (n: { name: string; amount: number }) => n.name === "Protein"
-          )?.amount || 0;
+
+        // Extract all 4 macros
+        const calories = getNutrient(nutrients, "Calories");
+        const protein = getNutrient(nutrients, "Protein");
+        const carbs = getNutrient(nutrients, "Carbohydrates");
+        const fat = getNutrient(nutrients, "Fat");
 
         return (
           <TouchableOpacity
@@ -79,15 +89,36 @@ const RecipeList = ({ navigation }: Props) => {
               style={styles.recipeImage}
               resizeMode="cover"
             />
-            <Text style={styles.recipeTitle} numberOfLines={2}>
-              {recipe.title}
-            </Text>
-            <Text style={styles.recipeInfo}>
-              {Math.round(calories)} kcal · {Math.round(protein)}g protein
-            </Text>
+            <View style={styles.contentContainer}>
+              <Text style={styles.recipeTitle} numberOfLines={2}>
+                {recipe.title}
+              </Text>
+
+              {/* Nutrition Badges Row */}
+              <View style={styles.nutritionRow}>
+                <View style={styles.nutrientBadge}>
+                  <Ionicons name="flame" size={12} color="#FF5722" />
+                  <Text style={styles.nutrientText}>{calories} kcal</Text>
+                </View>
+                <View style={styles.nutrientBadge}>
+                  <Ionicons name="restaurant" size={12} color="#4CAF50" />
+                  <Text style={styles.nutrientText}>{protein}g P</Text>
+                </View>
+                <View style={styles.nutrientBadge}>
+                  <Ionicons name="leaf" size={12} color="#2196F3" />
+                  <Text style={styles.nutrientText}>{carbs}g C</Text>
+                </View>
+                <View style={styles.nutrientBadge}>
+                  <Ionicons name="water" size={12} color="#FFC107" />
+                  <Text style={styles.nutrientText}>{fat}g F</Text>
+                </View>
+              </View>
+            </View>
           </TouchableOpacity>
         );
       })}
+      {/* Padding at bottom for scrolling */}
+      <View style={{ height: 40 }} />
     </ScrollView>
   );
 };
@@ -105,27 +136,44 @@ const styles = StyleSheet.create({
     backgroundColor: "#262135",
   },
   recipeCard: {
-    backgroundColor: "#333",
+    backgroundColor: "#3C3952", // Slightly lighter than background
     borderRadius: 16,
-    padding: 12,
     marginBottom: 16,
+    overflow: "hidden", // Ensures image corners align with card
   },
   recipeImage: {
     width: "100%",
     height: 150,
-    borderRadius: 12,
     backgroundColor: "#555",
   },
-  recipeTitle: {
-    fontSize: 16,
-    fontWeight: "600",
-    marginTop: 8,
-    color: "#fff",
+  contentContainer: {
+    padding: 12,
   },
-  recipeInfo: {
+  recipeTitle: {
+    fontSize: 18,
+    fontWeight: "bold",
+    color: "#fff",
+    marginBottom: 10,
+  },
+  // New Styles for the Badge layout
+  nutritionRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+  },
+  nutrientBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "rgba(255,255,255,0.1)", // Glassmorphism effect
+    paddingVertical: 4,
+    paddingHorizontal: 8,
+    borderRadius: 8,
+    gap: 4,
+  },
+  nutrientText: {
+    color: "#ddd",
     fontSize: 12,
-    color: "#ccc",
-    marginTop: 4,
+    fontWeight: "600",
   },
 });
 
