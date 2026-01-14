@@ -8,25 +8,18 @@ import {
   TouchableOpacity,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { RouteProp, useNavigation } from "@react-navigation/native";
-import { DietStackParamList } from "../navigation/DietNavigator";
 import { Ionicons } from "@expo/vector-icons";
+import { NativeStackScreenProps } from "@react-navigation/native-stack";
+import { DietStackParamList } from "../navigation/DietNavigator";
 
-type RecipeDetailRouteProp = RouteProp<DietStackParamList, "RecipeDetail">;
+type Props = NativeStackScreenProps<DietStackParamList, "RecipeDetail">;
 
-type Props = {
-  route: RecipeDetailRouteProp;
-};
-
-const RecipeDetailScreen = ({ route }: Props) => {
+const RecipeDetailScreen = ({ route, navigation }: Props) => {
   const { recipe } = route.params;
-  const navigation = useNavigation();
 
   // Safely extract data with fallbacks
   const nutrients = recipe.nutrition?.nutrients || [];
-  // Spoonacular sends ingredients here when 'fillIngredients=true'
   const ingredients = recipe.extendedIngredients || [];
-  // Instructions are usually in analyzedInstructions[0].steps
   const instructions = recipe.analyzedInstructions?.[0]?.steps || [];
 
   const getNutrient = (name: string) =>
@@ -106,7 +99,6 @@ const RecipeDetailScreen = ({ route }: Props) => {
             ))
           ) : (
             <Text style={styles.listText}>
-              {/* Fallback if instructions come as a plain string */}
               {recipe.instructions?.replace(/<[^>]*>?/gm, "") ||
                 "Instructions not available."}
             </Text>

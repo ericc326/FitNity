@@ -44,6 +44,15 @@ const MealsScreen = () => {
   const [showDisclaimer, setShowDisclaimer] = useState(true);
   const [isSelectionVisible, setSelectionVisible] = useState(false);
   const [pendingFood, setPendingFood] = useState<any>(null);
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [editingMealId, setEditingMealId] = useState<string | null>(null);
+  const [editFormData, setEditFormData] = useState({
+    name: "",
+    calories: "",
+    protein: "",
+    carbs: "",
+    fat: "",
+  });
 
   const navigation = useNavigation<DietScreenNavigationProp>();
   type DietScreenNavigationProp = NativeStackNavigationProp<
@@ -60,6 +69,7 @@ const MealsScreen = () => {
     dietInfo,
     isLoading,
     changeDate,
+    editMeal,
   } = useMealPlan();
 
   // Define available meal types for selection
@@ -106,6 +116,36 @@ const MealsScreen = () => {
       },
     ]);
   };
+  const handleOpenEdit = (meal: any) => {
+    if (!meal.food) return;
+
+    setEditingMealId(meal.id);
+    setEditFormData({
+      name: meal.food.name,
+      calories: meal.food.calories.toString(),
+      protein: meal.food.protein.toString(),
+      carbs: meal.food.carbs.toString(),
+      fat: meal.food.fat.toString(),
+    });
+    setShowEditModal(true);
+  };
+
+  // Save the changes
+  const handleSaveEdit = () => {
+    if (!editingMealId) return;
+
+    editMeal(
+      editingMealId,
+      editFormData.name,
+      Number(editFormData.calories) || 0,
+      Number(editFormData.protein) || 0,
+      Number(editFormData.carbs) || 0,
+      Number(editFormData.fat) || 0
+    );
+
+    setShowEditModal(false);
+    setEditingMealId(null);
+  };
 
   const handleAddCustomMeal = () => {
     if (!customMealData.name || !customMealData.calories) {
@@ -143,17 +183,21 @@ const MealsScreen = () => {
 
   const fetchRecommendedMeals = async () => {
     if (!hasCompletedSetup) return;
+    // Don't fetch if we already have data or missing key
     if (recommendedMeals.length > 0 || !SPOONACULAR_API_KEY) return;
 
     setLoadingRecipes(true);
     try {
       const target = dietInfo ? parseInt(dietInfo.targetCalories) : 2000;
-
+      // Ensure at least 600 calories remain for search, or it returns nothing
       const remainingCalories = Math.max(target - totalNutrition.calories, 600);
       const maxCalories = remainingCalories;
-      const url = `https://api.spoonacular.com/recipes/complexSearch?apiKey=${SPOONACULAR_API_KEY}&number=6&minProtein=10&maxCalories=${maxCalories}&addRecipeInformation=true&fillIngredients=true&instructionsRequired=true`;
 
-      // Debugging: Log URL to check if API Key is loading correctly
+      // --- FIX IS HERE ---
+      // Added: &addRecipeNutrition=true
+      // This tells API to send Carbs and Fat data too!
+      const url = `https://api.spoonacular.com/recipes/complexSearch?apiKey=${SPOONACULAR_API_KEY}&number=6&minProtein=10&maxCalories=${maxCalories}&addRecipeInformation=true&addRecipeNutrition=true&fillIngredients=true&instructionsRequired=true`;
+
       console.log("Fetching URL:", url);
 
       const res = await fetch(url);
@@ -177,46 +221,6 @@ const MealsScreen = () => {
     }
   }, [isLoading, dietInfo, totalNutrition.calories]);
 
-  const handleQuickAddRecipe = (recipe: any) => {
-    // 1. Extract nutrients from the recipe data
-    const nutrients = recipe.nutrition?.nutrients || [];
-    const calories = Math.round(
-      nutrients.find((n: any) => n.name === "Calories")?.amount || 0
-    );
-    const protein = Math.round(
-      nutrients.find((n: any) => n.name === "Protein")?.amount || 0
-    );
-    const carbs = Math.round(
-      nutrients.find((n: any) => n.name === "Carbohydrates")?.amount || 0
-    );
-    const fat = Math.round(
-      nutrients.find((n: any) => n.name === "Fat")?.amount || 0
-    );
-
-    const foodData = {
-      id: `recipe-${recipe.id}`,
-      name: recipe.title,
-      calories,
-      protein,
-      carbs,
-      fat,
-      category: "recommendation",
-    };
-
-    // 2. Alert the user to choose which meal slot to add it to
-    Alert.alert(
-      "Add to Log",
-      `Which meal slot would you like to add "${recipe.title}" to?`,
-      [
-        { text: "Cancel", style: "cancel" },
-        { text: "Breakfast", onPress: () => updateMeal("breakfast", foodData) },
-        { text: "Lunch", onPress: () => updateMeal("lunch", foodData) },
-        { text: "Dinner", onPress: () => updateMeal("dinner", foodData) },
-        { text: "Snacks", onPress: () => updateMeal("snacks", foodData) },
-      ]
-    );
-  };
-
   const handleAIRecommendations = () => {
     // If setup is not complete, we might still want to show the modal
     // to let the AI help set them up, or redirect them.
@@ -238,6 +242,7 @@ const MealsScreen = () => {
     setShowAIRecommendations(true);
   };
 
+  // Helper for rendering a single meal row
   // Helper for rendering a single meal row
   const MealItem = ({ meal }: { meal: any }) => (
     <View style={styles.mealItem}>
@@ -267,8 +272,22 @@ const MealsScreen = () => {
         </View>
       </View>
       {meal.food ? (
-        <View style={styles.foodInfo}>
-          <Text style={styles.foodName}>{meal.food.name}</Text>
+        <TouchableOpacity
+          style={styles.foodInfo}
+          onPress={() => handleOpenEdit(meal)} // <--- CLICK TO EDIT
+        >
+          <View
+            style={{
+              flexDirection: "row",
+              justifyContent: "space-between",
+              alignItems: "center",
+            }}
+          >
+            <Text style={styles.foodName}>{meal.food.name}</Text>
+            {/* Edit Icon */}
+            <Ionicons name="pencil" size={16} color="#999" />
+          </View>
+
           <View style={styles.nutritionRow}>
             <Text style={styles.nutritionText}>{meal.food.calories} kcal</Text>
             <Text style={styles.nutritionText}>
@@ -277,7 +296,7 @@ const MealsScreen = () => {
             <Text style={styles.nutritionText}>{meal.food.carbs}g carbs</Text>
             <Text style={styles.nutritionText}>{meal.food.fat}g fat</Text>
           </View>
-        </View>
+        </TouchableOpacity>
       ) : (
         <View style={styles.emptyMeal}>
           <Text style={styles.emptyText}>No meal planned</Text>
@@ -682,6 +701,104 @@ const MealsScreen = () => {
               onPress={handleAddCustomMeal}
             >
               <Text style={styles.addCustomButtonText}>Add Meal</Text>
+            </TouchableOpacity>
+          </ScrollView>
+        </SafeAreaView>
+      </Modal>
+
+      <Modal
+        visible={showEditModal}
+        animationType="slide"
+        presentationStyle="pageSheet"
+        onRequestClose={() => setShowEditModal(false)}
+      >
+        <SafeAreaView style={styles.modalContainer}>
+          <View style={styles.modalHeader}>
+            <TouchableOpacity onPress={() => setShowEditModal(false)}>
+              <Ionicons name="close" size={24} color="#333" />
+            </TouchableOpacity>
+            <Text style={styles.modalTitle}>Edit Meal</Text>
+            {/* Save Button in Header */}
+            <TouchableOpacity onPress={handleSaveEdit}>
+              <Text
+                style={{ color: "#4CAF50", fontWeight: "bold", fontSize: 16 }}
+              >
+                Save
+              </Text>
+            </TouchableOpacity>
+          </View>
+
+          <ScrollView style={styles.modalContent}>
+            {/* Meal Name */}
+            <View style={styles.inputGroup}>
+              <Text style={styles.inputLabel}>Meal Name</Text>
+              <TextInput
+                style={styles.textInput}
+                value={editFormData.name}
+                onChangeText={(text) =>
+                  setEditFormData({ ...editFormData, name: text })
+                }
+              />
+            </View>
+
+            {/* Calories */}
+            <View style={styles.inputGroup}>
+              <Text style={styles.inputLabel}>Calories</Text>
+              <TextInput
+                style={styles.textInput}
+                value={editFormData.calories}
+                keyboardType="numeric"
+                onChangeText={(text) =>
+                  setEditFormData({ ...editFormData, calories: text })
+                }
+              />
+            </View>
+
+            {/* Macros */}
+            <View style={styles.nutritionInputs}>
+              <View style={styles.inputGroupNutrient}>
+                <Text style={styles.inputLabel}>Protein (g)</Text>
+                <TextInput
+                  style={styles.textInput}
+                  value={editFormData.protein}
+                  keyboardType="numeric"
+                  onChangeText={(text) =>
+                    setEditFormData({ ...editFormData, protein: text })
+                  }
+                />
+              </View>
+
+              <View style={styles.inputGroupNutrient}>
+                <Text style={styles.inputLabel}>Carbs (g)</Text>
+                <TextInput
+                  style={styles.textInput}
+                  value={editFormData.carbs}
+                  keyboardType="numeric"
+                  onChangeText={(text) =>
+                    setEditFormData({ ...editFormData, carbs: text })
+                  }
+                />
+              </View>
+
+              <View style={styles.inputGroupNutrient}>
+                <Text style={styles.inputLabel}>Fat (g)</Text>
+                <TextInput
+                  style={styles.textInput}
+                  value={editFormData.fat}
+                  keyboardType="numeric"
+                  onChangeText={(text) =>
+                    setEditFormData({ ...editFormData, fat: text })
+                  }
+                />
+              </View>
+            </View>
+
+            {/* Big Save Button */}
+            <TouchableOpacity
+              style={styles.addCustomButton}
+              onPress={handleSaveEdit}
+            >
+              <Text style={styles.addCustomButtonText}>Save Changes</Text>
             </TouchableOpacity>
           </ScrollView>
         </SafeAreaView>
