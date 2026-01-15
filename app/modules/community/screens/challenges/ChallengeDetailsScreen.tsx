@@ -158,6 +158,7 @@ const WorkoutSessionModal = ({
   sets,
   reps,
   restSeconds,
+  gifUrl,
 }: {
   visible: boolean;
   onClose: () => void;
@@ -165,6 +166,7 @@ const WorkoutSessionModal = ({
   sets: number;
   reps: number;
   restSeconds: number;
+  gifUrl?: string;
 }) => {
   const [currentSet, setCurrentSet] = useState(1);
   const [isResting, setIsResting] = useState(false);
@@ -225,6 +227,10 @@ const WorkoutSessionModal = ({
           <TouchableOpacity style={styles.closeSession} onPress={onClose}>
             <MaterialCommunityIcons name="close" size={24} color="#fff" />
           </TouchableOpacity>
+
+          {gifUrl ? (
+            <Image source={{ uri: gifUrl }} style={styles.sessionGif} />
+          ) : null}
 
           <Text style={styles.sessionTitle}>
             {isResting ? "Rest Time" : `Set ${currentSet} of ${sets}`}
@@ -1017,6 +1023,7 @@ const ChallengeDetailsScreen = ({ route, navigation }: Props) => {
             sets={currentChallenge.customSets || 3}
             reps={currentChallenge.customReps || 10}
             restSeconds={currentChallenge.customRestSeconds || 60}
+            gifUrl={exerciseDetails?.gifUrl}
           />
         </View>
       </ScrollView>
@@ -1310,6 +1317,13 @@ const styles = StyleSheet.create({
     top: 40,
     right: 20,
     padding: 10,
+  },
+  sessionGif: {
+    width: "100%",
+    height: 250,
+    borderRadius: 8,
+    marginBottom: 16,
+    backgroundColor: "#444",
   },
   sessionTitle: {
     color: "#fff",

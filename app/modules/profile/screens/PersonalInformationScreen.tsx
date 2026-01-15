@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
+import { useNavigation } from "@react-navigation/native";
 import {
   View,
   Text,
@@ -44,6 +45,8 @@ const GENDERS = ["Male", "Female"];
 const GOALS = ["Build Muscle", "Lose Weight", "Increase Strength"];
 
 const PersonalInformationScreen: React.FC = () => {
+  const navigation = useNavigation();
+
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [uid, setUid] = useState<string | null>(null);
@@ -173,7 +176,12 @@ const PersonalInformationScreen: React.FC = () => {
         const newRef = await addDoc(colRef, payload);
         setHealthInfoDocId(newRef.id);
       }
-      Alert.alert("Success", "Your personal info has been updated.");
+      Alert.alert("Success", "Your personal info has been updated.", [
+        {
+          text: "OK",
+          onPress: () => navigation.goBack(),
+        },
+      ]);
     } catch {
       Alert.alert("Error", "Failed to save personal info.");
     } finally {

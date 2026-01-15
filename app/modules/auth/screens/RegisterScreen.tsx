@@ -48,6 +48,7 @@ const RegisterScreen: React.FC<RegisterScreenProps> = ({ navigation }) => {
   const [isLoading, setIsLoading] = useState(false);
 
   const handleRegister = async () => {
+    // 1. Basic Validation
     if (!name || !email || !password) {
       Alert.alert("Error", "Please fill in all fields");
       return;
@@ -63,28 +64,19 @@ const RegisterScreen: React.FC<RegisterScreenProps> = ({ navigation }) => {
       setIsLoading(true);
       const usersRef = collection(db, "users");
 
-      const emailQuery = query(
-        usersRef,
-        where("email", "==", email.toLowerCase())
-      );
-      const emailSnapshot = await getDocs(emailQuery);
-      if (!emailSnapshot.empty) {
-        setIsLoading(false);
-        Alert.alert(
-          "Email Already Registered",
-          "Please use a different email."
-        );
-        return;
-      }
-
+      // 2. Check if Name is already taken (Manual Check)
       const nameQuery = query(usersRef, where("name", "==", name));
       const nameSnapshot = await getDocs(nameQuery);
       if (!nameSnapshot.empty) {
         setIsLoading(false);
-        Alert.alert("Name Already Taken", "Please choose a different name.");
+        Alert.alert(
+          "Name Taken",
+          "This name is already in use. Please choose another."
+        );
         return;
       }
 
+      // 3. Create User in Firebase Auth
       const userCredential = await createUserWithEmailAndPassword(
         auth,
         email,
@@ -92,8 +84,10 @@ const RegisterScreen: React.FC<RegisterScreenProps> = ({ navigation }) => {
       );
       const user = userCredential.user;
 
+      // 4. Update Firebase Auth Profile
       await updateProfile(user, { displayName: name });
 
+      // 5. Store User Data in Firestore
       await setDoc(doc(db, "users", user.uid), {
         uid: user.uid,
         name,
@@ -101,6 +95,7 @@ const RegisterScreen: React.FC<RegisterScreenProps> = ({ navigation }) => {
         createdAt: new Date().toISOString(),
       });
 
+      // 6. Success Handling
       Alert.alert("Success", `Registered as ${name}`, [
         {
           text: "OK",
@@ -108,10 +103,34 @@ const RegisterScreen: React.FC<RegisterScreenProps> = ({ navigation }) => {
         },
       ]);
     } catch (error: any) {
-      Alert.alert(
-        "Registration Error",
-        error.message || "Something went wrong"
-      );
+      // 7. Friendly Error Mapping
+      let friendlyMessage = "An unexpected error occurred. Please try again.";
+
+      switch (error.code) {
+        case "auth/weak-password":
+          friendlyMessage =
+            "Your password is too weak. It must be at least 6 characters long.";
+          break;
+        case "auth/email-already-in-use":
+          friendlyMessage =
+            "This email is already registered. Try logging in instead.";
+          break;
+        case "auth/invalid-email":
+          friendlyMessage = "The email address format is invalid.";
+          break;
+        case "auth/network-request-failed":
+          friendlyMessage =
+            "Network error. Please check your internet connection.";
+          break;
+        case "auth/too-many-requests":
+          friendlyMessage = "Too many attempts. Please try again later.";
+          break;
+        default:
+          // Use the default message or the error's own message if it's not a Firebase code
+          friendlyMessage = error.message || friendlyMessage;
+      }
+
+      Alert.alert("Registration Error", friendlyMessage);
     } finally {
       setIsLoading(false);
     }
