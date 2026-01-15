@@ -9,6 +9,8 @@ import {
   Image,
   Modal,
   Pressable,
+  Keyboard,
+  TouchableWithoutFeedback,
 } from "react-native";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { NativeStackScreenProps } from "@react-navigation/native-stack";
@@ -37,6 +39,18 @@ const EditChallengeScreen = ({ route, navigation }: Props) => {
 
   const challenge = challengeRef.current;
 
+  // --- HELPER TO FORMAT LABEL ---
+  const formatLabel = (
+    s: number | null,
+    r: number | null,
+    rs: number | null
+  ) => {
+    if (s && r) {
+      return `${s} Sets × ${r} Reps • ${rs || 0}s Rest`;
+    }
+    return null;
+  };
+
   const [title, setTitle] = useState(challenge.title);
   const [description, setDescription] = useState(challenge.description);
   const [duration, setDuration] = useState(challenge.duration.toString());
@@ -46,7 +60,7 @@ const EditChallengeScreen = ({ route, navigation }: Props) => {
   const [imageLoading, setImageLoading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
 
-  // Workout Fields (only used if challenge.type === 'workout')
+  // Workout Fields
   const isWorkoutType = challenge.type === "workout";
   const [selectedWorkout, setSelectedWorkout] = useState<string | null>(
     challenge.workoutName || null
@@ -65,8 +79,16 @@ const EditChallengeScreen = ({ route, navigation }: Props) => {
   const [customRestSec, setCustomRestSec] = useState<number | null>(
     challenge.customRestSeconds || null
   );
+
+  // Initialize with a Fresh Label if possible, otherwise fallback to DB
   const [customLabel, setCustomLabel] = useState<string | null>(
-    challenge.customLabel || null
+    formatLabel(
+      challenge.customSets,
+      challenge.customReps,
+      challenge.customRestSeconds
+    ) ||
+      challenge.customLabel ||
+      null
   );
 
   useEffect(() => {
@@ -135,9 +157,8 @@ const EditChallengeScreen = ({ route, navigation }: Props) => {
 
     setIsSaving(true);
     try {
-      let imageUrl = challenge.imageUrl; // default to old image
+      let imageUrl = challenge.imageUrl;
 
-      // If selectedImage is a new local file (not the old URL), upload it
       if (
         selectedImage &&
         selectedImage !== challenge.imageUrl &&
@@ -156,7 +177,6 @@ const EditChallengeScreen = ({ route, navigation }: Props) => {
             console.warn("Failed to delete old image:", err);
           }
         }
-
         imageUrl = await uploadImage(selectedImage);
       }
 
@@ -212,12 +232,10 @@ const EditChallengeScreen = ({ route, navigation }: Props) => {
   };
 
   const isChanged =
-    // 1. General Fields
     title.trim() !== challenge.title.trim() ||
     description.trim() !== challenge.description.trim() ||
     duration.trim() !== challenge.duration.toString().trim() ||
     selectedImage !== (challenge.imageUrl || null) ||
-    // 2. Workout Fields (Combined with OR '||')
     (isWorkoutType &&
       (selectedWorkoutId !== challenge.workoutId ||
         customSets !== challenge.customSets ||
@@ -375,68 +393,79 @@ const EditChallengeScreen = ({ route, navigation }: Props) => {
       </View>
 
       <Modal visible={showCustomModal} transparent animationType="fade">
-        <View style={styles.modalContainer}>
-          <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>Update Workout Goals</Text>
+        <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
+          <View style={styles.modalContainer}>
+            {/* Prevent touch on the modal content from closing the keyboard unnecessarily if clicking inputs */}
+            <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
+              <View style={styles.modalContent}>
+                <Text style={styles.modalTitle}>Update Workout Goals</Text>
 
-            <View style={styles.modalRow}>
-              <Text style={{ color: "#fff", marginBottom: 6 }}>Sets</Text>
-              <TextInput
-                style={styles.numberInput}
-                value={customSets?.toString() ?? ""}
-                onChangeText={(t) => setCustomSets(t ? Number(t) : null)}
-                keyboardType="numeric"
-                placeholder="e.g. 3"
-                placeholderTextColor="#777"
-              />
-            </View>
+                <View style={styles.modalRow}>
+                  <Text style={{ color: "#fff", marginBottom: 6 }}>Sets</Text>
+                  <TextInput
+                    style={styles.numberInput}
+                    value={customSets?.toString() ?? ""}
+                    onChangeText={(t) => setCustomSets(t ? Number(t) : null)}
+                    keyboardType="numeric"
+                    placeholder="e.g. 3"
+                    placeholderTextColor="#777"
+                  />
+                </View>
 
-            <View style={styles.modalRow}>
-              <Text style={{ color: "#fff", marginBottom: 6 }}>Reps / Set</Text>
-              <TextInput
-                style={styles.numberInput}
-                value={customReps?.toString() ?? ""}
-                onChangeText={(t) => setCustomReps(t ? Number(t) : null)}
-                keyboardType="numeric"
-                placeholder="e.g. 10"
-                placeholderTextColor="#777"
-              />
-            </View>
+                <View style={styles.modalRow}>
+                  <Text style={{ color: "#fff", marginBottom: 6 }}>
+                    Reps / Set
+                  </Text>
+                  <TextInput
+                    style={styles.numberInput}
+                    value={customReps?.toString() ?? ""}
+                    onChangeText={(t) => setCustomReps(t ? Number(t) : null)}
+                    keyboardType="numeric"
+                    placeholder="e.g. 10"
+                    placeholderTextColor="#777"
+                  />
+                </View>
 
-            <View style={styles.modalRow}>
-              <Text style={{ color: "#fff", marginBottom: 6 }}>Rest (sec)</Text>
-              <TextInput
-                style={styles.numberInput}
-                value={customRestSec?.toString() ?? ""}
-                onChangeText={(t) => setCustomRestSec(t ? Number(t) : null)}
-                keyboardType="numeric"
-                placeholder="e.g. 60"
-                placeholderTextColor="#777"
-              />
-            </View>
+                <View style={styles.modalRow}>
+                  <Text style={{ color: "#fff", marginBottom: 6 }}>
+                    Rest (sec)
+                  </Text>
+                  <TextInput
+                    style={styles.numberInput}
+                    value={customRestSec?.toString() ?? ""}
+                    onChangeText={(t) => setCustomRestSec(t ? Number(t) : null)}
+                    keyboardType="numeric"
+                    placeholder="e.g. 60"
+                    placeholderTextColor="#777"
+                  />
+                </View>
 
-            <View style={styles.modalButtons}>
-              <Pressable
-                style={[styles.modalButton, { backgroundColor: "#444" }]}
-                onPress={() => setShowCustomModal(false)}
-              >
-                <Text style={styles.modalButtonText}>Cancel</Text>
-              </Pressable>
-              <Pressable
-                style={[styles.modalButton, { backgroundColor: "#4a90e2" }]}
-                onPress={() => {
-                  const s = customSets ?? 0;
-                  const r = customReps ?? 0;
-                  const rs = customRestSec ?? 0;
-                  setCustomLabel(`${s} Sets × ${r} Reps • ${rs}s Rest`);
-                  setShowCustomModal(false);
-                }}
-              >
-                <Text style={styles.modalButtonText}>Save</Text>
-              </Pressable>
-            </View>
+                <View style={styles.modalButtons}>
+                  <Pressable
+                    style={[styles.modalButton, { backgroundColor: "#444" }]}
+                    onPress={() => setShowCustomModal(false)}
+                  >
+                    <Text style={styles.modalButtonText}>Cancel</Text>
+                  </Pressable>
+                  <Pressable
+                    style={[styles.modalButton, { backgroundColor: "#4a90e2" }]}
+                    onPress={() => {
+                      const s = customSets ?? 0;
+                      const r = customReps ?? 0;
+                      const rs = customRestSec ?? 0;
+                      // REGENERATE LABEL ON SAVE
+                      const freshLabel = formatLabel(s, r, rs);
+                      setCustomLabel(freshLabel);
+                      setShowCustomModal(false);
+                    }}
+                  >
+                    <Text style={styles.modalButtonText}>Save</Text>
+                  </Pressable>
+                </View>
+              </View>
+            </TouchableWithoutFeedback>
           </View>
-        </View>
+        </TouchableWithoutFeedback>
       </Modal>
     </KeyboardAwareScrollView>
   );
