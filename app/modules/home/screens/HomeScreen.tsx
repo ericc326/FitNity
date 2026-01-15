@@ -49,6 +49,7 @@ interface Exercise {
   duration?: string;
   imageURL?: string;
   level: Level;
+  instructions?: string[];
 }
 
 interface Task {
@@ -69,11 +70,13 @@ const HomeScreen: React.FC = () => {
   const [userName, setUserName] = useState<string>("");
   const [todayTasks, setTodayTasks] = useState<Task[]>([]);
   const [loadingTasks, setLoadingTasks] = useState(true);
+
   // Health Info State
   const [bmi, setBmi] = useState<number | null>(null);
   const [bmiDesc, setBmiDesc] = useState<string>("");
   const [tdee, setTdee] = useState<string>("--");
   const [userLevel, setUserLevel] = useState<Level | null>(null);
+  const [userGoal, setUserGoal] = useState<string>("Build Muscle");
 
   const [suggestedWorkouts, setSuggestedWorkouts] = useState<any[]>([]);
   const [loadingWorkouts, setLoadingWorkouts] = useState(true);
@@ -112,7 +115,7 @@ const HomeScreen: React.FC = () => {
     return () => unsubscribe();
   }, [navigation]);
 
-  // Fetch Health Info
+  // Fetch Health Info (Level & Goal)
   useEffect(() => {
     const currentUser = auth.currentUser;
     if (!currentUser) return;
@@ -148,7 +151,9 @@ const HomeScreen: React.FC = () => {
           setTdee("--");
         }
 
+        // ✅ CAPTURE LEVEL AND GOAL
         setUserLevel((data.level as Level) ?? "Beginner");
+        setUserGoal(data.goal ?? "Build Muscle");
       },
       (err) => console.error("Healthinfo listener error:", err)
     );
@@ -209,7 +214,7 @@ const HomeScreen: React.FC = () => {
   // Fetch Suggested Workouts
   useEffect(() => {
     const fetchSuggestedWorkouts = async () => {
-      if (!userLevel) return; // wait until level is known to avoid Beginner→Intermediate flicker
+      if (!userLevel) return; // wait until level is known
       setLoadingWorkouts(true);
       try {
         const exercisesRef = collection(db, "exercises");
@@ -224,6 +229,7 @@ const HomeScreen: React.FC = () => {
             duration: "4",
             imageURL: data.gifUrl,
             level: userLevel,
+            instructions: data.instructions || [],
           };
         });
 
@@ -457,9 +463,14 @@ const HomeScreen: React.FC = () => {
                 <TouchableOpacity
                   style={styles.viewBtn}
                   onPress={() =>
+                    // ✅ FIXED: Pass Level AND Goal to the Engine
                     navigation.navigate("Workout", {
                       screen: "RecommendationWorkout",
-                      params: { workout, level: userLevel ?? "Beginner" },
+                      params: {
+                        workout,
+                        level: userLevel ?? "Beginner",
+                        goal: userGoal, // Passing the real goal from Firebase
+                      },
                     })
                   }
                 >

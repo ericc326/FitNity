@@ -24,6 +24,7 @@ export type AuthStackParamList = {
     weight: string;
     height: string;
     level: string;
+    goal: string;
   };
 };
 
