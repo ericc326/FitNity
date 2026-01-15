@@ -45,6 +45,9 @@ interface Participant {
   lastUpdated?: any;
 }
 
+const DEFAULT_WORKOUT_IMG = require("../../../../assets/default_workout_pic.jpg");
+const DEFAULT_ACTIVITY_IMG = require("../../../../assets/default_activity_pic.jpg");
+
 const Tag = ({ text }: { text: string }) => (
   <View style={styles.tag}>
     <Text style={styles.tagText}>{text}</Text>
@@ -310,6 +313,10 @@ const ChallengeDetailsScreen = ({ route, navigation }: Props) => {
   const [lastUpdatedDateString, setLastUpdatedDateString] = useState<
     string | null
   >(null);
+
+  const [isImageLoading, setIsImageLoading] = useState(
+    !!currentChallenge.imageUrl
+  );
 
   const onRefresh = async () => {
     setRefreshing(true);
@@ -736,6 +743,11 @@ const ChallengeDetailsScreen = ({ route, navigation }: Props) => {
       ? exerciseDetails.instructions
       : [];
 
+  const fallbackImage =
+    currentChallenge.type === "workout"
+      ? DEFAULT_WORKOUT_IMG
+      : DEFAULT_ACTIVITY_IMG;
+
   return (
     <View style={styles.container}>
       {/* Header */}
@@ -761,14 +773,29 @@ const ChallengeDetailsScreen = ({ route, navigation }: Props) => {
         }
       >
         {/* Challenge Image */}
-        <Image
-          source={{
-            uri:
-              currentChallenge.imageUrl ||
-              "https://images.unsplash.com/photo-1599058917212-dc7e845ab4c2",
-          }}
-          style={styles.image}
-        />
+        <View style={styles.imageWrapper}>
+          <Image
+            source={
+              currentChallenge.imageUrl
+                ? { uri: currentChallenge.imageUrl }
+                : fallbackImage
+            }
+            style={styles.image}
+            // 3. Add Load Handlers
+            onLoadStart={() => {
+              if (currentChallenge.imageUrl) setIsImageLoading(true);
+            }}
+            onLoadEnd={() => setIsImageLoading(false)}
+            onError={() => setIsImageLoading(false)}
+          />
+
+          {/* 4. The Loading Overlay */}
+          {isImageLoading && (
+            <View style={styles.imageLoadingOverlay}>
+              <LoadingIndicator size="large" color="#fff" />
+            </View>
+          )}
+        </View>
         {/* Challenge Info */}
         <View style={styles.infoContainer}>
           <Text style={styles.title}>{currentChallenge.title}</Text>
@@ -1101,6 +1128,20 @@ const styles = StyleSheet.create({
   image: {
     width: "100%",
     height: 200,
+  },
+  imageWrapper: {
+    position: "relative", // Needed for absolute positioning of loader
+  },
+  imageLoadingOverlay: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: "rgba(0,0,0,0.3)", // Semi-transparent dimming
+    zIndex: 1,
   },
   infoContainer: {
     padding: 16,

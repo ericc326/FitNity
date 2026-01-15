@@ -31,6 +31,9 @@ type NavigationProp = NativeStackNavigationProp<
   "ChallengesList"
 >;
 
+const DEFAULT_WORKOUT_IMG = require("../../../../assets/default_workout_pic.jpg");
+const DEFAULT_ACTIVITY_IMG = require("../../../../assets/default_activity_pic.jpg");
+
 type Challenge = {
   id: string;
   title: string;
@@ -38,6 +41,7 @@ type Challenge = {
   imageUrl?: string;
   createdBy: string;
   participantCount: number;
+  type?: string;
 };
 
 type ChallengeCardProps = {
@@ -54,7 +58,12 @@ const ChallengeCard: React.FC<ChallengeCardProps> = ({
   userProgress,
 }) => {
   const isCreator = item.createdBy === auth.currentUser?.uid;
-  const [imageLoading, setImageLoading] = useState(true);
+  const imageSource = item.imageUrl
+    ? { uri: item.imageUrl }
+    : item.type === "workout"
+      ? DEFAULT_WORKOUT_IMG
+      : DEFAULT_ACTIVITY_IMG;
+  const [imageLoading, setImageLoading] = useState(!!item.imageUrl);
 
   React.useEffect(() => {
     if (item.imageUrl) {
@@ -71,11 +80,7 @@ const ChallengeCard: React.FC<ChallengeCardProps> = ({
     <TouchableOpacity style={styles.card} onPress={onPress} activeOpacity={0.8}>
       <View style={styles.imageContainer}>
         <Image
-          source={{
-            uri: item.imageUrl
-              ? item.imageUrl
-              : "https://images.unsplash.com/photo-1599058917212-dc7e845ab4c2",
-          }}
+          source={imageSource}
           style={styles.image}
           onLoadEnd={() => setImageLoading(false)}
           onError={() => setImageLoading(false)}
