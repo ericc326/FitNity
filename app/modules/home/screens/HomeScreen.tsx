@@ -409,7 +409,7 @@ const HomeScreen: React.FC = () => {
                     </View>
 
                     <Text style={styles.taskDuration}>
-                      {task.duration || ""}
+                      {task.duration ? `${task.duration} duration` : ""}
                     </Text>
                   </View>
                 </TouchableOpacity>
