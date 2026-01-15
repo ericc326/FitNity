@@ -42,6 +42,7 @@ interface Participant {
   name: string;
   progress: number;
   joinedAt: any;
+  lastUpdated?: any;
 }
 
 const Tag = ({ text }: { text: string }) => (
@@ -306,6 +307,9 @@ const ChallengeDetailsScreen = ({ route, navigation }: Props) => {
   const [participantJoinDate, setParticipantJoinDate] = useState<Date | null>(
     null
   );
+  const [lastUpdatedDateString, setLastUpdatedDateString] = useState<
+    string | null
+  >(null);
 
   const onRefresh = async () => {
     setRefreshing(true);
@@ -423,11 +427,13 @@ const ChallengeDetailsScreen = ({ route, navigation }: Props) => {
 
           let joinedAtVal = null;
           let progressVal = 0;
+          let lastUpdatedVal = null;
 
           if (progressDoc.exists()) {
             const d = progressDoc.data();
             progressVal = d.progress || 0;
             joinedAtVal = d.joinedAt;
+            lastUpdatedVal = d.lastUpdated;
           } else {
             joinedAtVal = serverTimestamp();
           }
@@ -443,6 +449,15 @@ const ChallengeDetailsScreen = ({ route, navigation }: Props) => {
               // Fallback if not yet written
               setParticipantJoinDate(new Date());
             }
+
+            //Set the state for the current user's last updated date
+            if (lastUpdatedVal && lastUpdatedVal.toDate) {
+              setLastUpdatedDateString(
+                lastUpdatedVal.toDate().toLocaleDateString()
+              );
+            } else {
+              setLastUpdatedDateString(null);
+            }
           }
 
           participantsData.push({
@@ -450,6 +465,7 @@ const ChallengeDetailsScreen = ({ route, navigation }: Props) => {
             name: userData.name,
             progress: progressVal,
             joinedAt: joinedAtVal,
+            lastUpdated: lastUpdatedVal,
           });
         }
       }
@@ -535,6 +551,14 @@ const ChallengeDetailsScreen = ({ route, navigation }: Props) => {
 
   const handleSessionComplete = async () => {
     setShowSessionModal(false);
+
+    // Safety check: if somehow they opened the modal but already finished today
+    const today = new Date().toLocaleDateString();
+    if (lastUpdatedDateString === today) {
+      Alert.alert("Goal Met", "You have already completed the goal for today.");
+      return;
+    }
+
     setLoading(true);
 
     try {
@@ -671,8 +695,11 @@ const ChallengeDetailsScreen = ({ route, navigation }: Props) => {
 
       await updateDoc(statsRef, {
         progress: progress,
-        lastUpdated: serverTimestamp(), // Useful for debugging/auditing
+        lastUpdated: serverTimestamp(),
       });
+
+      // Update the local state immediately so UI updates without refresh
+      setLastUpdatedDateString(new Date().toLocaleDateString());
 
       if (progress >= 100) {
         await checkAndAwardBadge(currentUser.uid);
@@ -944,7 +971,7 @@ const ChallengeDetailsScreen = ({ route, navigation }: Props) => {
             )}
           </View>
 
-          {/* BUTTON */}
+          {/* BUTTON LOGIC */}
           <View style={styles.buttonContainer}>
             {isParticipant ? (
               userProgress >= 100 ? (
@@ -961,6 +988,23 @@ const ChallengeDetailsScreen = ({ route, navigation }: Props) => {
                   />
                   <Text style={styles.updateProgressButtonText}>
                     Challenge Completed
+                  </Text>
+                </View>
+              ) : // Check if last updated date is today
+              lastUpdatedDateString === new Date().toLocaleDateString() ? (
+                <View
+                  style={[
+                    styles.updateProgressButton,
+                    { backgroundColor: "#555", opacity: 0.8 }, // Grey/Disabled look
+                  ]}
+                >
+                  <MaterialCommunityIcons
+                    name="check-circle"
+                    size={24}
+                    color="#fff"
+                  />
+                  <Text style={styles.updateProgressButtonText}>
+                    Goal Completed Today
                   </Text>
                 </View>
               ) : currentChallenge.type === "workout" ? (
@@ -1013,7 +1057,7 @@ const ChallengeDetailsScreen = ({ route, navigation }: Props) => {
             onUpdate={handleUpdateProgress}
             loading={loading}
             initialProgress={userProgress}
-            maxAllowed={maxAllowedProgress} // Pass the Integrity Check Limit
+            maxAllowed={maxAllowedProgress}
           />
 
           <WorkoutSessionModal
