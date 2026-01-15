@@ -15,6 +15,7 @@ export type WorkoutStackParamList = {
   RecommendationWorkout: {
     workout: any;
     level: string;
+    goal: string;
   };
 };
 

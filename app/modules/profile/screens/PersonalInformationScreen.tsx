@@ -30,6 +30,7 @@ type HealthInfo = {
   age?: string | number;
   bmi?: number | null;
   level?: string;
+  goal?: string;
   gender?: string;
   bmr?: number | null;
   tdee?: number | null;
@@ -40,6 +41,7 @@ type HealthInfo = {
 
 const LEVELS = ["Beginner", "Intermediate", "Advanced"];
 const GENDERS = ["Male", "Female"];
+const GOALS = ["Build Muscle", "Lose Weight", "Increase Strength"];
 
 const PersonalInformationScreen: React.FC = () => {
   const [loading, setLoading] = useState(true);
@@ -52,9 +54,12 @@ const PersonalInformationScreen: React.FC = () => {
   const [weightKg, setWeightKg] = useState<string>("");
   const [heightCm, setHeightCm] = useState<string>("");
   const [fitnessLevel, setFitnessLevel] = useState<string>("");
+  const [fitnessGoal, setFitnessGoal] = useState<string>("");
   const [healthInfoNote, setHealthInfoNote] = useState<string>("");
+
   const [showLevelPicker, setShowLevelPicker] = useState(false);
   const [showGenderPicker, setShowGenderPicker] = useState(false);
+  const [showGoalPicker, setShowGoalPicker] = useState(false);
 
   const bmi = useMemo(() => {
     const w = parseFloat(weightKg);
@@ -89,6 +94,7 @@ const PersonalInformationScreen: React.FC = () => {
         if (data.height != null) setHeightCm(String(data.height));
         if (data.age != null) setAge(String(data.age));
         if (data.level) setFitnessLevel(String(data.level));
+        if (data.goal) setFitnessGoal(String(data.goal));
         if (data.gender) setGender(String(data.gender));
         if (data.healthInfo) setHealthInfoNote(String(data.healthInfo));
       }
@@ -126,9 +132,8 @@ const PersonalInformationScreen: React.FC = () => {
     let calculatedBmr = null;
     let calculatedTdee = null;
 
-    // Only calculate if have ALL required fields (Weight, Height, Age, Gender, Level)
     if (w && h && a && gender && fitnessLevel) {
-      // A. Calculate BMR (Mifflin-St Jeor)
+      // A. Calculate BMR
       let bmr = 10 * w + 6.25 * h - 5 * a;
       if (gender === "Male") {
         bmr += 5;
@@ -137,7 +142,7 @@ const PersonalInformationScreen: React.FC = () => {
       }
       calculatedBmr = Math.round(bmr);
 
-      // B. Calculate TDEE (Multiplier)
+      // B. Calculate TDEE
       let multiplier = 1.2;
       if (fitnessLevel === "Intermediate") multiplier = 1.55;
       if (fitnessLevel === "Advanced") multiplier = 1.725;
@@ -151,6 +156,7 @@ const PersonalInformationScreen: React.FC = () => {
       age: age || "",
       bmi: bmi ? Number(bmi) : null,
       level: fitnessLevel,
+      goal: fitnessGoal,
       gender: gender || "",
       healthInfo: healthInfoNote || "",
       bmr: calculatedBmr,
@@ -209,16 +215,7 @@ const PersonalInformationScreen: React.FC = () => {
             onPress={() => setShowGenderPicker(true)}
           >
             <Text style={styles.label}>Gender</Text>
-            <View
-              style={[
-                styles.input,
-                {
-                  flexDirection: "row",
-                  justifyContent: "space-between",
-                  alignItems: "center",
-                },
-              ]}
-            >
+            <View style={[styles.input, styles.selectorInput]}>
               <Text style={{ color: gender ? "#fff" : "#666" }}>
                 {gender || "Select Gender"}
               </Text>
@@ -248,23 +245,30 @@ const PersonalInformationScreen: React.FC = () => {
             textColor={getBmiColor(bmi)}
           />
 
-          <Text style={styles.title}>Fitness Level</Text>
+          <Text style={styles.title}>Fitness Profile</Text>
+
+          {/* ✅ Fitness Level Selector */}
           <TouchableOpacity
             style={styles.pickerField}
             onPress={() => setShowLevelPicker(true)}
           >
-            <Text style={styles.label}>Level</Text>
-            <View
-              style={[
-                styles.input,
-                {
-                  flexDirection: "row",
-                  justifyContent: "space-between",
-                  alignItems: "center",
-                },
-              ]}
-            >
+            <Text style={styles.label}>Current Level</Text>
+            <View style={[styles.input, styles.selectorInput]}>
               <Text style={{ color: "#fff" }}>{fitnessLevel || "--"}</Text>
+              <Text style={{ color: "#aaa" }}>▼</Text>
+            </View>
+          </TouchableOpacity>
+
+          {/* ✅ Fitness Goal Selector */}
+          <TouchableOpacity
+            style={[styles.pickerField, { marginTop: 12 }]}
+            onPress={() => setShowGoalPicker(true)}
+          >
+            <Text style={styles.label}>Primary Goal</Text>
+            <View style={[styles.input, styles.selectorInput]}>
+              <Text style={{ color: "#fff" }}>
+                {fitnessGoal || "Select Goal"}
+              </Text>
               <Text style={{ color: "#aaa" }}>▼</Text>
             </View>
           </TouchableOpacity>
@@ -295,6 +299,9 @@ const PersonalInformationScreen: React.FC = () => {
           </TouchableOpacity>
         </ScrollView>
       </KeyboardAvoidingView>
+
+      {/* --- MODALS --- */}
+
       {/* Gender Picker Modal */}
       <Modal visible={showGenderPicker} transparent animationType="fade">
         <View style={styles.modalBackdrop}>
@@ -331,6 +338,7 @@ const PersonalInformationScreen: React.FC = () => {
           </View>
         </View>
       </Modal>
+
       {/* Level Picker Modal */}
       <Modal visible={showLevelPicker} transparent animationType="fade">
         <View style={styles.modalBackdrop}>
@@ -361,6 +369,43 @@ const PersonalInformationScreen: React.FC = () => {
             <TouchableOpacity
               style={styles.modalCancelButton}
               onPress={() => setShowLevelPicker(false)}
+            >
+              <Text style={styles.modalCancelText}>Cancel</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+      {/* ✅ Goal Picker Modal */}
+      <Modal visible={showGoalPicker} transparent animationType="fade">
+        <View style={styles.modalBackdrop}>
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>Select Fitness Goal</Text>
+            {GOALS.map((g) => (
+              <TouchableOpacity
+                key={g}
+                style={[
+                  styles.levelOption,
+                  fitnessGoal === g && styles.levelOptionActive,
+                ]}
+                onPress={() => {
+                  setFitnessGoal(g);
+                  setShowGoalPicker(false);
+                }}
+              >
+                <Text
+                  style={[
+                    styles.levelOptionText,
+                    fitnessGoal === g && styles.levelOptionTextActive,
+                  ]}
+                >
+                  {g}
+                </Text>
+              </TouchableOpacity>
+            ))}
+            <TouchableOpacity
+              style={styles.modalCancelButton}
+              onPress={() => setShowGoalPicker(false)}
             >
               <Text style={styles.modalCancelText}>Cancel</Text>
             </TouchableOpacity>
@@ -440,6 +485,11 @@ const styles = StyleSheet.create({
     color: "#fff",
     borderWidth: 1,
     borderColor: "#2a2540",
+  },
+  selectorInput: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
   },
   pickerField: { gap: 6 },
   modalBackdrop: {
