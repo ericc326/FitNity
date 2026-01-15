@@ -7,6 +7,8 @@ import {
   StyleSheet,
   Image,
   Alert,
+  Keyboard,
+  TouchableWithoutFeedback,
 } from "react-native";
 import { signInWithEmailAndPassword } from "firebase/auth";
 import { collection, query, where, getDocs } from "firebase/firestore";
@@ -23,6 +25,7 @@ import {
   CompositeNavigationProp,
   CommonActions,
 } from "@react-navigation/native";
+import LoadingIndicator from "../../../components/LoadingIndicator";
 
 type LoginScreenNavigationProp = CompositeNavigationProp<
   NativeStackNavigationProp<AuthStackParamList, "Login">,
@@ -37,6 +40,7 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ navigation }) => {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [passwordVisible, setPasswordVisible] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
   const insets = useSafeAreaInsets();
 
   const handleLogin = async () => {
@@ -44,6 +48,9 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ navigation }) => {
       Alert.alert("Error", "Please enter both email and password.");
       return;
     }
+    Keyboard.dismiss();
+    setIsLoading(true);
+
     let loginEmail = email;
 
     const isEmail = /\S+@\S+\.\S+/.test(email);
@@ -55,12 +62,14 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ navigation }) => {
         const querySnapshot = await getDocs(q);
         if (querySnapshot.empty) {
           Alert.alert("Login Failed", "No user found with that name");
+          setIsLoading(false);
           return;
         }
         const userData = querySnapshot.docs[0].data();
         loginEmail = userData.email;
       } catch (error) {
         Alert.alert("Login Failed", "Error retrieving user information");
+        setIsLoading(false);
         return;
       }
     }
@@ -78,6 +87,7 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ navigation }) => {
         })
       );
     } catch (error: any) {
+      setIsLoading(false);
       if (
         error.code === "auth/wrong-password" ||
         error.code === "auth/invalid-credential"
@@ -95,71 +105,85 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ navigation }) => {
 
   return (
     <SafeAreaView style={styles.safeContainer}>
-      <TouchableOpacity
-        onPress={() => navigation.navigate("Welcome")}
-        style={[styles.backButton, { top: insets.top }]}
-      >
-        <MaterialCommunityIcons name="arrow-left" size={28} color="#fff" />
-      </TouchableOpacity>
-      <View style={styles.container}>
-        <Image
-          source={require("../../../../assets/iconFitNity.png")}
-          style={styles.logo}
-          resizeMode="contain"
-        />
-        <Text style={styles.title}>Login to FitNity</Text>
-
-        <TextInput
-          style={styles.input}
-          placeholder="Enter your email or username"
-          placeholderTextColor="#888"
-          autoCapitalize="none"
-          keyboardType="email-address"
-          value={email}
-          onChangeText={setEmail}
-        />
-
-        <View style={styles.passwordContainer}>
-          <TextInput
-            style={styles.passwordInput}
-            placeholder="Enter your password"
-            placeholderTextColor="#888"
-            secureTextEntry={!passwordVisible}
-            value={password}
-            onChangeText={setPassword}
-            autoCapitalize="none"
-          />
+      <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
+        <View style={{ flex: 1 }}>
           <TouchableOpacity
-            onPress={() => setPasswordVisible(!passwordVisible)}
-            style={styles.eyeIcon}
-            activeOpacity={0.7}
+            onPress={() => navigation.navigate("Welcome")}
+            style={[styles.backButton, { top: insets.top }]}
           >
-            <MaterialCommunityIcons
-              name={passwordVisible ? "eye" : "eye-off"}
-              size={24}
-              color="#888"
+            <MaterialCommunityIcons name="arrow-left" size={28} color="#fff" />
+          </TouchableOpacity>
+          <View style={styles.container}>
+            <Image
+              source={require("../../../../assets/iconFitNity.png")}
+              style={styles.logo}
+              resizeMode="contain"
             />
-          </TouchableOpacity>
+            <Text style={styles.title}>Login to FitNity</Text>
+
+            <TextInput
+              style={styles.input}
+              placeholder="Enter your email or username"
+              placeholderTextColor="#888"
+              autoCapitalize="none"
+              keyboardType="email-address"
+              value={email}
+              onChangeText={setEmail}
+            />
+
+            <View style={styles.passwordContainer}>
+              <TextInput
+                style={styles.passwordInput}
+                placeholder="Enter your password"
+                placeholderTextColor="#888"
+                secureTextEntry={!passwordVisible}
+                value={password}
+                onChangeText={setPassword}
+                autoCapitalize="none"
+              />
+              <TouchableOpacity
+                onPress={() => setPasswordVisible(!passwordVisible)}
+                style={styles.eyeIcon}
+                activeOpacity={0.7}
+              >
+                <MaterialCommunityIcons
+                  name={passwordVisible ? "eye" : "eye-off"}
+                  size={24}
+                  color="#888"
+                />
+              </TouchableOpacity>
+            </View>
+
+            <TouchableOpacity
+              onPress={handleForgotPassword}
+              style={styles.forgotPassword}
+            >
+              <Text style={styles.forgotPasswordText}>Forgot Password?</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity onPress={handleLogin} style={styles.loginButton}>
+              <Text style={styles.loginButtonText}>Login</Text>
+            </TouchableOpacity>
+
+            <View style={styles.registerContainer}>
+              <Text style={styles.registerText}>Don't have an account? </Text>
+              <TouchableOpacity onPress={() => navigation.navigate("Register")}>
+                <Text style={styles.registerButtonText}>Register now</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
         </View>
-
-        <TouchableOpacity
-          onPress={handleForgotPassword}
-          style={styles.forgotPassword}
-        >
-          <Text style={styles.forgotPasswordText}>Forgot Password?</Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity onPress={handleLogin} style={styles.loginButton}>
-          <Text style={styles.loginButtonText}>Login</Text>
-        </TouchableOpacity>
-
-        <View style={styles.registerContainer}>
-          <Text style={styles.registerText}>Don't have an account? </Text>
-          <TouchableOpacity onPress={() => navigation.navigate("Register")}>
-            <Text style={styles.registerButtonText}>Register now</Text>
-          </TouchableOpacity>
-        </View>
-      </View>
+      </TouchableWithoutFeedback>
+      {isLoading && (
+        <LoadingIndicator
+          size="large"
+          color="#fff"
+          style={{
+            backgroundColor: "rgba(0, 0, 0, 0.6)",
+            zIndex: 999,
+          }}
+        />
+      )}
     </SafeAreaView>
   );
 };
