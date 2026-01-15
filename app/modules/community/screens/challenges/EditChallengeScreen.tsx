@@ -212,10 +212,17 @@ const EditChallengeScreen = ({ route, navigation }: Props) => {
   };
 
   const isChanged =
+    // 1. General Fields
     title.trim() !== challenge.title.trim() ||
     description.trim() !== challenge.description.trim() ||
     duration.trim() !== challenge.duration.toString().trim() ||
-    selectedImage !== (challenge.imageUrl || null);
+    selectedImage !== (challenge.imageUrl || null) ||
+    // 2. Workout Fields (Combined with OR '||')
+    (isWorkoutType &&
+      (selectedWorkoutId !== challenge.workoutId ||
+        customSets !== challenge.customSets ||
+        customReps !== challenge.customReps ||
+        customRestSec !== challenge.customRestSeconds));
 
   return (
     <KeyboardAwareScrollView
@@ -240,7 +247,7 @@ const EditChallengeScreen = ({ route, navigation }: Props) => {
           value={title}
           onChangeText={setTitle}
         />
-        <Text style={styles.label}>Title</Text>
+        <Text style={styles.label}>Description</Text>
         <TextInput
           style={[styles.input, styles.textArea]}
           placeholder="Challenge Description"
@@ -316,6 +323,11 @@ const EditChallengeScreen = ({ route, navigation }: Props) => {
                 });
               }}
             >
+              <MaterialCommunityIcons
+                name="dumbbell"
+                size={20}
+                color="#bdbdbd"
+              />
               <Text style={styles.workoutDetailButtonText}>
                 {selectedWorkout}
               </Text>
@@ -326,8 +338,13 @@ const EditChallengeScreen = ({ route, navigation }: Props) => {
               style={styles.workoutDetailButton}
               onPress={() => setShowCustomModal(true)}
             >
+              <MaterialCommunityIcons
+                name="chart-bar"
+                size={20}
+                color="#bdbdbd"
+              />
               <Text style={styles.workoutDetailButtonText}>
-                {customLabel || "Set Reps"}
+                {customLabel || "Set Reps & Rest"}
               </Text>
               <MaterialCommunityIcons name="pencil" size={20} color="#bdbdbd" />
             </TouchableOpacity>
@@ -356,55 +373,66 @@ const EditChallengeScreen = ({ route, navigation }: Props) => {
           )}
         </TouchableOpacity>
       </View>
-      {/* REPS MODAL */}
+
       <Modal visible={showCustomModal} transparent animationType="fade">
         <View style={styles.modalContainer}>
           <View style={styles.modalContent}>
             <Text style={styles.modalTitle}>Update Workout Goals</Text>
 
             <View style={styles.modalRow}>
-              <Text style={{ color: "#fff" }}>Sets</Text>
+              <Text style={{ color: "#fff", marginBottom: 6 }}>Sets</Text>
               <TextInput
                 style={styles.numberInput}
-                value={customSets?.toString()}
-                onChangeText={(t) => setCustomSets(Number(t))}
+                value={customSets?.toString() ?? ""}
+                onChangeText={(t) => setCustomSets(t ? Number(t) : null)}
                 keyboardType="numeric"
+                placeholder="e.g. 3"
+                placeholderTextColor="#777"
               />
             </View>
+
             <View style={styles.modalRow}>
-              <Text style={{ color: "#fff" }}>Reps</Text>
+              <Text style={{ color: "#fff", marginBottom: 6 }}>Reps / Set</Text>
               <TextInput
                 style={styles.numberInput}
-                value={customReps?.toString()}
-                onChangeText={(t) => setCustomReps(Number(t))}
+                value={customReps?.toString() ?? ""}
+                onChangeText={(t) => setCustomReps(t ? Number(t) : null)}
                 keyboardType="numeric"
+                placeholder="e.g. 10"
+                placeholderTextColor="#777"
               />
             </View>
+
             <View style={styles.modalRow}>
-              <Text style={{ color: "#fff" }}>Rest (s)</Text>
+              <Text style={{ color: "#fff", marginBottom: 6 }}>Rest (sec)</Text>
               <TextInput
                 style={styles.numberInput}
-                value={customRestSec?.toString()}
-                onChangeText={(t) => setCustomRestSec(Number(t))}
+                value={customRestSec?.toString() ?? ""}
+                onChangeText={(t) => setCustomRestSec(t ? Number(t) : null)}
                 keyboardType="numeric"
+                placeholder="e.g. 60"
+                placeholderTextColor="#777"
               />
             </View>
 
             <View style={styles.modalButtons}>
               <Pressable
-                style={styles.modalButton}
+                style={[styles.modalButton, { backgroundColor: "#444" }]}
                 onPress={() => setShowCustomModal(false)}
               >
-                <Text style={{ color: "#fff" }}>Cancel</Text>
+                <Text style={styles.modalButtonText}>Cancel</Text>
               </Pressable>
               <Pressable
                 style={[styles.modalButton, { backgroundColor: "#4a90e2" }]}
                 onPress={() => {
-                  setCustomLabel(`${customSets} Sets × ${customReps} Reps`);
+                  const s = customSets ?? 0;
+                  const r = customReps ?? 0;
+                  const rs = customRestSec ?? 0;
+                  setCustomLabel(`${s} Sets × ${r} Reps • ${rs}s Rest`);
                   setShowCustomModal(false);
                 }}
               >
-                <Text style={{ color: "#fff" }}>Save</Text>
+                <Text style={styles.modalButtonText}>Save</Text>
               </Pressable>
             </View>
           </View>
@@ -512,7 +540,6 @@ const styles = StyleSheet.create({
   },
   workoutDetailButton: {
     flexDirection: "row",
-    justifyContent: "space-between",
     alignItems: "center",
     backgroundColor: "#333",
     borderRadius: 12,
@@ -522,6 +549,8 @@ const styles = StyleSheet.create({
   workoutDetailButtonText: {
     color: "#fff",
     fontSize: 15,
+    marginLeft: 12,
+    flex: 1,
   },
   modalContainer: {
     flex: 1,
@@ -530,10 +559,10 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   modalContent: {
-    width: "80%",
+    width: "85%",
     backgroundColor: "#2b2435",
-    padding: 20,
     borderRadius: 12,
+    padding: 20,
   },
   modalTitle: {
     color: "#fff",
@@ -542,18 +571,13 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   modalRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
     marginBottom: 12,
   },
   numberInput: {
-    backgroundColor: "#444",
+    backgroundColor: "rgba(255,255,255,0.1)",
+    borderRadius: 8,
+    padding: 10,
     color: "#fff",
-    width: 60,
-    padding: 8,
-    borderRadius: 6,
-    textAlign: "center",
   },
   modalButtons: {
     flexDirection: "row",
@@ -561,9 +585,14 @@ const styles = StyleSheet.create({
     marginTop: 16,
   },
   modalButton: {
-    padding: 10,
+    paddingVertical: 10,
+    paddingHorizontal: 20,
+    borderRadius: 8,
     marginLeft: 10,
-    borderRadius: 6,
+  },
+  modalButtonText: {
+    color: "#fff",
+    fontWeight: "600",
   },
 });
 

@@ -301,7 +301,7 @@ const CreateChallengeScreen = () => {
                 color="#bdbdbd"
               />
               <Text style={styles.workoutDetailButtonText}>
-                {customLabel || "Set Reps & Sets"}
+                {customLabel || "Set Reps & Rest"}
               </Text>
               <MaterialCommunityIcons
                 name="chevron-right"
