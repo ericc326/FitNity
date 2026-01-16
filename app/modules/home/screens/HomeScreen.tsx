@@ -380,9 +380,6 @@ const HomeScreen: React.FC = () => {
               <Text style={[styles.badge, styles.trainingBadge]}>
                 {userGoal}
               </Text>
-              <Text style={[styles.badge, styles.communityBadge]}>
-                Community
-              </Text>
             </View>
           </View>
 
@@ -602,10 +599,6 @@ const styles = StyleSheet.create({
   },
   trainingBadge: {
     backgroundColor: "#f55",
-  },
-  communityBadge: {
-    backgroundColor: "#4a90e2",
-    color: "#fff",
   },
   statisticsHeader: {
     flexDirection: "row",
