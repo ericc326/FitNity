@@ -1018,11 +1018,12 @@ const ChallengeDetailsScreen = ({ route, navigation }: Props) => {
                   </Text>
                 </View>
               ) : // Check if last updated date is today
-              lastUpdatedDateString === new Date().toLocaleDateString() ? (
+              currentChallenge.type === "workout" &&
+                lastUpdatedDateString === new Date().toLocaleDateString() ? (
                 <View
                   style={[
                     styles.updateProgressButton,
-                    { backgroundColor: "#555", opacity: 0.8 }, // Grey/Disabled look
+                    { backgroundColor: "#555", opacity: 0.8 },
                   ]}
                 >
                   <MaterialCommunityIcons
