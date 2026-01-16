@@ -211,28 +211,92 @@ const HomeScreen: React.FC = () => {
     return () => unsubscribe && unsubscribe();
   }, []);
 
+  // --- 1. COPY THE HEURISTIC ENGINE HERE ---
+  const categorizeExercise = (exerciseName: string): string => {
+    const name = exerciseName.toLowerCase();
+    const advancedKeywords = [
+      "one arm",
+      "single leg",
+      "unilateral",
+      "stability ball",
+      "bosu ball",
+      "wheel roller",
+      "olympic barbell",
+      "kettlebell",
+      "hammer",
+      "tire",
+      "sled",
+      "weighted",
+      "explosive",
+      "plyo",
+      "jump",
+      "dragon flag",
+    ];
+
+    const beginnerKeywords = [
+      "machine",
+      "assisted",
+      "smith",
+      "cable",
+      "elliptical",
+      "bike",
+      "stepmill",
+      "ergometer",
+      "band",
+      "seated",
+      "kneeling",
+      "support",
+      "leverage",
+      "wall",
+    ];
+
+    if (advancedKeywords.some((key) => name.includes(key))) return "Advanced";
+    if (beginnerKeywords.some((key) => name.includes(key))) return "Beginner";
+    return "Intermediate";
+  };
+
   // Fetch Suggested Workouts
   useEffect(() => {
     const fetchSuggestedWorkouts = async () => {
-      if (!userLevel) return; // wait until level is known
+      if (!userLevel) return;
       setLoadingWorkouts(true);
       try {
         const exercisesRef = collection(db, "exercises");
         const snapshot = await getDocs(exercisesRef);
 
-        const allExercises: Exercise[] = snapshot.docs.map((doc) => {
-          const data = doc.data();
-          return {
-            id: doc.id,
-            name: data.name,
-            bodyPart: data.bodyParts?.[0] || "General",
-            duration: "4",
-            imageURL: data.gifUrl,
-            level: userLevel,
-            instructions: data.instructions || [],
-          };
-        });
+        const allExercises: Exercise[] = snapshot.docs
+          .map((doc) => {
+            const data = doc.data();
+            return {
+              id: doc.id,
+              name: data.name,
+              bodyPart: data.bodyParts?.[0] || "General",
+              duration: "4",
+              imageURL: data.gifUrl,
+              level: userLevel,
+              instructions: data.instructions || [],
+            };
+          })
+          // 1. Remove Broken Images & Duplicates
+          .filter((ex) => ex.imageURL && ex.imageURL.length > 5)
+          .filter((v, i, a) => a.findIndex((t) => t.id === v.id) === i)
 
+          // 🚨 2. APPLY HEURISTIC FILTER HERE (The "Smart" Logic)
+          .filter((ex) => {
+            const difficulty = categorizeExercise(ex.name || "");
+
+            // If Beginner, ONLY allow Beginner moves
+            if (userLevel === "Beginner") return difficulty === "Beginner";
+
+            // If Intermediate, allow Intermediate + Beginner
+            if (userLevel === "Intermediate")
+              return difficulty === "Intermediate" || difficulty === "Beginner";
+
+            // If Advanced, allow EVERYTHING
+            return true;
+          });
+
+        // 3. Group and Randomize (Same as before)
         const grouped: Record<string, Exercise[]> = {};
         allExercises.forEach((ex) => {
           if (!grouped[ex.bodyPart]) grouped[ex.bodyPart] = [];
@@ -244,22 +308,26 @@ const HomeScreen: React.FC = () => {
           return shuffled.slice(0, Math.min(count, arr.length));
         };
 
-        const workouts = Object.entries(grouped).map(
-          ([bodyPart, exercises]) => {
+        const workouts = Object.entries(grouped)
+          .map(([bodyPart, exercises]) => {
+            // Get 4 to 6 exercises
             const set = getRandom(exercises, 4 + Math.floor(Math.random() * 2));
+
             const total = set.reduce(
               (sum, e) => sum + (e.duration ? parseInt(e.duration) : 10),
               0
             );
 
+            if (set.length === 0) return null;
+
             return {
               title: `${bodyPart} ${userLevel}`,
-              exercises: set,
+              exercises: set, // <--- These are now GUARANTEED valid for the level
               duration: `${total} min`,
               image: set[0]?.imageURL ?? null,
             };
-          }
-        );
+          })
+          .filter(Boolean);
 
         setSuggestedWorkouts(workouts);
       } catch (error) {
@@ -271,7 +339,6 @@ const HomeScreen: React.FC = () => {
     };
     fetchSuggestedWorkouts();
   }, [userLevel]);
-
   // Navigation functions
   const goToSchedule = () =>
     navigation.navigate("Schedule", { screen: "ScheduleList" });
@@ -310,7 +377,9 @@ const HomeScreen: React.FC = () => {
 
             <View style={styles.badgeRow}>
               <Text style={styles.badge}>{userLevel}</Text>
-              <Text style={[styles.badge, styles.trainingBadge]}>Training</Text>
+              <Text style={[styles.badge, styles.trainingBadge]}>
+                {userGoal}
+              </Text>
               <Text style={[styles.badge, styles.communityBadge]}>
                 Community
               </Text>

@@ -77,8 +77,8 @@ type PlanDetails = {
 const heuristicRules: Record<string, Record<string, PlanDetails>> = {
   "Build Muscle": {
     Beginner: { sets: 3, reps: 10, rest: 90 },
-    Intermediate: { sets: 4, reps: 10, rest: 60 },
-    Advanced: { sets: 5, reps: 12, rest: 60 },
+    Intermediate: { sets: 4, reps: 12, rest: 60 },
+    Advanced: { sets: 5, reps: 15, rest: 60 },
   },
   "Lose Weight": {
     Beginner: { sets: 3, reps: 15, rest: 45 },
