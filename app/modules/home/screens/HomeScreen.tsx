@@ -151,7 +151,7 @@ const HomeScreen: React.FC = () => {
           setTdee("--");
         }
 
-        // ✅ CAPTURE LEVEL AND GOAL
+        // Capture Level & Goal
         setUserLevel((data.level as Level) ?? "Beginner");
         setUserGoal(data.goal ?? "Build Muscle");
       },
@@ -211,7 +211,6 @@ const HomeScreen: React.FC = () => {
     return () => unsubscribe && unsubscribe();
   }, []);
 
-  // --- 1. COPY THE HEURISTIC ENGINE HERE ---
   const categorizeExercise = (exerciseName: string): string => {
     const name = exerciseName.toLowerCase();
     const advancedKeywords = [
@@ -277,11 +276,11 @@ const HomeScreen: React.FC = () => {
               instructions: data.instructions || [],
             };
           })
-          // 1. Remove Broken Images & Duplicates
+          // Remove Broken Images & Duplicates
           .filter((ex) => ex.imageURL && ex.imageURL.length > 5)
           .filter((v, i, a) => a.findIndex((t) => t.id === v.id) === i)
 
-          // 🚨 2. APPLY HEURISTIC FILTER HERE (The "Smart" Logic)
+          // Apply filter (The "Smart" Logic)
           .filter((ex) => {
             const difficulty = categorizeExercise(ex.name || "");
 
@@ -296,7 +295,7 @@ const HomeScreen: React.FC = () => {
             return true;
           });
 
-        // 3. Group and Randomize (Same as before)
+        // Group and Randomize (Same as before)
         const grouped: Record<string, Exercise[]> = {};
         allExercises.forEach((ex) => {
           if (!grouped[ex.bodyPart]) grouped[ex.bodyPart] = [];
@@ -322,7 +321,7 @@ const HomeScreen: React.FC = () => {
 
             return {
               title: `${bodyPart} ${userLevel}`,
-              exercises: set, // <--- These are now GUARANTEED valid for the level
+              exercises: set,
               duration: `${total} min`,
               image: set[0]?.imageURL ?? null,
             };
@@ -339,7 +338,6 @@ const HomeScreen: React.FC = () => {
     };
     fetchSuggestedWorkouts();
   }, [userLevel]);
-  // Navigation functions
   const goToSchedule = () =>
     navigation.navigate("Schedule", { screen: "ScheduleList" });
 
@@ -529,13 +527,12 @@ const HomeScreen: React.FC = () => {
                 <TouchableOpacity
                   style={styles.viewBtn}
                   onPress={() =>
-                    // ✅ FIXED: Pass Level AND Goal to the Engine
                     navigation.navigate("Workout", {
                       screen: "RecommendationWorkout",
                       params: {
                         workout,
                         level: userLevel ?? "Beginner",
-                        goal: userGoal, // Passing the real goal from Firebase
+                        goal: userGoal,
                       },
                     })
                   }

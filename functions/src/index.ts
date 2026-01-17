@@ -244,11 +244,7 @@ export const deleteUserAndData = functions.https.onRequest(async (req, res) => {
 
       // 4) Delete related top-level collections documents created by this user
       const collectionsToTry = [
-        "workouts",
-        "activities",
-        "userData",
         "posts",
-        "schedules",
         "challenges",
       ];
       for (const col of collectionsToTry) {

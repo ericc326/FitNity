@@ -14,12 +14,10 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { useMealPlan } from "./MealPlanContext";
 
 interface PersonalInfo {
-  // New fields for the 'dietinfo' subcollection
   goal: string;
   dietaryRestrictions: string[];
   allergies: string[];
   targetCalories: string;
-  // Local fields used only for calculation (existing in healthinfo)
   age: string;
   gender: string;
   weight: string;
@@ -30,7 +28,6 @@ interface PersonalInfo {
 interface PersonalInfoModalProps {
   visible: boolean;
   onClose: () => void;
-  // onComplete now returns the data intended for the 'dietinfo' subcollection
   onComplete: (dietInfo: any) => void;
 }
 
@@ -53,10 +50,8 @@ const PersonalInfoModal: React.FC<PersonalInfoModalProps> = ({
     targetCalories: "",
   });
 
-  const [dietaryRestrictionInput, setDietaryRestrictionInput] = useState("");
   const [allergyInput, setAllergyInput] = useState("");
 
-  // Simplified steps focusing on your new requirements
   const steps = ["Activity & Goal", "Dietary Preferences"];
 
   const activityLevels = [
@@ -180,7 +175,7 @@ const PersonalInfoModal: React.FC<PersonalInfoModalProps> = ({
 
   const renderStep = () => {
     switch (currentStep) {
-      case 0: // Step 1: Caloric Goal & Activity
+      case 0: // Caloric Goal & Activity
         return (
           <View style={styles.stepContainer}>
             <Text style={styles.stepTitle}>Caloric Goal</Text>
@@ -313,7 +308,10 @@ const PersonalInfoModal: React.FC<PersonalInfoModalProps> = ({
 };
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#f1e3ec" },
+  container: {
+    flex: 1,
+    backgroundColor: "#f1e3ec",
+  },
   header: {
     flexDirection: "row",
     justifyContent: "space-between",
@@ -321,13 +319,31 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: "#E0E0E0",
   },
-  headerTitle: { fontSize: 18, fontWeight: "bold" },
-  content: { flex: 1, paddingHorizontal: 20 },
+  headerTitle: {
+    fontSize: 18,
+    fontWeight: "bold",
+  },
+  content: {
+    flex: 1,
+    paddingHorizontal: 20,
+  },
   stepContainer: { paddingVertical: 20 },
-  stepTitle: { fontSize: 24, fontWeight: "bold", marginBottom: 8 },
-  stepDescription: { fontSize: 16, color: "#666", marginBottom: 20 },
+  stepTitle: {
+    fontSize: 24,
+    fontWeight: "bold",
+    marginBottom: 8,
+  },
+  stepDescription: {
+    fontSize: 16,
+    color: "#666",
+    marginBottom: 20,
+  },
   inputGroup: { marginTop: 20 },
-  inputLabel: { fontSize: 16, fontWeight: "600", marginBottom: 10 },
+  inputLabel: {
+    fontSize: 16,
+    fontWeight: "600",
+    marginBottom: 10,
+  },
   textInput: {
     backgroundColor: "white",
     borderRadius: 12,
@@ -343,8 +359,15 @@ const styles = StyleSheet.create({
     borderColor: "#E0E0E0",
     marginBottom: 10,
   },
-  radioButtonActive: { borderColor: "#4CAF50", backgroundColor: "#E8F5E8" },
-  checkboxGrid: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
+  radioButtonActive: {
+    borderColor: "#4CAF50",
+    backgroundColor: "#E8F5E8",
+  },
+  checkboxGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+  },
   checkboxButton: {
     padding: 10,
     backgroundColor: "white",
@@ -352,8 +375,14 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "#E0E0E0",
   },
-  checkboxButtonActive: { borderColor: "#4CAF50", backgroundColor: "#E8F5E8" },
-  customInputContainer: { flexDirection: "row", gap: 8 },
+  checkboxButtonActive: {
+    borderColor: "#4CAF50",
+    backgroundColor: "#E8F5E8",
+  },
+  customInputContainer: {
+    flexDirection: "row",
+    gap: 8,
+  },
   customInput: {
     flex: 1,
     backgroundColor: "white",
@@ -362,7 +391,11 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "#E0E0E0",
   },
-  addButton: { padding: 12, backgroundColor: "#E8F5E8", borderRadius: 12 },
+  addButton: {
+    padding: 12,
+    backgroundColor: "#E8F5E8",
+    borderRadius: 12,
+  },
   tagContainer: {
     flexDirection: "row",
     flexWrap: "wrap",
@@ -375,7 +408,10 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
     borderRadius: 16,
   },
-  tagText: { color: "white", fontSize: 12 },
+  tagText: {
+    color: "white",
+    fontSize: 12,
+  },
   footer: {
     flexDirection: "row",
     justifyContent: "space-between",

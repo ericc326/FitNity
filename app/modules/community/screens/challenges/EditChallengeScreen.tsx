@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef } from "react";
 import {
   View,
   Text,
@@ -39,7 +39,7 @@ const EditChallengeScreen = ({ route, navigation }: Props) => {
 
   const challenge = challengeRef.current;
 
-  // --- HELPER TO FORMAT LABEL ---
+  // HELPER TO FORMAT LABEL
   const formatLabel = (
     s: number | null,
     r: number | null,
@@ -395,7 +395,6 @@ const EditChallengeScreen = ({ route, navigation }: Props) => {
       <Modal visible={showCustomModal} transparent animationType="fade">
         <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
           <View style={styles.modalContainer}>
-            {/* Prevent touch on the modal content from closing the keyboard unnecessarily if clicking inputs */}
             <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
               <View style={styles.modalContent}>
                 <Text style={styles.modalTitle}>Update Workout Goals</Text>

@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import { useState } from "react";
 import {
   View,
   Text,
@@ -44,9 +44,7 @@ const markdownStyles = {
 };
 
 export default function AiMealPlanner() {
-  // FIXED: Initialize Navigation
   const navigation = useNavigation();
-  // FIXED: Import Context
   const { updateMeal } = useMealPlan();
 
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
@@ -55,7 +53,6 @@ export default function AiMealPlanner() {
   const [result, setResult] = useState<string>("");
   const [jsonData, setJsonData] = useState<NutritionData | null>(null);
 
-  // FIXED: State for the popup modal
   const [showMealSelector, setShowMealSelector] = useState(false);
 
   const pickImage = async () => {
@@ -247,7 +244,7 @@ export default function AiMealPlanner() {
 
     updateMeal(mealType, foodItem);
     setShowMealSelector(false);
-    Alert.alert("Success", `${foodItem.name} added to ${mealType}!`); // Updated alert too
+    Alert.alert("Success", `${foodItem.name} added to ${mealType}!`);
     navigation.goBack();
   };
 
@@ -396,7 +393,7 @@ export default function AiMealPlanner() {
         <View style={{ height: 40 }} />
       </ScrollView>
 
-      {/* --- MEAL SELECTOR MODAL --- */}
+      {/* Meal Selector Modal */}
       {showMealSelector && (
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
@@ -431,12 +428,23 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: "#262135",
   },
-  scroll: { paddingHorizontal: 20, paddingTop: 20 },
-  headerContainer: { alignItems: "center", marginBottom: 20 },
-  headerSubtitle: { fontSize: 14, color: "#bfb9d6", marginTop: -20 },
-
-  /* IMAGE */
-  imageWrapper: { alignItems: "center", marginBottom: 20 },
+  scroll: {
+    paddingHorizontal: 20,
+    paddingTop: 20,
+  },
+  headerContainer: {
+    alignItems: "center",
+    marginBottom: 20,
+  },
+  headerSubtitle: {
+    fontSize: 14,
+    color: "#bfb9d6",
+    marginTop: -20,
+  },
+  imageWrapper: {
+    alignItems: "center",
+    marginBottom: 20,
+  },
   image: {
     width: "100%",
     height: 260,
@@ -445,8 +453,6 @@ const styles = StyleSheet.create({
     borderWidth: 2,
     borderColor: "#3C3952",
   },
-
-  /* BUTTONS & ACTIONS */
   actionSection: {
     marginBottom: 20,
     gap: 12,
@@ -486,7 +492,7 @@ const styles = StyleSheet.create({
     fontSize: 18,
   },
   addToLogButton: {
-    backgroundColor: "#22C55E", // Bright Green
+    backgroundColor: "#22C55E",
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
@@ -506,8 +512,6 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: "bold",
   },
-
-  /* SUMMARY CARD */
   card: {
     backgroundColor: "#3C3952",
     borderRadius: 20,
@@ -520,17 +524,36 @@ const styles = StyleSheet.create({
     marginBottom: 15,
     color: "#fff",
   },
-  scoreWrapper: { alignItems: "center", marginBottom: 20 },
-  scoreText: { fontSize: 24, fontWeight: "bold", color: "#fff" },
-  factRow: { flexDirection: "row", alignItems: "center", marginBottom: 10 },
-  factText: { marginLeft: 8, fontSize: 15, color: "#ddd" },
+  scoreWrapper: {
+    alignItems: "center",
+    marginBottom: 20,
+  },
+  scoreText: {
+    fontSize: 24,
+    fontWeight: "bold",
+    color: "#fff",
+  },
+  factRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 10,
+  },
+  factText: {
+    marginLeft: 8,
+    fontSize: 15,
+    color: "#ddd",
+  },
   vitaminTitle: {
     marginTop: 20,
     fontWeight: "bold",
     fontSize: 16,
     color: "#fff",
   },
-  vitaminWrapper: { flexDirection: "row", flexWrap: "wrap", marginTop: 8 },
+  vitaminWrapper: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    marginTop: 8,
+  },
   vitaminTag: {
     flexDirection: "row",
     backgroundColor: "#5A6DF0",
@@ -546,16 +569,12 @@ const styles = StyleSheet.create({
     color: "#fff",
     fontSize: 12,
   },
-
-  /* MARKDOWN BOX */
   markdownCard: {
     backgroundColor: "#3C3952",
     borderRadius: 20,
     padding: 20,
     marginBottom: 20,
   },
-
-  /* MODAL STYLES */
   modalOverlay: {
     position: "absolute",
     top: 0,

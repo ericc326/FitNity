@@ -40,7 +40,7 @@ const OnboardingLevelScreen: React.FC<Props> = ({ navigation, route }) => {
       >
         <Text style={styles.headerTitle}>Personalize Your Plan</Text>
 
-        {/* --- GOAL SECTION --- */}
+        {/* GOAL SECTION */}
         <Text style={styles.sectionLabel}>What is your fitness goal?</Text>
         <View style={styles.selectionContainer}>
           {goals.map((goal) => (
@@ -64,7 +64,7 @@ const OnboardingLevelScreen: React.FC<Props> = ({ navigation, route }) => {
           ))}
         </View>
 
-        {/* --- LEVEL SECTION --- */}
+        {/* LEVEL SECTION */}
         <Text style={styles.sectionLabel}>What is your level?</Text>
         <View style={styles.selectionContainer}>
           {levels.map((level) => (
@@ -112,7 +112,11 @@ const OnboardingLevelScreen: React.FC<Props> = ({ navigation, route }) => {
 };
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#fff", paddingHorizontal: 20 },
+  container: {
+    flex: 1,
+    backgroundColor: "#fff",
+    paddingHorizontal: 20,
+  },
   headerTitle: {
     fontSize: 24,
     fontWeight: "bold",
@@ -128,7 +132,10 @@ const styles = StyleSheet.create({
     marginTop: 20,
     marginBottom: 15,
   },
-  selectionContainer: { width: "100%", marginBottom: 10 },
+  selectionContainer: {
+    width: "100%",
+    marginBottom: 10,
+  },
   levelButton: {
     backgroundColor: "#f5f5f5",
     paddingVertical: 15,
@@ -136,9 +143,17 @@ const styles = StyleSheet.create({
     alignItems: "center",
     marginBottom: 10,
   },
-  levelSelected: { backgroundColor: "#7b68ee" },
-  levelText: { fontSize: 16, color: "#333" },
-  levelTextSelected: { color: "#fff", fontWeight: "bold" },
+  levelSelected: {
+    backgroundColor: "#7b68ee",
+  },
+  levelText: {
+    fontSize: 16,
+    color: "#333",
+  },
+  levelTextSelected: {
+    color: "#fff",
+    fontWeight: "bold",
+  },
   chip: {
     backgroundColor: "#f5f5f5",
     paddingVertical: 12,
@@ -148,9 +163,18 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "#eee",
   },
-  chipSelected: { backgroundColor: "#7b68ee", borderColor: "#7b68ee" },
-  chipText: { color: "#333", textAlign: "center" },
-  chipTextSelected: { color: "#fff", fontWeight: "bold" },
+  chipSelected: {
+    backgroundColor: "#7b68ee",
+    borderColor: "#7b68ee",
+  },
+  chipText: {
+    color: "#333",
+    textAlign: "center",
+  },
+  chipTextSelected: {
+    color: "#fff",
+    fontWeight: "bold",
+  },
   navRow: {
     flexDirection: "row",
     justifyContent: "space-between",
@@ -166,7 +190,11 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
   },
-  navBtnText: { fontSize: 18, color: "#7b68ee", fontWeight: "bold" },
+  navBtnText: {
+    fontSize: 18,
+    color: "#7b68ee",
+    fontWeight: "bold",
+  },
 });
 
 export default OnboardingLevelScreen;

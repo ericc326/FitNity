@@ -1,4 +1,3 @@
-import React from "react";
 import { createMaterialTopTabNavigator } from "@react-navigation/material-top-tabs";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import ChallengesTab from "../screens/challenges/ChallengesTab";

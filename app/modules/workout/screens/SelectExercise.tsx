@@ -39,7 +39,6 @@ const SelectExercise = ({ navigation }: Props) => {
   ); // id of selected exercise
   const [exerciseData, setExerciseData] = useState<any[]>([]);
   const [filteredExercises, setFilteredExercises] = useState<any[]>([]);
-  const [bodyParts, setBodyParts] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
   const [isFilterVisible, setIsFilterVisible] = useState(false);
 
@@ -104,7 +103,7 @@ const SelectExercise = ({ navigation }: Props) => {
   useEffect(() => {
     let filtered = exerciseData;
 
-    // 1. Filter by Body Part
+    // Filter by Body Part
     if (selectedBodyPart && selectedBodyPart !== "All") {
       filtered = filtered.filter((ex: any) => {
         const parts = Array.isArray(ex.bodyParts)
@@ -116,7 +115,7 @@ const SelectExercise = ({ navigation }: Props) => {
       });
     }
 
-    // 2. Filter by Equipment
+    // Filter by Equipment
     if (selectedEquipment && selectedEquipment !== "All") {
       filtered = filtered.filter((ex: any) => {
         const equips = Array.isArray(ex.equipments)
@@ -128,7 +127,7 @@ const SelectExercise = ({ navigation }: Props) => {
       });
     }
 
-    // 3. Filter by Search Text
+    // Filter by Search Text
     if (searchText.trim()) {
       filtered = filtered.filter((ex: any) =>
         ex.name?.toLowerCase().includes(searchText.toLowerCase())
@@ -431,13 +430,37 @@ const SelectExercise = ({ navigation }: Props) => {
 };
 
 const styles = StyleSheet.create({
-  safeArea: { flex: 1, backgroundColor: "#262135" },
-  container: { flex: 1, backgroundColor: "#262135" },
-  headerBlock: { paddingHorizontal: 20, paddingTop: 12, paddingBottom: 10 },
-  headerRow: { flexDirection: "row", alignItems: "center", marginBottom: 12 },
-  backButton: { paddingRight: 12, paddingVertical: 4 },
-  title: { fontSize: 24, fontWeight: "bold", color: "white" },
-  searchRow: { flexDirection: "row", alignItems: "center" },
+  safeArea: {
+    flex: 1,
+    backgroundColor: "#262135",
+  },
+  container: {
+    flex: 1,
+    backgroundColor: "#262135",
+  },
+  headerBlock: {
+    paddingHorizontal: 20,
+    paddingTop: 12,
+    paddingBottom: 10,
+  },
+  headerRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 12,
+  },
+  backButton: {
+    paddingRight: 12,
+    paddingVertical: 4,
+  },
+  title: {
+    fontSize: 24,
+    fontWeight: "bold",
+    color: "white",
+  },
+  searchRow: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
   searchContainer: {
     flex: 1,
     flexDirection: "row",
@@ -448,7 +471,11 @@ const styles = StyleSheet.create({
     height: 50,
   },
   searchIcon: { marginRight: 10 },
-  searchInput: { flex: 1, color: "white", fontSize: 16 },
+  searchInput: {
+    flex: 1,
+    color: "white",
+    fontSize: 16,
+  },
   filterIconButton: {
     marginLeft: 12,
     backgroundColor: "#1E1E2D",
@@ -477,9 +504,20 @@ const styles = StyleSheet.create({
     overflow: "hidden",
     marginRight: 16,
   },
-  exerciseImage: { width: "100%", height: "100%" },
-  exerciseText: { fontSize: 16, color: "white", fontWeight: "600" },
-  categoryText: { fontSize: 12, color: "#8E8E9E", marginTop: 4 },
+  exerciseImage: {
+    width: "100%",
+    height: "100%",
+  },
+  exerciseText: {
+    fontSize: 16,
+    color: "white",
+    fontWeight: "600",
+  },
+  categoryText: {
+    fontSize: 12,
+    color: "#8E8E9E",
+    marginTop: 4,
+  },
   selectedExercise: {
     backgroundColor: "#2A2A3A",
     borderColor: "#5A3BFF",
@@ -491,8 +529,6 @@ const styles = StyleSheet.create({
     marginTop: 40,
     fontSize: 16,
   },
-
-  /* MODAL STYLES */
   modalOverlay: {
     flex: 1,
     backgroundColor: "rgba(0,0,0,0.7)",
@@ -510,7 +546,11 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     marginBottom: 20,
   },
-  modalTitle: { color: "white", fontSize: 20, fontWeight: "bold" },
+  modalTitle: {
+    color: "white",
+    fontSize: 20,
+    fontWeight: "bold",
+  },
   filterLabel: {
     color: "#8E8E9E",
     fontSize: 14,
@@ -518,7 +558,10 @@ const styles = StyleSheet.create({
     textTransform: "uppercase",
     letterSpacing: 1,
   },
-  chipContainer: { flexDirection: "row", flexWrap: "wrap" },
+  chipContainer: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+  },
   chip: {
     backgroundColor: "#1E1E2D",
     paddingHorizontal: 16,
@@ -529,9 +572,15 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "#333",
   },
-  activeChip: { backgroundColor: "#5A3BFF", borderColor: "#5A3BFF" },
+  activeChip: {
+    backgroundColor: "#5A3BFF",
+    borderColor: "#5A3BFF",
+  },
   chipText: { color: "#aaa", fontSize: 14 },
-  activeChipText: { color: "white", fontWeight: "bold" },
+  activeChipText: {
+    color: "white",
+    fontWeight: "bold",
+  },
   applyButton: {
     backgroundColor: "#5A3BFF",
     padding: 16,
@@ -539,16 +588,29 @@ const styles = StyleSheet.create({
     alignItems: "center",
     marginTop: 24,
   },
-  applyButtonText: { color: "white", fontSize: 16, fontWeight: "bold" },
+  applyButtonText: {
+    color: "white",
+    fontSize: 16,
+    fontWeight: "bold",
+  },
 
-  fixedAddContainer: { position: "absolute", bottom: 20, left: 20, right: 20 },
+  fixedAddContainer: {
+    position: "absolute",
+    bottom: 20,
+    left: 20,
+    right: 20,
+  },
   addButton: {
     backgroundColor: "#5A3BFF",
     padding: 16,
     borderRadius: 12,
     alignItems: "center",
   },
-  addButtonText: { color: "white", fontSize: 16, fontWeight: "bold" },
+  addButtonText: {
+    color: "white",
+    fontSize: 16,
+    fontWeight: "bold",
+  },
 });
 
 export default SelectExercise;
