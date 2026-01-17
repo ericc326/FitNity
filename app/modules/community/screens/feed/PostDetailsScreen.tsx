@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import { useState, useEffect } from "react";
 import {
   View,
   Text,
@@ -570,7 +570,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   actionButton: {
-    marginLeft: 12, // Space between edit and delete icons
+    marginLeft: 12,
   },
   editContainer: {
     marginTop: 8,

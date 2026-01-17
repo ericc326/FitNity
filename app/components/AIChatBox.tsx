@@ -381,7 +381,7 @@ Never give medical diagnoses; recommend consulting a healthcare professional for
 
     const showSub = Keyboard.addListener(showEvent, onKeyboardShow);
     const hideSub = Keyboard.addListener(hideEvent, () => {
-      /* noop for now - kept to remove subscription properly */
+      /* no-op for now - kept to remove subscription properly */
     });
 
     return () => {
@@ -454,7 +454,7 @@ Never give medical diagnoses; recommend consulting a healthcare professional for
                 contentContainerStyle={{ paddingVertical: 10, flexGrow: 1 }}
                 keyboardShouldPersistTaps="handled"
               >
-                {/* ...existing messages rendering and suggest button ... */}
+                {/* existing messages rendering and suggest button */}
                 {messages.length === 0 && (
                   <Text style={styles.message}>
                     Hi! Ask me anything about fitness and health.
@@ -539,7 +539,6 @@ Never give medical diagnoses; recommend consulting a healthcare professional for
 };
 
 const styles = StyleSheet.create({
-  // Modal styles
   modalOverlay: {
     flex: 1,
     backgroundColor: "rgba(30, 30, 46, 0.7)",
@@ -560,7 +559,6 @@ const styles = StyleSheet.create({
     elevation: 10,
     justifyContent: "space-between",
   },
-  // Header styles
   header: {
     flexDirection: "row",
     justifyContent: "space-between",
@@ -576,7 +574,6 @@ const styles = StyleSheet.create({
     fontSize: 20,
     color: "#999",
   },
-  // Chat content styles
   chatContent: {
     flex: 1,
   },
@@ -644,7 +641,6 @@ const styles = StyleSheet.create({
     alignItems: "center",
     marginVertical: 12,
   },
-  // Input area styles
   inputContainer: {
     flexDirection: "row",
     alignItems: "center",

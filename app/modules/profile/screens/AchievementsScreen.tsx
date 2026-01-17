@@ -1,11 +1,10 @@
-import React, { useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import {
   View,
   Text,
   StyleSheet,
   FlatList,
   TouchableOpacity,
-  Image,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
@@ -62,7 +61,6 @@ const AchievementsScreen = () => {
     return (
       <View style={styles.badgeCard}>
         <View style={styles.iconContainer}>
-          {/*  */}
           <MaterialCommunityIcons
             name={(item.icon as any) || "trophy"}
             size={40}

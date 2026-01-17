@@ -9,4 +9,5 @@ declare module "@env" {
   export const GEMINI_API_KEY: string;
   export const OPENAI_API_KEY: string;
   export const SPOONACULAR_API_KEY: string;
+  export const POSETRACKER_API_KEY: string;
 }

@@ -26,9 +26,7 @@ const WorkoutNavigator: React.FC = () => {
   const route =
     useRoute<RouteProp<Record<string, { resetToMain?: boolean }>, string>>();
 
-  /**
-   * Automatically reset navigation to WorkoutMain if resetToMain param is passed
-   */
+  //Automatically reset navigation to WorkoutMain if resetToMain param is passed
   useEffect(() => {
     if (route.params?.resetToMain) {
       navigation.reset({

@@ -1,4 +1,4 @@
-import React, {
+import {
   createContext,
   ReactNode,
   useContext,
@@ -16,7 +16,7 @@ import {
   setDoc,
   addDoc,
   deleteDoc,
-  updateDoc, // Ensure updateDoc is imported
+  updateDoc,
 } from "firebase/firestore";
 
 /* ===================== TYPES ===================== */
@@ -105,7 +105,7 @@ export const MealPlanProvider = ({ children }: { children: ReactNode }) => {
   const [healthInfo, setHealthInfo] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(true);
 
-  // 1. EFFECT: Auth State Listener
+  // Auth State Listener
   useEffect(() => {
     const unsubscribe = auth.onAuthStateChanged((user) => {
       if (!user) {
@@ -120,7 +120,7 @@ export const MealPlanProvider = ({ children }: { children: ReactNode }) => {
     return () => unsubscribe();
   }, []);
 
-  // 2. EFFECT: Health Info Listener
+  // Health Info Listener
   useEffect(() => {
     if (!auth.currentUser) {
       setHealthInfo(null);
@@ -145,7 +145,7 @@ export const MealPlanProvider = ({ children }: { children: ReactNode }) => {
     return () => unsubscribe();
   }, [auth.currentUser]);
 
-  // 3. EFFECT: Diet Info Listener
+  // Diet Info Listener
   useEffect(() => {
     if (!auth.currentUser) {
       setDietInfo(null);
@@ -175,7 +175,7 @@ export const MealPlanProvider = ({ children }: { children: ReactNode }) => {
     return () => unsubscribe();
   }, [auth.currentUser]);
 
-  // 4. EFFECT: Meals Listener
+  // Meals Listener
   useEffect(() => {
     if (!auth.currentUser) {
       setMeals(createDefaultMeals());
@@ -210,23 +210,21 @@ export const MealPlanProvider = ({ children }: { children: ReactNode }) => {
     return () => unsubscribe();
   }, [selectedDate, auth.currentUser]);
 
-  /* ===================== ACTIONS ===================== */
-
   const changeDate = (date: string) => {
     setSelectedDate(date);
   };
 
-  // --- Updated updateMeal (Combines foods instead of replacing) ---
+  // Updated updateMeal (Combines foods instead of replacing)
   const updateMeal = async (mealType: string, newFood: FoodItem) => {
     if (!auth.currentUser) return;
 
-    // 1. Find the current meal in our local state to see if it already has food
+    // Find the current meal in our local state to see if it already has food
     const existingMeal = meals.find((m) => m.id === mealType);
 
-    // 2. Prepare the data to save
+    // Prepare the data to save
     let finalFood = newFood;
 
-    // 3. COMBINE LOGIC: If food already exists, merge them!
+    // Combine logic: If food already exists, merge them
     if (existingMeal && existingMeal.hasFood && existingMeal.food) {
       const current = existingMeal.food;
 
@@ -243,7 +241,7 @@ export const MealPlanProvider = ({ children }: { children: ReactNode }) => {
       };
     }
 
-    // 4. Save to Firebase (Same logic as before, just using finalFood)
+    // Save to Firebase (Same logic as before, just using finalFood)
     const mealsRef = collection(db, "users", auth.currentUser.uid, "meals");
 
     if (existingMeal?.docId) {
@@ -252,7 +250,7 @@ export const MealPlanProvider = ({ children }: { children: ReactNode }) => {
         {
           date: selectedDate,
           mealType,
-          food: finalFood, // <--- Saving the merged object
+          food: finalFood,
           updatedAt: serverTimestamp(),
         },
         { merge: true }
@@ -267,7 +265,7 @@ export const MealPlanProvider = ({ children }: { children: ReactNode }) => {
     }
   };
 
-  // --- NEW: Edit Meal Function (Updates Firebase) ---
+  // Edit Meal Function (Updates Firebase)
   const editMeal = async (
     mealId: string,
     name: string,
@@ -283,12 +281,11 @@ export const MealPlanProvider = ({ children }: { children: ReactNode }) => {
       // Find the specific meal in current state to get its docId
       const targetMeal = meals.find((m) => m.id === mealId);
 
-      // We can only edit if it already exists in Firebase (has a docId)
+      // Edit if it already exists in Firebase (has a docId)
       if (targetMeal && targetMeal.docId && targetMeal.food) {
         const mealDocRef = doc(db, "users", uid, "meals", targetMeal.docId);
 
         // Update the 'food' object inside the document
-        // We preserve the original food ID and category, just updating values
         await updateDoc(mealDocRef, {
           food: {
             ...targetMeal.food,
@@ -299,8 +296,6 @@ export const MealPlanProvider = ({ children }: { children: ReactNode }) => {
             fat,
           },
         });
-        // Note: We don't need to setMeals() here because the Snapshot Listener (Effect #4)
-        // will automatically detect the change in Firebase and update the UI.
       } else {
         console.warn("Cannot edit meal: No Document ID found.");
       }
@@ -386,7 +381,7 @@ export const MealPlanProvider = ({ children }: { children: ReactNode }) => {
         updateMeal,
         removeMeal,
         addCustomMeal,
-        editMeal, // <--- ADDED HERE so it is exposed to components
+        editMeal,
         getTotalNutrition,
         saveDietInfo,
       }}

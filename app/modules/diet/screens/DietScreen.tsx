@@ -1,6 +1,6 @@
 import AIFoodRecommendation from "../component/AiFoodRecommendation";
 import { useMealPlan } from "../component/MealPlanContext";
-import React, { useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 
 import { GEMINI_API_KEY, SPOONACULAR_API_KEY } from "@env";
 import {
@@ -75,7 +75,6 @@ const MealsScreen = () => {
   // Define available meal types for selection
   const mealTypes = ["breakfast", "lunch", "dinner", "snacks"];
 
-  // This automatically becomes true if dietInfo exists and has calories
   const hasCompletedSetup = !!(dietInfo && dietInfo.targetCalories);
 
   useEffect(() => {
@@ -84,23 +83,22 @@ const MealsScreen = () => {
 
   const totalNutrition = getTotalNutrition();
 
-  // Initialize Date
   useEffect(() => {
     const todayString = new Date().toISOString().split("T")[0];
     changeDate(todayString);
   }, []);
 
   const handleSelectFood = (food: any) => {
-    // Case 1: We already know the meal (User clicked specific + button)
+    // Case 1: Know the meal (User clicked specific + button)
     if (selectedMealId) {
       updateMeal(selectedMealId, food);
       setShowAIRecommendations(false);
       setSelectedMealId(null);
       return;
     }
-    // 2. If we DON'T know the meal (User clicked Bulb), show the selector
+    // 2. DON'T know the meal (User clicked Bulb), show the selector
     setPendingFood(food);
-    setSelectionVisible(true); // Open the "Dropdown" list
+    setSelectionVisible(true);
   };
 
   const handleRemoveMeal = (mealId: string) => {
@@ -130,7 +128,6 @@ const MealsScreen = () => {
     setShowEditModal(true);
   };
 
-  // Save the changes
   const handleSaveEdit = () => {
     if (!editingMealId) return;
 
@@ -193,9 +190,6 @@ const MealsScreen = () => {
       const remainingCalories = Math.max(target - totalNutrition.calories, 600);
       const maxCalories = remainingCalories;
 
-      // --- FIX IS HERE ---
-      // Added: &addRecipeNutrition=true
-      // This tells API to send Carbs and Fat data too!
       const url = `https://api.spoonacular.com/recipes/complexSearch?apiKey=${SPOONACULAR_API_KEY}&number=6&minProtein=10&maxCalories=${maxCalories}&addRecipeInformation=true&addRecipeNutrition=true&fillIngredients=true&instructionsRequired=true`;
 
       console.log("Fetching URL:", url);
@@ -222,12 +216,7 @@ const MealsScreen = () => {
   }, [isLoading, dietInfo, totalNutrition.calories]);
 
   const handleAIRecommendations = () => {
-    // If setup is not complete, we might still want to show the modal
-    // to let the AI help set them up, or redirect them.
-    // Based on your UI text "Complete Setup", users expect an action here.
     if (!hasCompletedSetup) {
-      // You can either open the AI to help them setup, or navigate to a setup screen.
-      // For now, I'll keep your original logic which opens the modal:
       setSelectedMealId(null);
       setShowAIRecommendations(true);
       return;
@@ -242,7 +231,6 @@ const MealsScreen = () => {
     setShowAIRecommendations(true);
   };
 
-  // Helper for rendering a single meal row
   // Helper for rendering a single meal row
   const MealItem = ({ meal }: { meal: any }) => (
     <View style={styles.mealItem}>
@@ -274,7 +262,7 @@ const MealsScreen = () => {
       {meal.food ? (
         <TouchableOpacity
           style={styles.foodInfo}
-          onPress={() => handleOpenEdit(meal)} // <--- CLICK TO EDIT
+          onPress={() => handleOpenEdit(meal)}
         >
           <View
             style={{
@@ -607,7 +595,7 @@ const MealsScreen = () => {
           </View>
 
           <ScrollView style={styles.modalContent}>
-            {/* NEW: Meal Type Selector */}
+            {/* Meal Type Selector */}
             <View style={styles.inputGroup}>
               <Text style={styles.inputLabel}>Select Meal Time</Text>
               <View style={styles.mealTypeContainer}>
@@ -1321,7 +1309,6 @@ const styles = StyleSheet.create({
     fontWeight: "bold",
     fontSize: 16,
   },
-  // NEW STYLES for Meal Selector
   mealTypeContainer: {
     flexDirection: "row",
     flexWrap: "wrap",

@@ -1,5 +1,4 @@
-// WorkoutScreen.tsx
-import React, { useState, useEffect } from "react";
+import { useState, useEffect } from "react";
 import {
   View,
   Text,
@@ -11,7 +10,6 @@ import {
   FlatList,
   Dimensions,
   ActivityIndicator,
-  SafeAreaView,
   Modal,
 } from "react-native";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
@@ -21,6 +19,7 @@ import { WorkoutStackParamList } from "../navigation/WorkoutNavigator";
 import { collection, getDocs, query, orderBy } from "firebase/firestore";
 import { db, auth } from "../../../../firebaseConfig";
 import { LineChart } from "react-native-chart-kit";
+import { SafeAreaView } from "react-native-safe-area-context";
 
 const { width } = Dimensions.get("window");
 
@@ -195,7 +194,6 @@ const WorkoutScreen = () => {
 
       <View style={styles.textContainer}>
         <Text style={styles.exerciseName}>{item.name}</Text>
-        {/* UPDATED: Now shows Body Parts and Equipment exactly like SelectExercise */}
         <Text style={styles.exerciseMeta}>
           {item.bodyParts?.join(", ") || "Body"} |{" "}
           {item.equipments?.join(", ") || "No Equipment"}
@@ -203,7 +201,8 @@ const WorkoutScreen = () => {
       </View>
     </TouchableOpacity>
   );
-  /* ===================== PROGRESS CHART LOGIC ===================== */
+
+  //PROGRESS CHART LOGIC
   const renderProgressChart = () => {
     // Only show if we have data to display
     if (dynamicProgress.length === 0) return null;
@@ -551,7 +550,11 @@ const WorkoutScreen = () => {
 };
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#262135", paddingTop: 60 },
+  container: {
+    flex: 1,
+    backgroundColor: "#262135",
+    paddingTop: 60,
+  },
   tabContainer: {
     flexDirection: "row",
     marginHorizontal: 20,
@@ -560,11 +563,26 @@ const styles = StyleSheet.create({
     overflow: "hidden",
     backgroundColor: "#2a2a3a",
   },
-  tabButton: { flex: 1, paddingVertical: 15, alignItems: "center" },
+  tabButton: {
+    flex: 1,
+    paddingVertical: 15,
+    alignItems: "center",
+  },
   activeTab: { backgroundColor: "#5A3BFF" },
-  tabText: { color: "white", fontWeight: "bold", fontSize: 16 },
-  headerBlock: { marginHorizontal: 20, marginBottom: 15 },
-  searchRow: { flexDirection: "row", alignItems: "center", gap: 10 },
+  tabText: {
+    color: "white",
+    fontWeight: "bold",
+    fontSize: 16,
+  },
+  headerBlock: {
+    marginHorizontal: 20,
+    marginBottom: 15,
+  },
+  searchRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+  },
   searchContainer: {
     flex: 1,
     flexDirection: "row",
@@ -575,7 +593,11 @@ const styles = StyleSheet.create({
     height: 50,
   },
   searchIcon: { marginRight: 8 },
-  searchInput: { flex: 1, color: "white", fontSize: 16 },
+  searchInput: {
+    flex: 1,
+    color: "white",
+    fontSize: 16,
+  },
   filterIconButton: {
     backgroundColor: "#1E1E2D",
     padding: 10,
@@ -602,7 +624,10 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: "bold",
   },
-  exerciseList: { paddingHorizontal: 20, paddingBottom: 20 },
+  exerciseList: {
+    paddingHorizontal: 20,
+    paddingBottom: 20,
+  },
   exerciseItem: {
     flexDirection: "row",
     alignItems: "center",
@@ -618,12 +643,31 @@ const styles = StyleSheet.create({
     overflow: "hidden",
     marginRight: 15,
   },
-  exerciseImage: { width: "100%", height: "100%" },
+  exerciseImage: {
+    width: "100%",
+    height: "100%",
+  },
   textContainer: { flex: 1 },
-  exerciseName: { color: "white", fontSize: 18, fontWeight: "bold" },
-  exerciseMeta: { color: "#aaa", fontSize: 12, marginTop: 2 },
-  backButton: { flexDirection: "row", alignItems: "center", padding: 20 },
-  backText: { color: "white", marginLeft: 10, fontSize: 16 },
+  exerciseName: {
+    color: "white",
+    fontSize: 18,
+    fontWeight: "bold",
+  },
+  exerciseMeta: {
+    color: "#aaa",
+    fontSize: 12,
+    marginTop: 2,
+  },
+  backButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    padding: 20,
+  },
+  backText: {
+    color: "white",
+    marginLeft: 10,
+    fontSize: 16,
+  },
   exerciseTitle: {
     color: "white",
     fontSize: 24,
@@ -646,7 +690,11 @@ const styles = StyleSheet.create({
     marginTop: 20,
     marginBottom: 10,
   },
-  descriptionText: { color: "#aaa", marginHorizontal: 20, lineHeight: 22 },
+  descriptionText: {
+    color: "#aaa",
+    marginHorizontal: 20,
+    lineHeight: 22,
+  },
   emptyStateText: {
     color: "#888",
     textAlign: "center",
@@ -661,7 +709,10 @@ const styles = StyleSheet.create({
     marginLeft: 20,
     marginBottom: 15,
   },
-  progressTable: { minWidth: width - 30, paddingHorizontal: 15 },
+  progressTable: {
+    minWidth: width - 30,
+    paddingHorizontal: 15,
+  },
   progressHeaderRow: {
     flexDirection: "row",
     backgroundColor: "#2a2a3a",
@@ -682,9 +733,21 @@ const styles = StyleSheet.create({
     textAlign: "center",
     fontSize: 12,
   },
-  cell: { flex: 1, color: "white", textAlign: "center", fontSize: 12 },
-  growthCell: { color: "#4CAF50", fontWeight: "bold" },
-  chartContainer: { marginHorizontal: 20, marginTop: 10, alignItems: "center" },
+  cell: {
+    flex: 1,
+    color: "white",
+    textAlign: "center",
+    fontSize: 12,
+  },
+  growthCell: {
+    color: "#4CAF50",
+    fontWeight: "bold",
+  },
+  chartContainer: {
+    marginHorizontal: 20,
+    marginTop: 10,
+    alignItems: "center",
+  },
   chartTitle: {
     color: "white",
     fontSize: 18,
@@ -692,8 +755,6 @@ const styles = StyleSheet.create({
     alignSelf: "flex-start",
     marginBottom: 10,
   },
-
-  /* MODAL STYLES (MATCHING SELECT EXERCISE) */
   modalOverlay: {
     flex: 1,
     backgroundColor: "rgba(0,0,0,0.8)",
@@ -711,7 +772,11 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     marginBottom: 20,
   },
-  modalTitle: { color: "white", fontSize: 20, fontWeight: "bold" },
+  modalTitle: {
+    color: "white",
+    fontSize: 20,
+    fontWeight: "bold",
+  },
   filterLabel: {
     color: "#8E8E9E",
     fontSize: 12,
@@ -719,7 +784,11 @@ const styles = StyleSheet.create({
     marginBottom: 10,
     textTransform: "uppercase",
   },
-  chipContainer: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
+  chipContainer: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+  },
   chip: {
     backgroundColor: "#1E1E2D",
     paddingHorizontal: 14,
@@ -728,9 +797,18 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "#333",
   },
-  activeChip: { backgroundColor: "#5A3BFF", borderColor: "#5A3BFF" },
-  chipText: { color: "#aaa", fontSize: 13 },
-  activeChipText: { color: "white", fontWeight: "bold" },
+  activeChip: {
+    backgroundColor: "#5A3BFF",
+    borderColor: "#5A3BFF",
+  },
+  chipText: {
+    color: "#aaa",
+    fontSize: 13,
+  },
+  activeChipText: {
+    color: "white",
+    fontWeight: "bold",
+  },
   applyButton: {
     backgroundColor: "#5A3BFF",
     padding: 16,
@@ -738,11 +816,15 @@ const styles = StyleSheet.create({
     alignItems: "center",
     marginTop: 25,
   },
-  applyButtonText: { color: "white", fontWeight: "bold", fontSize: 16 },
+  applyButtonText: {
+    color: "white",
+    fontWeight: "bold",
+    fontSize: 16,
+  },
 
   metaBadge: {
     flexDirection: "row",
-    backgroundColor: "#35354a", // Lighter than background
+    backgroundColor: "#35354a",
     paddingHorizontal: 12,
     paddingVertical: 8,
     borderRadius: 8,
@@ -765,12 +847,12 @@ const styles = StyleSheet.create({
     textTransform: "capitalize",
   },
   instructionsContainer: {
-    backgroundColor: "#1E1E2D", // Card background for instructions
+    backgroundColor: "#1E1E2D",
     borderTopLeftRadius: 30,
     borderTopRightRadius: 30,
     padding: 25,
     marginTop: 10,
-    minHeight: 400, // Ensure it fills bottom
+    minHeight: 400,
   },
   instructionRow: {
     flexDirection: "row",
@@ -784,7 +866,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
     marginRight: 15,
-    marginTop: 2, // Align with top of text
+    marginTop: 2,
   },
   stepNumber: {
     color: "white",
@@ -795,9 +877,9 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   instructionText: {
-    color: "#E0E0E0", // Brighter text for readability
+    color: "#E0E0E0",
     fontSize: 15,
-    lineHeight: 24, // Better spacing between lines
+    lineHeight: 24,
   },
 });
 

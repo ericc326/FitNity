@@ -21,7 +21,6 @@ interface FoodItem {
   carbs: number;
   fat: number;
   category: string;
-  // NEW FIELDS
   ingredients?: string[];
   instructions?: string[];
 }
@@ -31,11 +30,6 @@ class GeminiService {
   private model: any = null;
   private apiKey: string | null = null;
 
-  constructor() {
-    // Don't initialize with a placeholder key
-    // The API key will be set when needed
-  }
-
   setApiKey(apiKey: string) {
     if (!apiKey || apiKey.trim() === "") {
       throw new Error("API key is required");
@@ -43,7 +37,6 @@ class GeminiService {
 
     this.apiKey = apiKey.trim();
     this.genAI = new GoogleGenerativeAI(this.apiKey);
-    // Use gemini-1.5-flash for faster, cheaper inference, or pro for better quality
     this.model = this.genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
   }
 

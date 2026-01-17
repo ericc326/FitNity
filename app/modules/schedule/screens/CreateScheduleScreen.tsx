@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useMemo } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import {
   View,
   Text,
@@ -123,7 +123,7 @@ const CreateScheduleScreen = ({ navigation, route }: Props) => {
     const currentUser = auth.currentUser;
     if (!currentUser) return;
 
-    setIsSuggesting(true); // Shows the LoadingIndicator
+    setIsSuggesting(true);
     try {
       const suggestion = await suggestOptimalTime(
         currentUser.uid,
@@ -155,7 +155,7 @@ const CreateScheduleScreen = ({ navigation, route }: Props) => {
       console.error("Suggestion Error:", error);
       Alert.alert("Error", "Could not analyze schedule availability.");
     } finally {
-      setIsSuggesting(false); // Hides the LoadingIndicator
+      setIsSuggesting(false);
     }
   };
 
@@ -208,7 +208,7 @@ const CreateScheduleScreen = ({ navigation, route }: Props) => {
 
         Alert.alert("Time Conflict", errorMessage, alertButtons);
         setLoading(false);
-        return; // STOP saving
+        return;
       }
 
       // Reference to the user's specific 'schedules' subcollection
@@ -244,7 +244,7 @@ const CreateScheduleScreen = ({ navigation, route }: Props) => {
         weightLifted: customWeight || "Bodyweight",
         customRestSeconds: customRestSec ?? undefined,
         customLabel: customLabel ?? undefined,
-        notificationId: notificationId ?? null, // store so you can cancel/update later
+        notificationId: notificationId ?? null, // store so can cancel/update later
       };
 
       await addDoc(userSchedulesRef, newScheduleData);
@@ -297,7 +297,7 @@ const CreateScheduleScreen = ({ navigation, route }: Props) => {
             placeholderTextColor="#aaa"
             value={title}
             onChangeText={setTitle}
-            editable={!loading} // Disable while saving
+            editable={!loading}
           />
 
           {/* DatePicker Component */}
@@ -368,7 +368,7 @@ const CreateScheduleScreen = ({ navigation, route }: Props) => {
             </>
           )}
 
-          {/* DURATION SELECTOR */}
+          {/* Duration Selector */}
           <Text style={styles.label}>Duration (minutes)</Text>
           <View style={styles.durationContainer}>
             {[30, 45, 60, 75, 90].map((mins) => (

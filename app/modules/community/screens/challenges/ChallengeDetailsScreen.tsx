@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import { useState, useEffect } from "react";
 import {
   View,
   Text,
@@ -112,7 +112,7 @@ const ProgressModal = ({
               step={1}
               value={localProgress}
               onValueChange={(val) => {
-                // --- INTEGRITY CHECK UI ---
+                // INTEGRITY CHECK UI
                 if (val > maxAllowed) {
                   // Snap back to max allowed
                   setLocalProgress(maxAllowed);
@@ -286,7 +286,7 @@ const WorkoutSessionModal = ({
   );
 };
 
-// --- MAIN SCREEN ---
+// MAIN SCREEN
 const ChallengeDetailsScreen = ({ route, navigation }: Props) => {
   const { challenge } = route.params;
   const [isParticipant, setIsParticipant] = useState(false);
@@ -305,7 +305,7 @@ const ChallengeDetailsScreen = ({ route, navigation }: Props) => {
   const [refreshing, setRefreshing] = useState(false);
   const [currentChallenge, setCurrentChallenge] = useState(challenge);
 
-  // --- DATA INTEGRITY STATES ---
+  // DATA INTEGRITY STATES
   const [maxAllowedProgress, setMaxAllowedProgress] = useState(100);
   const [participantJoinDate, setParticipantJoinDate] = useState<Date | null>(
     null
@@ -341,7 +341,7 @@ const ChallengeDetailsScreen = ({ route, navigation }: Props) => {
     fetchExerciseDetails(currentChallenge);
   }, [currentChallenge]);
 
-  // --- INTEGRITY LOGIC: CALCULATE MAX ALLOWED PROGRESS ---
+  // INTEGRITY LOGIC: CALCULATE MAX ALLOWED PROGRESS
   useEffect(() => {
     // If challenge is 1 day or less, no restriction needed (or user allows instant finish)
     if (currentChallenge.duration <= 1) {
@@ -445,7 +445,7 @@ const ChallengeDetailsScreen = ({ route, navigation }: Props) => {
             joinedAtVal = serverTimestamp();
           }
 
-          // --- CAPTURE CURRENT USER JOIN DATE FOR INTEGRITY CHECK ---
+          // CAPTURE CURRENT USER JOIN DATE FOR INTEGRITY CHECK
           if (currentUser && participantId === currentUser.uid) {
             if (joinedAtVal && joinedAtVal.toDate) {
               setParticipantJoinDate(joinedAtVal.toDate());
@@ -670,7 +670,7 @@ const ChallengeDetailsScreen = ({ route, navigation }: Props) => {
         return;
       }
 
-      // --- SERVER-SIDE/LOGIC INTEGRITY CHECK ---
+      // ERVER-SIDE/LOGIC INTEGRITY CHECK
       // Even if user bypassed UI, check math here before writing
       if (participantJoinDate && currentChallenge.duration > 1) {
         const now = new Date();
@@ -781,7 +781,7 @@ const ChallengeDetailsScreen = ({ route, navigation }: Props) => {
                 : fallbackImage
             }
             style={styles.image}
-            // 3. Add Load Handlers
+            // Add Load Handlers
             onLoadStart={() => {
               if (currentChallenge.imageUrl) setIsImageLoading(true);
             }}
@@ -789,7 +789,7 @@ const ChallengeDetailsScreen = ({ route, navigation }: Props) => {
             onError={() => setIsImageLoading(false)}
           />
 
-          {/* 4. The Loading Overlay */}
+          {/* The Loading Overlay */}
           {isImageLoading && (
             <View style={styles.imageLoadingOverlay}>
               <LoadingIndicator size="large" color="#fff" />
@@ -1131,7 +1131,7 @@ const styles = StyleSheet.create({
     height: 200,
   },
   imageWrapper: {
-    position: "relative", // Needed for absolute positioning of loader
+    position: "relative",
   },
   imageLoadingOverlay: {
     position: "absolute",
@@ -1141,7 +1141,7 @@ const styles = StyleSheet.create({
     bottom: 0,
     justifyContent: "center",
     alignItems: "center",
-    backgroundColor: "rgba(0,0,0,0.3)", // Semi-transparent dimming
+    backgroundColor: "rgba(0,0,0,0.3)",
     zIndex: 1,
   },
   infoContainer: {
@@ -1386,7 +1386,6 @@ const styles = StyleSheet.create({
     fontWeight: "600",
     marginLeft: 8,
   },
-  // Session Modal Styles
   sessionOverlay: {
     flex: 1,
     backgroundColor: "#262135",

@@ -1,4 +1,3 @@
-import React from "react";
 import { NavigatorScreenParams } from "@react-navigation/native";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
@@ -8,8 +7,6 @@ import AuthNavigator, {
   AuthStackParamList,
 } from "../modules/auth/navigation/AuthNavigator";
 import HomeScreen from "../modules/home/screens/HomeScreen";
-import WorkoutScreen from "../modules/workout/screens/WorkoutScreen";
-import DietScreen from "../modules/diet/screens/DietScreen";
 import CommunityScreen from "../modules/community/screens/CommunityScreen";
 import ProfileNavigator from "../modules/profile/navigation/ProfileNavigator";
 import DietNavigator, {
@@ -25,9 +22,9 @@ import AiCoachScreen from "../modules/workout/screens/AiCoachScreen";
 
 // Tab Navigation Types
 export type HomeTabParamList = {
-  Home: undefined; // Home shouldn't have nested navigator params
+  Home: undefined;
   Schedule: NavigatorScreenParams<ScheduleStackParamList>;
-  Workout: NavigatorScreenParams<WorkoutStackParamList>; // Fixed to use WorkoutStackParamList
+  Workout: NavigatorScreenParams<WorkoutStackParamList>;
   Diet: NavigatorScreenParams<DietStackParamList>;
   Community: undefined;
 };

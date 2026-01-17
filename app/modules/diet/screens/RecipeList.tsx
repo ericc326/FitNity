@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import {
   ScrollView,
   TouchableOpacity,
@@ -11,7 +11,6 @@ import {
 import { NativeStackScreenProps } from "@react-navigation/native-stack";
 import { DietStackParamList } from "../navigation/DietNavigator";
 import { SPOONACULAR_API_KEY } from "@env";
-// Added Ionicons for better UI visualization
 import { Ionicons } from "@expo/vector-icons";
 
 // Recipe & Nutrient types
@@ -34,9 +33,6 @@ const RecipeList = ({ navigation }: Props) => {
     const fetchAllRecipes = async () => {
       setLoading(true);
       try {
-        // --- FIXED URL HERE ---
-        // Added: &addRecipeNutrition=true
-        // This ensures Spoonacular sends Fat and Carbs data
         const res = await fetch(
           `https://api.spoonacular.com/recipes/complexSearch?apiKey=${SPOONACULAR_API_KEY}&number=50&minProtein=10&addRecipeInformation=true&addRecipeNutrition=true&fillIngredients=true&instructionsRequired=true`
         );
@@ -54,7 +50,6 @@ const RecipeList = ({ navigation }: Props) => {
 
   // Helper function to extract nutrients cleanly
   const getNutrient = (nutrients: any[], name: string) => {
-    // Note: Spoonacular uses "Carbohydrates", not "Carbs"
     const n = nutrients?.find((item: any) => item.name === name);
     return n ? Math.round(n.amount) : 0;
   };
@@ -117,7 +112,6 @@ const RecipeList = ({ navigation }: Props) => {
           </TouchableOpacity>
         );
       })}
-      {/* Padding at bottom for scrolling */}
       <View style={{ height: 40 }} />
     </ScrollView>
   );
@@ -136,10 +130,10 @@ const styles = StyleSheet.create({
     backgroundColor: "#262135",
   },
   recipeCard: {
-    backgroundColor: "#3C3952", // Slightly lighter than background
+    backgroundColor: "#3C3952",
     borderRadius: 16,
     marginBottom: 16,
-    overflow: "hidden", // Ensures image corners align with card
+    overflow: "hidden",
   },
   recipeImage: {
     width: "100%",
@@ -155,7 +149,6 @@ const styles = StyleSheet.create({
     color: "#fff",
     marginBottom: 10,
   },
-  // New Styles for the Badge layout
   nutritionRow: {
     flexDirection: "row",
     flexWrap: "wrap",
@@ -164,7 +157,7 @@ const styles = StyleSheet.create({
   nutrientBadge: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "rgba(255,255,255,0.1)", // Glassmorphism effect
+    backgroundColor: "rgba(255,255,255,0.1)",
     paddingVertical: 4,
     paddingHorizontal: 8,
     borderRadius: 8,

@@ -27,7 +27,7 @@ export type DietStackParamList = {
   DietHome: undefined;
   FoodDetails: { food: FoodItem };
   FoodScanner: undefined;
-  MealRecipes: { mealType: string }; // Add the new route with params
+  MealRecipes: { mealType: string };
   AiMealPlanner: undefined;
   RecipeList: { recipes: Recipe[]; loading?: boolean };
   RecipeDetail: { recipe: any };

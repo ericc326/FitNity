@@ -18,8 +18,6 @@ export interface SuggestionResult {
   reason: string;
 }
 
-// need modify os that when edit cuirrent time wont cause conflict with itself
-
 /**
  * Optimal workout time suggestion based on fitness level and schedule
  */
@@ -36,7 +34,7 @@ export const suggestOptimalTime = async (
     // Check if target date is today or in the future
     const isToday = targetMoment.isSame(now, "day");
 
-    // 1. Fetch Fitness Level
+    // Fetch Fitness Level
     let fitnessLevel: FitnessLevel = "beginner";
 
     // Read latest health info
@@ -56,10 +54,10 @@ export const suggestOptimalTime = async (
 
     console.log(`Detected fitness level: ${fitnessLevel}`);
 
-    // 2. Define Preferred Time Windows
+    // Define Preferred Time Windows
     const preferredWindows = getPreferredWindows(fitnessLevel);
 
-    // 3. Fetch Existing Schedules
+    // Fetch Existing Schedules
     const startOfDay = targetMoment.startOf("day").toDate();
     const endOfDay = targetMoment.endOf("day").toDate();
 
@@ -97,7 +95,7 @@ export const suggestOptimalTime = async (
 
     console.log(`Found ${busySlots.length} busy slots`);
 
-    // 4. Find Available Slots in Preferred Windows
+    // Find Available Slots in Preferred Windows
     for (const window of preferredWindows) {
       const availableSlot = findFirstAvailableSlotInWindow(
         targetDate,
@@ -119,7 +117,7 @@ export const suggestOptimalTime = async (
       }
     }
 
-    // 5. Reasonable Hours Fallback
+    // Reasonable Hours Fallback
     console.log("No slots in preferred windows, checking reasonable hours");
 
     // For today, start from current time + 30 minutes
@@ -145,7 +143,7 @@ export const suggestOptimalTime = async (
       };
     }
 
-    // 6. Tomorrow Fallback
+    // Tomorrow Fallback
     if (isToday) {
       console.log("No slots today, checking tomorrow");
       const tomorrow = moment().add(1, "day").toDate();
@@ -171,7 +169,6 @@ export const suggestOptimalTime = async (
         }
       }
     }
-
     return null;
   } catch (error) {
     console.error("ScheduleSuggestionService Error:", error);
@@ -319,7 +316,7 @@ export const checkTimeAvailability = async (
     // Add 5-minute buffer
     // If user picks "Now" (e.g. 10:00:00) and hits save at 10:00:10,
     // without this buffer it is technically "in the past".
-    // We allow times up to 5 minutes ago to be valid.
+    // Allow times up to 5 minutes ago to be valid.
     const minimumAllowedTime = moment().subtract(5, "minutes");
 
     if (proposedStart.isBefore(minimumAllowedTime)) {

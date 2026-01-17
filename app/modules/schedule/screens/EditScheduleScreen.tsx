@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import { useState, useEffect } from "react";
 import {
   View,
   Text,
@@ -144,7 +144,7 @@ const EditScheduleScreen = ({ navigation, route }: Props) => {
     const currentUser = auth.currentUser;
     if (!currentUser) return;
 
-    setIsSuggesting(true); // Shows the LoadingIndicator
+    setIsSuggesting(true);
     try {
       const suggestion = await suggestOptimalTime(
         currentUser.uid,
@@ -177,7 +177,7 @@ const EditScheduleScreen = ({ navigation, route }: Props) => {
       console.error("Suggestion Error:", error);
       Alert.alert("Error", "Could not analyze schedule availability.");
     } finally {
-      setIsSuggesting(false); // Hides the LoadingIndicator
+      setIsSuggesting(false);
     }
   };
 
@@ -228,7 +228,7 @@ const EditScheduleScreen = ({ navigation, route }: Props) => {
 
         Alert.alert("Time Conflict", errorMessage, alertButtons);
         setLoading(false);
-        return; // STOP saving
+        return;
       }
 
       const scheduleRef = doc(
@@ -389,7 +389,7 @@ const EditScheduleScreen = ({ navigation, route }: Props) => {
             </>
           )}
 
-          {/* DURATION SELECTOR */}
+          {/* Duration Selector */}
           <Text style={styles.label}>Duration (minutes)</Text>
           <View style={styles.durationContainer}>
             {[30, 45, 60, 75, 90].map((mins) => (

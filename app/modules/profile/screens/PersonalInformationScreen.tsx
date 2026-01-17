@@ -136,7 +136,7 @@ const PersonalInformationScreen: React.FC = () => {
     let calculatedTdee = null;
 
     if (w && h && a && gender && fitnessLevel) {
-      // A. Calculate BMR
+      // Calculate BMR
       let bmr = 10 * w + 6.25 * h - 5 * a;
       if (gender === "Male") {
         bmr += 5;
@@ -145,7 +145,7 @@ const PersonalInformationScreen: React.FC = () => {
       }
       calculatedBmr = Math.round(bmr);
 
-      // B. Calculate TDEE
+      // Calculate TDEE
       let multiplier = 1.2;
       if (fitnessLevel === "Intermediate") multiplier = 1.55;
       if (fitnessLevel === "Advanced") multiplier = 1.725;
@@ -207,7 +207,7 @@ const PersonalInformationScreen: React.FC = () => {
           contentContainerStyle={styles.content}
           keyboardShouldPersistTaps="handled"
         >
-          {/* --- PERSONAL DETAILS SECTION --- */}
+          {/* PERSONAL DETAILS SECTION */}
           <Text style={styles.title}>Personal Details</Text>
 
           <Field
@@ -255,7 +255,7 @@ const PersonalInformationScreen: React.FC = () => {
 
           <Text style={styles.title}>Fitness Profile</Text>
 
-          {/* ✅ Fitness Level Selector */}
+          {/* Fitness Level Selector */}
           <TouchableOpacity
             style={styles.pickerField}
             onPress={() => setShowLevelPicker(true)}
@@ -267,7 +267,7 @@ const PersonalInformationScreen: React.FC = () => {
             </View>
           </TouchableOpacity>
 
-          {/* ✅ Fitness Goal Selector */}
+          {/* Fitness Goal Selector */}
           <TouchableOpacity
             style={[styles.pickerField, { marginTop: 12 }]}
             onPress={() => setShowGoalPicker(true)}
@@ -307,8 +307,6 @@ const PersonalInformationScreen: React.FC = () => {
           </TouchableOpacity>
         </ScrollView>
       </KeyboardAvoidingView>
-
-      {/* --- MODALS --- */}
 
       {/* Gender Picker Modal */}
       <Modal visible={showGenderPicker} transparent animationType="fade">
@@ -384,7 +382,7 @@ const PersonalInformationScreen: React.FC = () => {
         </View>
       </Modal>
 
-      {/* ✅ Goal Picker Modal */}
+      {/* Goal Picker Modal */}
       <Modal visible={showGoalPicker} transparent animationType="fade">
         <View style={styles.modalBackdrop}>
           <View style={styles.modalContent}>

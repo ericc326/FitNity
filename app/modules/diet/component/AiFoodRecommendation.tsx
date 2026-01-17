@@ -16,7 +16,7 @@ import PersonalInfoModal from "../component/PersonalInfoModal";
 import { GEMINI_API_KEY } from "@env";
 import { auth } from "../../../../firebaseConfig";
 
-// 1. UPDATED INTERFACE to include Recipe Details
+// UPDATED INTERFACE to include Recipe Details
 interface FoodItem {
   id: string;
   name: string;
@@ -48,7 +48,7 @@ const AIFoodRecommendation: React.FC<AIFoodRecommendationProps> = ({
   const [recommendations, setRecommendations] = useState<FoodItem[]>([]);
   const [isLoading, setIsLoading] = useState(false);
 
-  // NEW STATE: For viewing recipe details
+  // state for viewing recipe details
   const [selectedRecipe, setSelectedRecipe] = useState<FoodItem | null>(null);
   const [showRecipeModal, setShowRecipeModal] = useState(false);
 
@@ -107,7 +107,7 @@ const AIFoodRecommendation: React.FC<AIFoodRecommendationProps> = ({
       setRecommendations(recommendations);
     } catch (error) {
       console.error("Error generating recommendations:", error);
-      // Fallbacks would go here (omitted for brevity)
+      // Fallbacks (omitted for brevity)
       setRecommendations([]);
     } finally {
       setIsLoading(false);
@@ -124,10 +124,8 @@ const AIFoodRecommendation: React.FC<AIFoodRecommendationProps> = ({
     setShowRecipeModal(true);
   };
 
-  // --- UPDATED FOOD CARD COMPONENT ---
+  // UPDATED FOOD CARD COMPONENT
   const FoodCard = ({ food }: { food: FoodItem }) => {
-    // We remove the isViewOnly check so the button ALWAYS shows
-
     return (
       <View style={styles.foodCard}>
         <View style={styles.foodHeader}>
@@ -138,13 +136,12 @@ const AIFoodRecommendation: React.FC<AIFoodRecommendationProps> = ({
 
           {/* ACTION BUTTONS ROW */}
           <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
-            {/* 1. RECIPE BOOK BUTTON */}
+            {/* RECIPE BOOK BUTTON */}
             <TouchableOpacity onPress={() => handleOpenRecipe(food)}>
               <Ionicons name="book-outline" size={24} color="#2196F3" />
             </TouchableOpacity>
 
-            {/* 2. ADD BUTTON - ALWAYS VISIBLE NOW */}
-            {/* We removed the {!isViewOnly && } check here */}
+            {/* ADD BUTTON */}
             <TouchableOpacity onPress={() => handleSelectFood(food)}>
               <Ionicons name="add-circle" size={32} color="#4CAF50" />
             </TouchableOpacity>
@@ -280,7 +277,7 @@ const AIFoodRecommendation: React.FC<AIFoodRecommendationProps> = ({
         </View>
         {renderContent()}
 
-        {/* --- RECIPE INSTRUCTIONS MODAL --- */}
+        {/* RECIPE INSTRUCTIONS MODAL */}
         <Modal
           visible={showRecipeModal}
           transparent={true}
@@ -341,7 +338,10 @@ const AIFoodRecommendation: React.FC<AIFoodRecommendationProps> = ({
 export default AIFoodRecommendation;
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#f1e3ec" },
+  container: {
+    flex: 1,
+    backgroundColor: "#f1e3ec",
+  },
   modalHeader: {
     flexDirection: "row",
     justifyContent: "space-between",
@@ -392,7 +392,11 @@ const styles = StyleSheet.create({
     alignItems: "center",
     gap: 8,
   },
-  setupButtonText: { color: "white", fontSize: 16, fontWeight: "600" },
+  setupButtonText: {
+    color: "white",
+    fontSize: 16,
+    fontWeight: "600",
+  },
   generateButton: {
     backgroundColor: "#2196F3",
     paddingHorizontal: 24,
@@ -402,24 +406,42 @@ const styles = StyleSheet.create({
     alignItems: "center",
     gap: 8,
   },
-  generateButtonText: { color: "white", fontSize: 16, fontWeight: "600" },
+  generateButtonText: {
+    color: "white",
+    fontSize: 16,
+    fontWeight: "600",
+  },
   recommendationsContainer: { flex: 1 },
-  header: { paddingHorizontal: 20, paddingVertical: 20 },
+  header: {
+    paddingHorizontal: 20,
+    paddingVertical: 20,
+  },
   headerTitle: {
     fontSize: 24,
     fontWeight: "bold",
     color: "#333",
     marginBottom: 4,
   },
-  headerSubtitle: { fontSize: 16, color: "#666", marginBottom: 12 },
+  headerSubtitle: {
+    fontSize: 16,
+    color: "#666",
+    marginBottom: 12,
+  },
   profileInfo: {
     backgroundColor: "#E8F5E8",
     padding: 12,
     borderRadius: 8,
     marginTop: 8,
   },
-  profileText: { fontSize: 12, color: "#4CAF50", fontWeight: "500" },
-  recommendationsList: { paddingHorizontal: 20, gap: 12 },
+  profileText: {
+    fontSize: 12,
+    color: "#4CAF50",
+    fontWeight: "500",
+  },
+  recommendationsList: {
+    paddingHorizontal: 20,
+    gap: 12,
+  },
   foodCard: {
     backgroundColor: "white",
     borderRadius: 16,
@@ -432,12 +454,32 @@ const styles = StyleSheet.create({
     alignItems: "center",
     marginBottom: 12,
   },
-  foodName: { fontSize: 16, fontWeight: "600", color: "#333", flex: 1 },
-  foodCalories: { fontSize: 14, color: "#4CAF50", fontWeight: "600" },
-  nutritionInfo: { flexDirection: "row", gap: 16 },
+  foodName: {
+    fontSize: 16,
+    fontWeight: "600",
+    color: "#333",
+    flex: 1,
+  },
+  foodCalories: {
+    fontSize: 14,
+    color: "#4CAF50",
+    fontWeight: "600",
+  },
+  nutritionInfo: {
+    flexDirection: "row",
+    gap: 16,
+  },
   nutritionItem: { flex: 1 },
-  nutritionLabel: { fontSize: 12, color: "#666", marginBottom: 2 },
-  nutritionValue: { fontSize: 14, fontWeight: "600", color: "#333" },
+  nutritionLabel: {
+    fontSize: 12,
+    color: "#666",
+    marginBottom: 2,
+  },
+  nutritionValue: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: "#333",
+  },
   regenerateButton: {
     flexDirection: "row",
     alignItems: "center",
@@ -450,9 +492,11 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     gap: 8,
   },
-  regenerateButtonText: { fontSize: 16, color: "#4CAF50", fontWeight: "600" },
-
-  // --- NEW RECIPE MODAL STYLES ---
+  regenerateButtonText: {
+    fontSize: 16,
+    color: "#4CAF50",
+    fontWeight: "600",
+  },
   recipeModalOverlay: {
     flex: 1,
     backgroundColor: "rgba(0,0,0,0.5)",
@@ -476,7 +520,11 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     marginBottom: 10,
   },
-  recipeModalTitle: { fontSize: 18, fontWeight: "bold", color: "#333" },
+  recipeModalTitle: {
+    fontSize: 18,
+    fontWeight: "bold",
+    color: "#333",
+  },
   recipeFoodName: {
     fontSize: 22,
     fontWeight: "bold",
@@ -489,7 +537,12 @@ const styles = StyleSheet.create({
     color: "#333",
     marginBottom: 5,
   },
-  recipeText: { fontSize: 14, color: "#555", marginBottom: 4, lineHeight: 20 },
+  recipeText: {
+    fontSize: 14,
+    color: "#555",
+    marginBottom: 4,
+    lineHeight: 20,
+  },
   closeRecipeButton: {
     marginTop: 15,
     backgroundColor: "#2196F3",
@@ -497,5 +550,9 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     alignItems: "center",
   },
-  closeRecipeText: { color: "white", fontWeight: "bold", fontSize: 16 },
+  closeRecipeText: {
+    color: "white",
+    fontWeight: "bold",
+    fontSize: 16,
+  },
 });

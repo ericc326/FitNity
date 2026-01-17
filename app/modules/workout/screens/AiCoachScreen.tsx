@@ -14,8 +14,9 @@ import { useNavigation } from "@react-navigation/native";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { WorkoutStackParamList } from "../navigation/WorkoutNavigator";
 import * as Speech from "expo-speech";
+import { POSETRACKER_API_KEY } from "@env";
 
-const API_KEY = "d2b81624-30bb-4207-92c6-9f879a365eec";
+const API_KEY = POSETRACKER_API_KEY;
 const POSETRACKER_API = "https://app.posetracker.com/pose_tracker/tracking";
 
 // ✅ 1. DEFINE DELAY CONSTANT (4 Seconds)

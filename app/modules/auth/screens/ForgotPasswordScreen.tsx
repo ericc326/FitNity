@@ -1,6 +1,5 @@
 import React, { useState } from "react";
 import {
-  View,
   Text,
   TextInput,
   TouchableOpacity,
@@ -53,7 +52,7 @@ const ForgotPasswordScreen: React.FC<ForgotPasswordScreenProps> = ({
     setLoading(true);
 
     try {
-      // Step 1: Check if email exists in Firestore
+      // Check if email exists in Firestore
       const usersRef = collection(db, "users");
       const q = query(usersRef, where("email", "==", email.toLowerCase()));
       const querySnapshot = await getDocs(q);
@@ -66,7 +65,7 @@ const ForgotPasswordScreen: React.FC<ForgotPasswordScreenProps> = ({
         return;
       }
 
-      // Step 2: If email is found, send reset email
+      // If email is found, send reset email
       await sendPasswordResetEmail(auth, email);
       Alert.alert(
         "Success",

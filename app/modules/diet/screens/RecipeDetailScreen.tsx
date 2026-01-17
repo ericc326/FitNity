@@ -1,4 +1,3 @@
-import React from "react";
 import {
   View,
   Text,
@@ -44,7 +43,7 @@ const RecipeDetailScreen = ({ route, navigation }: Props) => {
 
         <Text style={styles.title}>{recipe.title}</Text>
 
-        {/* 1. Nutrition Card */}
+        {/* Nutrition Card */}
         <View style={styles.card}>
           <Text style={styles.cardHeader}>Nutrition Facts</Text>
           <View style={styles.nutrientRow}>
@@ -72,7 +71,7 @@ const RecipeDetailScreen = ({ route, navigation }: Props) => {
           </View>
         </View>
 
-        {/* 2. Ingredients Section */}
+        {/* Ingredients Section */}
         <View style={styles.sectionContainer}>
           <Text style={styles.sectionTitle}>🛒 Ingredients</Text>
           {ingredients.length > 0 ? (
@@ -87,7 +86,7 @@ const RecipeDetailScreen = ({ route, navigation }: Props) => {
           )}
         </View>
 
-        {/* 3. Instructions Section */}
+        {/* Instructions Section */}
         <View style={styles.sectionContainer}>
           <Text style={styles.sectionTitle}>👨‍🍳 Instructions</Text>
           {instructions.length > 0 ? (
@@ -114,7 +113,10 @@ const RecipeDetailScreen = ({ route, navigation }: Props) => {
 export default RecipeDetailScreen;
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#262135" },
+  container: {
+    flex: 1,
+    backgroundColor: "#262135",
+  },
   scrollView: { flex: 1 },
   backButton: {
     position: "absolute",
@@ -125,7 +127,11 @@ const styles = StyleSheet.create({
     padding: 8,
     borderRadius: 20,
   },
-  image: { width: "100%", height: 300, resizeMode: "cover" },
+  image: {
+    width: "100%",
+    height: 300,
+    resizeMode: "cover",
+  },
   overlay: {
     ...StyleSheet.absoluteFillObject,
     backgroundColor: "rgba(0,0,0,0.3)",
@@ -160,24 +166,51 @@ const styles = StyleSheet.create({
     alignItems: "center",
     paddingVertical: 8,
   },
-  nutrientText: { fontSize: 16, color: "#bfb9d6" },
-  nutrientValue: { fontSize: 16, fontWeight: "bold", color: "#fff" },
+  nutrientText: {
+    fontSize: 16,
+    color: "#bfb9d6",
+  },
+  nutrientValue: {
+    fontSize: 16,
+    fontWeight: "bold",
+    color: "#fff",
+  },
   divider: {
     height: 1,
     backgroundColor: "rgba(255, 255, 255, 0.1)",
     marginVertical: 4,
   },
-  sectionContainer: { paddingHorizontal: 20, marginTop: 10, marginBottom: 10 },
+  sectionContainer: {
+    paddingHorizontal: 20,
+    marginTop: 10,
+    marginBottom: 10,
+  },
   sectionTitle: {
     fontSize: 22,
     fontWeight: "bold",
     color: "#4CAF50",
     marginBottom: 12,
   },
-  listItem: { flexDirection: "row", marginBottom: 8 },
-  bullet: { color: "#4CAF50", fontSize: 18, marginRight: 8, marginTop: -2 },
-  listText: { fontSize: 16, color: "#E0E0E0", lineHeight: 24, flex: 1 },
-  stepContainer: { flexDirection: "row", marginBottom: 16 },
+  listItem: {
+    flexDirection: "row",
+    marginBottom: 8,
+  },
+  bullet: {
+    color: "#4CAF50",
+    fontSize: 18,
+    marginRight: 8,
+    marginTop: -2,
+  },
+  listText: {
+    fontSize: 16,
+    color: "#E0E0E0",
+    lineHeight: 24,
+    flex: 1,
+  },
+  stepContainer: {
+    flexDirection: "row",
+    marginBottom: 16,
+  },
   stepNumber: {
     color: "#262135",
     backgroundColor: "#4CAF50",
@@ -191,5 +224,8 @@ const styles = StyleSheet.create({
     marginTop: 2,
     fontSize: 14,
   },
-  emptyText: { color: "#888", fontStyle: "italic" },
+  emptyText: {
+    color: "#888",
+    fontStyle: "italic",
+  },
 });

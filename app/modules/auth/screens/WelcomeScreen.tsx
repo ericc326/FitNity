@@ -5,7 +5,6 @@ import { RootStackParamList } from "../../../navigation/AppNavigator";
 import { AuthStackParamList } from "../navigation/AuthNavigator";
 import { CompositeNavigationProp } from "@react-navigation/native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { MaterialCommunityIcons } from "@expo/vector-icons";
 
 type WelcomeScreenNavigationProp = CompositeNavigationProp<
   NativeStackNavigationProp<AuthStackParamList, "Welcome">,

@@ -18,7 +18,7 @@ type Props = NativeStackScreenProps<
   "RecommendationWorkout"
 >;
 
-// --- 1. HEURISTIC CLASSIFICATION LOGIC ---
+// HEURISTIC CLASSIFICATION LOGIC
 const categorizeExercise = (exerciseName: string): string => {
   const name = exerciseName.toLowerCase();
   const advancedKeywords = [
@@ -101,11 +101,11 @@ const RecommendationWorkoutScreen: React.FC<Props> = ({
   const userGoal = goal || "Build Muscle";
   const userLevel = level || "Beginner";
 
-  // NEW: State for the Detail Modal
+  // State for the Detail Modal
   const [selectedExercise, setSelectedExercise] = useState<any | null>(null);
   const [modalVisible, setModalVisible] = useState(false);
 
-  // --- 2. THE FILTERING ENGINE ---
+  // FILTERING ENGINE ---
   const personalizedExerciseList = useMemo(() => {
     const rawList = workout.exercises || [];
     const filtered = rawList.filter((ex: any) => {
@@ -123,7 +123,7 @@ const RecommendationWorkoutScreen: React.FC<Props> = ({
     heuristicRules[userGoal]?.[userLevel] ||
     heuristicRules["Build Muscle"]["Beginner"];
 
-  // --- 3. HANDLE EXERCISE CLICK ---
+  // HANDLE EXERCISE CLICK
   const handleExercisePress = (exercise: any) => {
     setSelectedExercise(exercise);
     setModalVisible(true);
@@ -220,7 +220,6 @@ const RecommendationWorkoutScreen: React.FC<Props> = ({
           <Text style={styles.sectionTitle}>Personalized Exercise List</Text>
 
           {personalizedExerciseList.map((exercise: any, index: number) => (
-            // ✅ CHANGED TO TouchableOpacity
             <TouchableOpacity
               key={exercise.id || index}
               style={styles.exerciseCard}
@@ -251,7 +250,7 @@ const RecommendationWorkoutScreen: React.FC<Props> = ({
         </ScrollView>
       </View>
 
-      {/* --- EXERCISE DETAIL MODAL --- */}
+      {/* EXERCISE DETAIL MODAL */}
       <Modal
         animationType="slide"
         transparent={true}
@@ -303,7 +302,7 @@ const RecommendationWorkoutScreen: React.FC<Props> = ({
 
                 {selectedExercise.instructions &&
                 selectedExercise.instructions.length > 0 ? (
-                  // 1. If Firebase has instructions, map through them
+                  // If Firebase has instructions, map through them
                   selectedExercise.instructions.map(
                     (inst: string, idx: number) => (
                       <View key={idx} style={styles.instructionRow}>
@@ -313,7 +312,7 @@ const RecommendationWorkoutScreen: React.FC<Props> = ({
                     )
                   )
                 ) : (
-                  // 2. Fallback for safety if database is empty
+                  // Fallback for safety if database is empty
                   <Text style={styles.instructionText}>
                     Perform this exercise with controlled movement. Focus on
                     form over weight.
@@ -339,10 +338,23 @@ const RecommendationWorkoutScreen: React.FC<Props> = ({
 export default RecommendationWorkoutScreen;
 
 const styles = StyleSheet.create({
-  safeContainer: { flex: 1, backgroundColor: "#262135" },
-  container: { flex: 1, backgroundColor: "#262135" },
-  headerContainer: { height: 250, width: "100%", position: "relative" },
-  headerImage: { width: "100%", height: "100%" },
+  safeContainer: {
+    flex: 1,
+    backgroundColor: "#262135",
+  },
+  container: {
+    flex: 1,
+    backgroundColor: "#262135",
+  },
+  headerContainer: {
+    height: 250,
+    width: "100%",
+    position: "relative",
+  },
+  headerImage: {
+    width: "100%",
+    height: "100%",
+  },
   headerOverlay: {
     ...StyleSheet.absoluteFillObject,
     backgroundColor: "rgba(0,0,0,0.5)",
@@ -364,7 +376,10 @@ const styles = StyleSheet.create({
     fontWeight: "bold",
     marginBottom: 8,
   },
-  badgeRow: { flexDirection: "row", alignItems: "center" },
+  badgeRow: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
   goalBadge: {
     backgroundColor: "#7b68ee",
     paddingHorizontal: 8,
@@ -372,9 +387,20 @@ const styles = StyleSheet.create({
     borderRadius: 4,
     marginRight: 10,
   },
-  goalBadgeText: { color: "#fff", fontSize: 12, fontWeight: "bold" },
-  workoutSubtitle: { color: "#e0e0e0", fontSize: 14, fontWeight: "600" },
-  contentContainer: { flex: 1, padding: 20 },
+  goalBadgeText: {
+    color: "#fff",
+    fontSize: 12,
+    fontWeight: "bold",
+  },
+  workoutSubtitle: {
+    color: "#e0e0e0",
+    fontSize: 14,
+    fontWeight: "600",
+  },
+  contentContainer: {
+    flex: 1,
+    padding: 20,
+  },
   planSummaryContainer: {
     marginBottom: 30,
     backgroundColor: "#2b263d",
@@ -387,7 +413,10 @@ const styles = StyleSheet.create({
     marginBottom: 15,
     lineHeight: 18,
   },
-  planBadgesRow: { flexDirection: "row", justifyContent: "space-between" },
+  planBadgesRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+  },
   badge: {
     backgroundColor: "#4CAF50",
     paddingVertical: 8,
@@ -398,7 +427,11 @@ const styles = StyleSheet.create({
     flex: 0.31,
     justifyContent: "center",
   },
-  badgeText: { color: "#fff", fontWeight: "bold", fontSize: 12 },
+  badgeText: {
+    color: "#fff",
+    fontWeight: "bold",
+    fontSize: 12,
+  },
   sectionTitle: {
     color: "#fff",
     fontSize: 18,
@@ -427,9 +460,10 @@ const styles = StyleSheet.create({
     fontWeight: "bold",
     marginBottom: 4,
   },
-  exerciseDetails: { color: "#aaa", fontSize: 13 },
-
-  // --- MODAL STYLES ---
+  exerciseDetails: {
+    color: "#aaa",
+    fontSize: 13,
+  },
   modalOverlay: {
     flex: 1,
     backgroundColor: "rgba(0,0,0,0.8)",
@@ -440,7 +474,7 @@ const styles = StyleSheet.create({
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
     padding: 24,
-    maxHeight: "85%", // Takes up most of the screen
+    maxHeight: "85%",
   },
   modalHeader: {
     flexDirection: "row",
