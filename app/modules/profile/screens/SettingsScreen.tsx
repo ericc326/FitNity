@@ -223,26 +223,6 @@ const SettingsScreen = () => {
             />
           </TouchableOpacity>
         </View>
-
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Privacy</Text>
-          <TouchableOpacity style={styles.settingItem}>
-            <Text style={styles.settingLabel}>Privacy Policy</Text>
-            <MaterialCommunityIcons
-              name="chevron-right"
-              size={24}
-              color="#8a84a5"
-            />
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.settingItem}>
-            <Text style={styles.settingLabel}>Terms of Service</Text>
-            <MaterialCommunityIcons
-              name="chevron-right"
-              size={24}
-              color="#8a84a5"
-            />
-          </TouchableOpacity>
-        </View>
       </View>
 
       <Modal visible={showTimeModal} transparent animationType="fade">
