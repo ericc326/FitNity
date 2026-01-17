@@ -51,7 +51,7 @@ const DietNavigator: React.FC = () => {
           headerShown: true,
           headerStyle: { backgroundColor: "#262135" },
           headerTintColor: "#fff",
-          title: "AI Meal Planner",
+          title: "AI Food Scanner",
           headerBackTitle: "Back",
         }}
       />
